@@ -119,6 +119,8 @@ const seedDatabase = async () => {
         expectedGuests: 500,
         bookingDeadline: new Date('2026-05-15'),
         status: 'active',
+        approvedBy: admin._id,
+        approvedAt: new Date(),
         pricingTiers: [
           {
             name: 'VIP',
@@ -161,7 +163,9 @@ const seedDatabase = async () => {
         },
         expectedGuests: 150,
         bookingDeadline: new Date('2026-07-10'),
-        status: 'planning',
+        status: 'active',
+        approvedBy: admin._id,
+        approvedAt: new Date(),
         pricingTiers: [
           {
             name: 'Family Suite',
@@ -187,6 +191,34 @@ const seedDatabase = async () => {
             primaryColor: '#ec4899',
             logo: 'https://via.placeholder.com/150',
             bannerImage: 'https://via.placeholder.com/1200x400',
+          },
+        },
+      },
+      {
+        name: 'Annual Sales Conference 2026',
+        type: 'corporate',
+        description: 'Company-wide sales conference with team building activities.',
+        planner: planner._id,
+        startDate: new Date('2026-09-10'),
+        endDate: new Date('2026-09-12'),
+        location: {
+          city: 'Chicago',
+          country: 'USA',
+          venue: 'Hyatt Regency',
+        },
+        expectedGuests: 200,
+        bookingDeadline: new Date('2026-08-10'),
+        status: 'pending-approval',
+        pricingTiers: [],
+        guestEligibilityRules: {
+          requireApproval: false,
+          maxGuestsPerBooking: 2,
+        },
+        micrositeConfig: {
+          isPublished: false,
+          customSlug: 'sales-conference-2026',
+          theme: {
+            primaryColor: '#10b981',
           },
         },
       },

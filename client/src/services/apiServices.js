@@ -14,6 +14,8 @@ export const eventService = {
   create: (data) => api.post('/events', data),
   update: (id, data) => api.put(`/events/${id}`, data),
   delete: (id) => api.delete(`/events/${id}`),
+  approve: (id) => api.put(`/events/${id}/approve`),
+  reject: (id, reason) => api.put(`/events/${id}/reject`, { reason }),
 };
 
 export const inventoryService = {

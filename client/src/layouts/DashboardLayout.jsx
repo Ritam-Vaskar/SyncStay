@@ -61,6 +61,7 @@ export const DashboardLayout = ({ children }) => {
     if (user?.role === 'admin') {
       return [
         ...baseItems,
+        { name: 'Event Approvals', href: '/admin/approvals', icon: FileText },
         { name: 'Users', href: '/admin/users', icon: Users },
         { name: 'All Events', href: '/admin/events', icon: Calendar },
         { name: 'Analytics', href: '/admin/analytics', icon: BarChart3 },

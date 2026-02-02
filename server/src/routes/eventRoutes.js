@@ -6,6 +6,8 @@ import {
   updateEvent,
   deleteEvent,
   getEventBySlug,
+  approveEvent,
+  rejectEvent,
 } from '../controllers/eventController.js';
 import { protect, authorize } from '../middlewares/auth.js';
 import { validateEvent, validateMongoId } from '../middlewares/validators.js';
@@ -28,6 +30,10 @@ router
     auditLogger('event_create', 'Event'),
     createEvent
   );
+
+// Admin approval routes
+router.put('/:id/approve', authorize('admin'), validateMongoId, auditLogger('event_approve', 'Event'), approveEvent);
+router.put('/:id/reject', authorize('admin'), validateMongoId, auditLogger('event_reject', 'Event'), rejectEvent);
 
 router
   .route('/:id')

@@ -7,6 +7,8 @@ import { DashboardLayout } from './layouts/DashboardLayout';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { DashboardPage } from './pages/DashboardPage';
+import { MicrositePage } from './pages/MicrositePage';
+import { AdminApprovalsPage } from './pages/AdminApprovalsPage';
 import { useAuthStore } from './store/authStore';
 
 const queryClient = new QueryClient({
@@ -41,6 +43,9 @@ function App() {
             path="/register"
             element={isAuthenticated ? <Navigate to="/dashboard" /> : <RegisterPage />}
           />
+
+          {/* Public Microsite Route */}
+          <Route path="/microsite/:slug" element={<MicrositePage />} />
 
           {/* Protected Routes */}
           <Route
@@ -161,6 +166,16 @@ function App() {
           />
 
           {/* Admin Routes */}
+          <Route
+            path="/admin/approvals"
+            element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <DashboardLayout>
+                  <AdminApprovalsPage />
+                </DashboardLayout>
+              </ProtectedRoute>
+            }
+          />
           <Route
             path="/admin/users"
             element={

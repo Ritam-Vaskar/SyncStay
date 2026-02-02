@@ -1,0 +1,237 @@
+import React, { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { eventService } from '@/services/apiServices';
+import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { formatDate, formatDistanceDate } from '@/utils/helpers';
+import { CheckCircle, XCircle, Clock, ExternalLink, Calendar, MapPin } from 'lucide-react';
+import toast from 'react-hot-toast';
+
+export const AdminApprovalsPage = () => {
+  const [selectedEvent, setSelectedEvent] = useState(null);
+  const [showRejectModal, setShowRejectModal] = useState(false);
+  const [rejectionReason, setRejectionReason] = useState('');
+  const queryClient = useQueryClient();
+
+  const { data: eventsData, isLoading } = useQuery({
+    queryKey: ['events', 'pending-approval'],
+    queryFn: () => eventService.getAll({ status: 'pending-approval' }),
+  });
+
+  const approveMutation = useMutation({
+    mutationFn: (eventId) => eventService.approve(eventId),
+    onSuccess: (data) => {
+      toast.success(`Event approved! Microsite: ${data.micrositeUrl}`);
+      queryClient.invalidateQueries(['events']);
+    },
+    onError: (error) => {
+      toast.error(error.message || 'Failed to approve event');
+    },
+  });
+
+  const rejectMutation = useMutation({
+    mutationFn: ({ eventId, reason }) => eventService.reject(eventId, reason),
+    onSuccess: () => {
+      toast.success('Event rejected');
+      queryClient.invalidateQueries(['events']);
+      setShowRejectModal(false);
+      setSelectedEvent(null);
+      setRejectionReason('');
+    },
+    onError: (error) => {
+      toast.error(error.message || 'Failed to reject event');
+    },
+  });
+
+  const handleApprove = (event) => {
+    if (window.confirm(`Approve "${event.name}" and publish microsite?`)) {
+      approveMutation.mutate(event._id);
+    }
+  };
+
+  const handleRejectClick = (event) => {
+    setSelectedEvent(event);
+    setShowRejectModal(true);
+  };
+
+  const handleRejectSubmit = () => {
+    if (!rejectionReason.trim()) {
+      toast.error('Please provide a rejection reason');
+      return;
+    }
+    rejectMutation.mutate({ eventId: selectedEvent._id, reason: rejectionReason });
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex justify-center py-12">
+        <LoadingSpinner size="lg" />
+      </div>
+    );
+  }
+
+  const pendingEvents = eventsData?.data || [];
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-3xl font-bold">Event Approvals</h1>
+          <p className="text-gray-600 mt-1">Review and approve events to publish microsites</p>
+        </div>
+        <div className="flex items-center gap-2 px-4 py-2 bg-amber-100 text-amber-800 rounded-lg">
+          <Clock className="h-5 w-5" />
+          <span className="font-semibold">{pendingEvents.length} Pending</span>
+        </div>
+      </div>
+
+      {pendingEvents.length === 0 ? (
+        <div className="card text-center py-12">
+          <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
+          <h3 className="text-xl font-semibold text-gray-900 mb-2">All Caught Up!</h3>
+          <p className="text-gray-600">No events pending approval at the moment.</p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {pendingEvents.map((event) => (
+            <div key={event._id} className="card hover:shadow-lg transition-shadow">
+              <div className="flex flex-col lg:flex-row gap-6">
+                {/* Event Info */}
+                <div className="flex-1">
+                  <div className="flex items-start justify-between mb-4">
+                    <div>
+                      <h3 className="text-2xl font-bold mb-1">{event.name}</h3>
+                      <span className="badge badge-warning">Pending Approval</span>
+                    </div>
+                    <div className="text-right text-sm text-gray-600">
+                      <p>Submitted {formatDistanceDate(event.createdAt)}</p>
+                      <p className="font-medium text-gray-900">{event.planner?.name}</p>
+                      {event.planner?.organization && (
+                        <p className="text-gray-500">{event.planner.organization}</p>
+                      )}
+                    </div>
+                  </div>
+
+                  <p className="text-gray-700 mb-4">{event.description}</p>
+
+                  <div className="grid md:grid-cols-3 gap-4 mb-4">
+                    <div className="flex items-center gap-2 text-sm">
+                      <Calendar className="h-4 w-4 text-gray-500" />
+                      <div>
+                        <p className="text-gray-600">Event Dates</p>
+                        <p className="font-medium">{formatDate(event.startDate)} - {formatDate(event.endDate)}</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 text-sm">
+                      <MapPin className="h-4 w-4 text-gray-500" />
+                      <div>
+                        <p className="text-gray-600">Location</p>
+                        <p className="font-medium">{event.location?.city}, {event.location?.country}</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 text-sm">
+                      <Clock className="h-4 w-4 text-gray-500" />
+                      <div>
+                        <p className="text-gray-600">Booking Deadline</p>
+                        <p className="font-medium">{formatDate(event.bookingDeadline)}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2 mb-4">
+                    <span className="text-xs bg-blue-100 text-blue-800 px-3 py-1 rounded-full">
+                      Type: {event.type}
+                    </span>
+                    <span className="text-xs bg-purple-100 text-purple-800 px-3 py-1 rounded-full">
+                      Expected Guests: {event.expectedGuests}
+                    </span>
+                    {event.micrositeConfig?.customSlug && (
+                      <span className="text-xs bg-gray-100 text-gray-800 px-3 py-1 rounded-full font-mono">
+                        Slug: {event.micrositeConfig.customSlug}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Actions */}
+                <div className="flex flex-col gap-3 lg:w-48">
+                  <button
+                    onClick={() => handleApprove(event)}
+                    disabled={approveMutation.isPending}
+                    className="btn bg-green-600 text-white hover:bg-green-700 flex items-center justify-center gap-2"
+                  >
+                    <CheckCircle className="h-5 w-5" />
+                    Approve & Publish
+                  </button>
+
+                  <button
+                    onClick={() => handleRejectClick(event)}
+                    disabled={rejectMutation.isPending}
+                    className="btn bg-red-600 text-white hover:bg-red-700 flex items-center justify-center gap-2"
+                  >
+                    <XCircle className="h-5 w-5" />
+                    Reject
+                  </button>
+
+                  {event.micrositeConfig?.customSlug && (
+                    <a
+                      href={`/microsite/${event.micrositeConfig.customSlug}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="btn btn-outline flex items-center justify-center gap-2"
+                    >
+                      <ExternalLink className="h-4 w-4" />
+                      Preview
+                    </a>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Rejection Modal */}
+      {showRejectModal && selectedEvent && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl max-w-md w-full p-6">
+            <h3 className="text-xl font-bold mb-4">Reject Event</h3>
+            <p className="text-gray-600 mb-4">
+              Please provide a reason for rejecting <strong>{selectedEvent.name}</strong>
+            </p>
+
+            <textarea
+              value={rejectionReason}
+              onChange={(e) => setRejectionReason(e.target.value)}
+              placeholder="Enter rejection reason..."
+              className="input mb-4"
+              rows="4"
+              autoFocus
+            />
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setShowRejectModal(false);
+                  setSelectedEvent(null);
+                  setRejectionReason('');
+                }}
+                className="btn btn-secondary flex-1"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleRejectSubmit}
+                disabled={rejectMutation.isPending || !rejectionReason.trim()}
+                className="btn bg-red-600 text-white hover:bg-red-700 flex-1"
+              >
+                {rejectMutation.isPending ? 'Rejecting...' : 'Confirm Rejection'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};

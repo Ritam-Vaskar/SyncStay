@@ -66,6 +66,9 @@ export const getEvent = asyncHandler(async (req, res) => {
 export const createEvent = asyncHandler(async (req, res) => {
   // Add planner to event
   req.body.planner = req.user.id;
+  
+  // Set status to pending-approval for planner-created events
+  req.body.status = 'pending-approval';
 
   // Generate custom slug if not provided
   if (!req.body.micrositeConfig?.customSlug) {
@@ -76,6 +79,7 @@ export const createEvent = asyncHandler(async (req, res) => {
     req.body.micrositeConfig = {
       ...req.body.micrositeConfig,
       customSlug: `${slug}-${Date.now()}`,
+      isPublished: false, // Not published until approved
     };
   }
 
@@ -92,7 +96,7 @@ export const createEvent = asyncHandler(async (req, res) => {
 
   res.status(201).json({
     success: true,
-    message: 'Event created successfully',
+    message: 'Event created and submitted for approval',
     data: event,
   });
 });
@@ -201,6 +205,98 @@ export const getEventBySlug = asyncHandler(async (req, res) => {
 
   res.status(200).json({
     success: true,
+    data: event,
+  });
+});
+
+/**
+ * @route   PUT /api/events/:id/approve
+ * @desc    Approve event and publish microsite
+ * @access  Private (Admin only)
+ */
+export const approveEvent = asyncHandler(async (req, res) => {
+  const event = await Event.findById(req.params.id);
+
+  if (!event) {
+    return res.status(404).json({
+      success: false,
+      message: 'Event not found',
+    });
+  }
+
+  if (event.status !== 'pending-approval') {
+    return res.status(400).json({
+      success: false,
+      message: 'Event is not pending approval',
+    });
+  }
+
+  // Approve and publish microsite
+  event.status = 'active';
+  event.approvedBy = req.user.id;
+  event.approvedAt = new Date();
+  event.micrositeConfig.isPublished = true;
+
+  await event.save();
+
+  // Log action
+  await createAuditLog({
+    user: req.user.id,
+    action: 'event_approve',
+    resource: 'Event',
+    resourceId: event._id,
+    status: 'success',
+    details: `Event approved and microsite published: ${event.micrositeConfig.customSlug}`,
+  });
+
+  res.status(200).json({
+    success: true,
+    message: 'Event approved and microsite published',
+    data: event,
+    micrositeUrl: `/microsite/${event.micrositeConfig.customSlug}`,
+  });
+});
+
+/**
+ * @route   PUT /api/events/:id/reject
+ * @desc    Reject event
+ * @access  Private (Admin only)
+ */
+export const rejectEvent = asyncHandler(async (req, res) => {
+  const { reason } = req.body;
+  const event = await Event.findById(req.params.id);
+
+  if (!event) {
+    return res.status(404).json({
+      success: false,
+      message: 'Event not found',
+    });
+  }
+
+  if (event.status !== 'pending-approval') {
+    return res.status(400).json({
+      success: false,
+      message: 'Event is not pending approval',
+    });
+  }
+
+  event.status = 'rejected';
+  event.rejectionReason = reason;
+  await event.save();
+
+  // Log action
+  await createAuditLog({
+    user: req.user.id,
+    action: 'event_reject',
+    resource: 'Event',
+    resourceId: event._id,
+    status: 'success',
+    details: `Rejection reason: ${reason}`,
+  });
+
+  res.status(200).json({
+    success: true,
+    message: 'Event rejected',
     data: event,
   });
 });
