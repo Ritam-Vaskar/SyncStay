@@ -84,14 +84,14 @@ export const MicrositePage = () => {
               <div className="bg-white/90 backdrop-blur px-4 py-2 rounded-lg shadow-lg flex items-center gap-3">
                 <div className="text-right">
                   <p className="text-sm font-semibold text-gray-900">{user?.name}</p>
-                  <p className="text-xs text-gray-600">{user?.email}</p>
+                  <p className="text-xs text-gray-600 capitalize">{user?.role}</p>
                 </div>
                 <Link
-                  to="/dashboard"
+                  to={`/microsite/${slug}/dashboard`}
                   className="btn btn-sm bg-primary-600 text-white hover:bg-primary-700 flex items-center gap-2"
                 >
                   <LayoutDashboard className="h-4 w-4" />
-                  Dashboard
+                  Event Dashboard
                 </Link>
                 <button
                   onClick={handleLogout}

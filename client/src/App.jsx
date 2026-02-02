@@ -1,14 +1,19 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router-dom';
+import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
 import { Toaster } from 'react-hot-toast';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { DashboardLayout } from './layouts/DashboardLayout';
+import { MicrositeDashboardLayout } from './layouts/MicrositeDashboardLayout';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { MicrositePage } from './pages/MicrositePage';
+import { MicrositeGuestDashboard } from './pages/MicrositeGuestDashboard';
+import { MicrositePlannerDashboard } from './pages/MicrositePlannerDashboard';
+import { MicrositeMyBookings } from './pages/MicrositeMyBookings';
 import { AdminApprovalsPage } from './pages/AdminApprovalsPage';
+import { eventService } from './services/apiServices';
 import { useAuthStore } from './store/authStore';
 
 const queryClient = new QueryClient({
@@ -26,6 +31,98 @@ const InventoryPage = () => <div className="card"><h2 className="text-2xl font-b
 const ProposalsPage = () => <div className="card"><h2 className="text-2xl font-bold">Proposals</h2><p className="mt-4">Proposals management coming soon...</p></div>;
 const BookingsPage = () => <div className="card"><h2 className="text-2xl font-bold">Bookings</h2><p className="mt-4">Bookings management coming soon...</p></div>;
 const AnalyticsPage = () => <div className="card"><h2 className="text-2xl font-bold">Analytics</h2><p className="mt-4">Analytics dashboard coming soon...</p></div>;
+
+// Router to decide which microsite dashboard to show based on role
+const MicrositeDashboardRouter = () => {
+  const { user } = useAuthStore();
+  
+  if (user?.role === 'planner') {
+    return <MicrositePlannerDashboard />;
+  }
+  
+  return <MicrositeGuestDashboard />;
+};
+
+// Microsite placeholder pages
+const MicrositePaymentsPlaceholder = () => {
+  const { slug } = useParams();
+  const { data: eventData } = useQuery({
+    queryKey: ['microsite-event', slug],
+    queryFn: () => eventService.getBySlug(slug),
+  });
+  return (
+    <MicrositeDashboardLayout event={eventData?.data}>
+      <div className="card">
+        <h2 className="text-2xl font-bold">Payment History</h2>
+        <p className="mt-4 text-gray-600">Payment tracking coming soon...</p>
+      </div>
+    </MicrositeDashboardLayout>
+  );
+};
+
+const MicrositeInventoryPlaceholder = () => {
+  const { slug } = useParams();
+  const { data: eventData } = useQuery({
+    queryKey: ['microsite-event', slug],
+    queryFn: () => eventService.getBySlug(slug),
+  });
+  return (
+    <MicrositeDashboardLayout event={eventData?.data}>
+      <div className="card">
+        <h2 className="text-2xl font-bold">Manage Inventory</h2>
+        <p className="mt-4 text-gray-600">Inventory management for this event coming soon...</p>
+      </div>
+    </MicrositeDashboardLayout>
+  );
+};
+
+const MicrositeAllBookingsPlaceholder = () => {
+  const { slug } = useParams();
+  const { data: eventData } = useQuery({
+    queryKey: ['microsite-event', slug],
+    queryFn: () => eventService.getBySlug(slug),
+  });
+  return (
+    <MicrositeDashboardLayout event={eventData?.data}>
+      <div className="card">
+        <h2 className="text-2xl font-bold">All Bookings</h2>
+        <p className="mt-4 text-gray-600">View all guest bookings for this event coming soon...</p>
+      </div>
+    </MicrositeDashboardLayout>
+  );
+};
+
+const MicrositeGuestsPlaceholder = () => {
+  const { slug } = useParams();
+  const { data: eventData } = useQuery({
+    queryKey: ['microsite-event', slug],
+    queryFn: () => eventService.getBySlug(slug),
+  });
+  return (
+    <MicrositeDashboardLayout event={eventData?.data}>
+      <div className="card">
+        <h2 className="text-2xl font-bold">Guest List</h2>
+        <p className="mt-4 text-gray-600">View all attendees for this event coming soon...</p>
+      </div>
+    </MicrositeDashboardLayout>
+  );
+};
+
+const MicrositeReportsPlaceholder = () => {
+  const { slug } = useParams();
+  const { data: eventData } = useQuery({
+    queryKey: ['microsite-event', slug],
+    queryFn: () => eventService.getBySlug(slug),
+  });
+  return (
+    <MicrositeDashboardLayout event={eventData?.data}>
+      <div className="card">
+        <h2 className="text-2xl font-bold">Event Reports</h2>
+        <p className="mt-4 text-gray-600">Analytics and reports for this event coming soon...</p>
+      </div>
+    </MicrositeDashboardLayout>
+  );
+};
 
 function App() {
   const { isAuthenticated } = useAuthStore();
@@ -46,6 +143,64 @@ function App() {
 
           {/* Public Microsite Route */}
           <Route path="/microsite/:slug" element={<MicrositePage />} />
+
+          {/* Microsite Dashboard Routes - Protected */}
+          <Route
+            path="/microsite/:slug/dashboard"
+            element={
+              <ProtectedRoute>
+                <MicrositeDashboardRouter />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/microsite/:slug/my-bookings"
+            element={
+              <ProtectedRoute allowedRoles={['guest']}>
+                <MicrositeMyBookings />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/microsite/:slug/payments"
+            element={
+              <ProtectedRoute allowedRoles={['guest']}>
+                <MicrositePaymentsPlaceholder />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/microsite/:slug/inventory"
+            element={
+              <ProtectedRoute allowedRoles={['planner']}>
+                <MicrositeInventoryPlaceholder />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/microsite/:slug/bookings"
+            element={
+              <ProtectedRoute allowedRoles={['planner']}>
+                <MicrositeAllBookingsPlaceholder />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/microsite/:slug/guests"
+            element={
+              <ProtectedRoute allowedRoles={['planner']}>
+                <MicrositeGuestsPlaceholder />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/microsite/:slug/reports"
+            element={
+              <ProtectedRoute allowedRoles={['planner']}>
+                <MicrositeReportsPlaceholder />
+              </ProtectedRoute>
+            }
+          />
 
           {/* Protected Routes */}
           <Route
