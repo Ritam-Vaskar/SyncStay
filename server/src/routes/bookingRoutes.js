@@ -5,6 +5,8 @@ import {
   createBooking,
   confirmBooking,
   cancelBooking,
+  approveBooking,
+  rejectBooking,
 } from '../controllers/bookingController.js';
 import { protect, authorize } from '../middlewares/auth.js';
 import { validateBooking, validateMongoId } from '../middlewares/validators.js';
@@ -32,6 +34,20 @@ router.put(
   authorize('planner', 'hotel', 'admin'),
   validateMongoId,
   confirmBooking
+);
+
+router.put(
+  '/:id/approve',
+  authorize('planner'),
+  validateMongoId,
+  approveBooking
+);
+
+router.put(
+  '/:id/reject',
+  authorize('planner'),
+  validateMongoId,
+  rejectBooking
 );
 
 router.put(

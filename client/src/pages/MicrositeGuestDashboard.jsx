@@ -30,7 +30,8 @@ export const MicrositeGuestDashboard = () => {
     total: bookings.length,
     confirmed: bookings.filter(b => b.status === 'confirmed').length,
     pending: bookings.filter(b => b.status === 'pending').length,
-    totalAmount: bookings.reduce((sum, b) => sum + (b.totalAmount || 0), 0),
+    rejected: bookings.filter(b => b.status === 'rejected').length,
+    totalAmount: bookings.reduce((sum, b) => sum + (b.pricing?.totalAmount || 0), 0),
   };
 
   return (
@@ -157,10 +158,11 @@ export const MicrositeGuestDashboard = () => {
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="font-bold text-gray-900">{formatCurrency(booking.totalAmount)}</p>
+                    <p className="font-bold text-gray-900">{formatCurrency(booking.pricing?.totalAmount || 0)}</p>
                     <span className={`badge ${
                       booking.status === 'confirmed' ? 'badge-success' :
                       booking.status === 'pending' ? 'badge-warning' :
+                      booking.status === 'rejected' ? 'badge-error' :
                       'badge-secondary'
                     }`}>
                       {booking.status}

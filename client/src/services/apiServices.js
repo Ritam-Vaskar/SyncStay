@@ -43,6 +43,8 @@ export const bookingService = {
   getById: (id) => api.get(`/bookings/${id}`),
   create: (data) => api.post('/bookings', data),
   confirm: (id) => api.put(`/bookings/${id}/confirm`),
+  approve: (id) => api.put(`/bookings/${id}/approve`),
+  reject: (id, reason) => api.put(`/bookings/${id}/reject`, { reason }),
   cancel: (id, reason) => api.put(`/bookings/${id}/cancel`, { reason }),
 };
 

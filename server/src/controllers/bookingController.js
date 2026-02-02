@@ -273,3 +273,123 @@ export const cancelBooking = asyncHandler(async (req, res) => {
     data: booking,
   });
 });
+
+/**
+ * @route   PUT /api/bookings/:id/approve
+ * @desc    Approve booking (Planner only)
+ * @access  Private (Planner)
+ */
+export const approveBooking = asyncHandler(async (req, res) => {
+  const booking = await Booking.findById(req.params.id).populate('event');
+
+  if (!booking) {
+    return res.status(404).json({
+      success: false,
+      message: 'Booking not found',
+    });
+  }
+
+  // Check if user is planner of this event
+  if (booking.event.planner.toString() !== req.user.id) {
+    return res.status(403).json({
+      success: false,
+      message: 'Only the event planner can approve bookings',
+    });
+  }
+
+  if (booking.status !== 'pending') {
+    return res.status(400).json({
+      success: false,
+      message: 'Only pending bookings can be approved',
+    });
+  }
+
+  booking.status = 'confirmed';
+  booking.approvedBy = req.user.id;
+  booking.approvedAt = new Date();
+  await booking.save();
+
+  // Log action
+  await createAuditLog({
+    user: req.user.id,
+    action: 'booking_approve',
+    resource: 'Booking',
+    resourceId: booking._id,
+    status: 'success',
+  });
+
+  const populatedBooking = await Booking.findById(booking._id)
+    .populate('event', 'name')
+    .populate('guest', 'name email');
+
+  res.status(200).json({
+    success: true,
+    message: 'Booking approved successfully',
+    data: populatedBooking,
+  });
+});
+
+/**
+ * @route   PUT /api/bookings/:id/reject
+ * @desc    Reject booking (Planner only)
+ * @access  Private (Planner)
+ */
+export const rejectBooking = asyncHandler(async (req, res) => {
+  const { reason } = req.body;
+  const booking = await Booking.findById(req.params.id).populate('event');
+
+  if (!booking) {
+    return res.status(404).json({
+      success: false,
+      message: 'Booking not found',
+    });
+  }
+
+  // Check if user is planner of this event
+  if (booking.event.planner.toString() !== req.user.id) {
+    return res.status(403).json({
+      success: false,
+      message: 'Only the event planner can reject bookings',
+    });
+  }
+
+  if (booking.status !== 'pending') {
+    return res.status(400).json({
+      success: false,
+      message: 'Only pending bookings can be rejected',
+    });
+  }
+
+  // Restore inventory
+  const inventory = await Inventory.findById(booking.inventory);
+  if (inventory) {
+    inventory.availableRooms += booking.roomDetails.numberOfRooms;
+    if (inventory.status === 'sold-out') {
+      inventory.status = 'locked';
+    }
+    await inventory.save();
+  }
+
+  booking.status = 'rejected';
+  booking.rejectionReason = reason || 'No reason provided';
+  await booking.save();
+
+  // Log action
+  await createAuditLog({
+    user: req.user.id,
+    action: 'booking_reject',
+    resource: 'Booking',
+    resourceId: booking._id,
+    status: 'success',
+  });
+
+  const populatedBooking = await Booking.findById(booking._id)
+    .populate('event', 'name')
+    .populate('guest', 'name email');
+
+  res.status(200).json({
+    success: true,
+    message: 'Booking rejected',
+    data: populatedBooking,
+  });
+});

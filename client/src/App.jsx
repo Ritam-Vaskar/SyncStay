@@ -12,6 +12,8 @@ import { MicrositePage } from './pages/MicrositePage';
 import { MicrositeGuestDashboard } from './pages/MicrositeGuestDashboard';
 import { MicrositePlannerDashboard } from './pages/MicrositePlannerDashboard';
 import { MicrositeMyBookings } from './pages/MicrositeMyBookings';
+import { MicrositePlannerBookings } from './pages/MicrositePlannerBookings';
+import { MicrositePlannerGuests } from './pages/MicrositePlannerGuests';
 import { AdminApprovalsPage } from './pages/AdminApprovalsPage';
 import { eventService } from './services/apiServices';
 import { useAuthStore } from './store/authStore';
@@ -76,37 +78,9 @@ const MicrositeInventoryPlaceholder = () => {
   );
 };
 
-const MicrositeAllBookingsPlaceholder = () => {
-  const { slug } = useParams();
-  const { data: eventData } = useQuery({
-    queryKey: ['microsite-event', slug],
-    queryFn: () => eventService.getBySlug(slug),
-  });
-  return (
-    <MicrositeDashboardLayout event={eventData?.data}>
-      <div className="card">
-        <h2 className="text-2xl font-bold">All Bookings</h2>
-        <p className="mt-4 text-gray-600">View all guest bookings for this event coming soon...</p>
-      </div>
-    </MicrositeDashboardLayout>
-  );
-};
 
-const MicrositeGuestsPlaceholder = () => {
-  const { slug } = useParams();
-  const { data: eventData } = useQuery({
-    queryKey: ['microsite-event', slug],
-    queryFn: () => eventService.getBySlug(slug),
-  });
-  return (
-    <MicrositeDashboardLayout event={eventData?.data}>
-      <div className="card">
-        <h2 className="text-2xl font-bold">Guest List</h2>
-        <p className="mt-4 text-gray-600">View all attendees for this event coming soon...</p>
-      </div>
-    </MicrositeDashboardLayout>
-  );
-};
+
+
 
 const MicrositeReportsPlaceholder = () => {
   const { slug } = useParams();
@@ -181,7 +155,7 @@ function App() {
             path="/microsite/:slug/bookings"
             element={
               <ProtectedRoute allowedRoles={['planner']}>
-                <MicrositeAllBookingsPlaceholder />
+                <MicrositePlannerBookings />
               </ProtectedRoute>
             }
           />
@@ -189,7 +163,7 @@ function App() {
             path="/microsite/:slug/guests"
             element={
               <ProtectedRoute allowedRoles={['planner']}>
-                <MicrositeGuestsPlaceholder />
+                <MicrositePlannerGuests />
               </ProtectedRoute>
             }
           />

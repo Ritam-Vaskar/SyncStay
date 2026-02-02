@@ -52,13 +52,23 @@ const bookingSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ['pending', 'confirmed', 'checked-in', 'checked-out', 'cancelled'],
+      enum: ['pending', 'confirmed', 'rejected', 'checked-in', 'checked-out', 'cancelled'],
       default: 'pending',
     },
     paymentStatus: {
       type: String,
       enum: ['unpaid', 'partial', 'paid', 'refunded'],
       default: 'unpaid',
+    },
+    approvedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+    },
+    approvedAt: {
+      type: Date,
+    },
+    rejectionReason: {
+      type: String,
     },
     specialRequests: {
       type: String,
