@@ -16,6 +16,11 @@ import { MicrositeMyBookings } from './pages/MicrositeMyBookings';
 import { MicrositePlannerBookings } from './pages/MicrositePlannerBookings';
 import { MicrositePlannerGuests } from './pages/MicrositePlannerGuests';
 import { AdminApprovalsPage } from './pages/AdminApprovalsPage';
+import { PlannerEventsPage } from './pages/PlannerEventsPage';
+import { CreateProposalPage } from './pages/CreateProposalPage';
+import { PlannerInventoryPage } from './pages/PlannerInventoryPage';
+import { PlannerBookingsPage } from './pages/PlannerBookingsPage';
+import { PlannerAnalyticsPage } from './pages/PlannerAnalyticsPage';
 import { eventService } from './services/apiServices';
 import { useAuthStore } from './store/authStore';
 
@@ -28,12 +33,17 @@ const queryClient = new QueryClient({
   },
 });
 
-// Placeholder pages
-const EventsPage = () => <div className="card"><h2 className="text-2xl font-bold">Events</h2><p className="mt-4">Events management coming soon...</p></div>;
-const InventoryPage = () => <div className="card"><h2 className="text-2xl font-bold">Inventory</h2><p className="mt-4">Inventory management coming soon...</p></div>;
+// Placeholder pages for other roles
 const ProposalsPage = () => <div className="card"><h2 className="text-2xl font-bold">Proposals</h2><p className="mt-4">Proposals management coming soon...</p></div>;
-const BookingsPage = () => <div className="card"><h2 className="text-2xl font-bold">Bookings</h2><p className="mt-4">Bookings management coming soon...</p></div>;
-const AnalyticsPage = () => <div className="card"><h2 className="text-2xl font-bold">Analytics</h2><p className="mt-4">Analytics dashboard coming soon...</p></div>;
+const HotelRfpsPage = () => <div className="card"><h2 className="text-2xl font-bold">Hotel RFPs</h2><p className="mt-4">Hotel RFP management coming soon...</p></div>;
+const HotelInventoryPage = () => <div className="card"><h2 className="text-2xl font-bold">Hotel Inventory</h2><p className="mt-4">Hotel inventory management coming soon...</p></div>;
+const HotelBookingsPage = () => <div className="card"><h2 className="text-2xl font-bold">Hotel Bookings</h2><p className="mt-4">Hotel bookings management coming soon...</p></div>;
+const GuestBookingsPage = () => <div className="card"><h2 className="text-2xl font-bold">My Bookings</h2><p className="mt-4">Guest bookings page coming soon...</p></div>;
+const GuestEventsPage = () => <div className="card"><h2 className="text-2xl font-bold">Browse Events</h2><p className="mt-4">Event browsing coming soon...</p></div>;
+const AdminUsersPage = () => <div className="card"><h2 className="text-2xl font-bold">Users Management</h2><p className="mt-4">User management coming soon...</p></div>;
+const AdminEventsPage = () => <div className="card"><h2 className="text-2xl font-bold">All Events</h2><p className="mt-4">All events overview coming soon...</p></div>;
+const AdminAnalyticsPage = () => <div className="card"><h2 className="text-2xl font-bold">Admin Analytics</h2><p className="mt-4">Analytics dashboard coming soon...</p></div>;
+const AdminLogsPage = () => <div className="card"><h2 className="text-2xl font-bold">Audit Logs</h2><p className="mt-4">Audit logs coming soon...</p></div>;
 
 // Router to decide which microsite dashboard to show based on role
 const MicrositeDashboardRouter = () => {
@@ -198,7 +208,17 @@ function App() {
             element={
               <ProtectedRoute allowedRoles={['planner']}>
                 <DashboardLayout>
-                  <EventsPage />
+                  <PlannerEventsPage />
+                </DashboardLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/planner/proposals/create"
+            element={
+              <ProtectedRoute allowedRoles={['planner']}>
+                <DashboardLayout>
+                  <CreateProposalPage />
                 </DashboardLayout>
               </ProtectedRoute>
             }
@@ -208,7 +228,7 @@ function App() {
             element={
               <ProtectedRoute allowedRoles={['planner']}>
                 <DashboardLayout>
-                  <InventoryPage />
+                  <PlannerInventoryPage />
                 </DashboardLayout>
               </ProtectedRoute>
             }
@@ -228,7 +248,7 @@ function App() {
             element={
               <ProtectedRoute allowedRoles={['planner']}>
                 <DashboardLayout>
-                  <BookingsPage />
+                  <PlannerBookingsPage />
                 </DashboardLayout>
               </ProtectedRoute>
             }
@@ -238,7 +258,7 @@ function App() {
             element={
               <ProtectedRoute allowedRoles={['planner']}>
                 <DashboardLayout>
-                  <AnalyticsPage />
+                  <PlannerAnalyticsPage />
                 </DashboardLayout>
               </ProtectedRoute>
             }
@@ -250,7 +270,7 @@ function App() {
             element={
               <ProtectedRoute allowedRoles={['hotel']}>
                 <DashboardLayout>
-                  <ProposalsPage />
+                  <HotelRfpsPage />
                 </DashboardLayout>
               </ProtectedRoute>
             }
@@ -260,7 +280,7 @@ function App() {
             element={
               <ProtectedRoute allowedRoles={['hotel']}>
                 <DashboardLayout>
-                  <InventoryPage />
+                  <HotelInventoryPage />
                 </DashboardLayout>
               </ProtectedRoute>
             }
@@ -270,7 +290,7 @@ function App() {
             element={
               <ProtectedRoute allowedRoles={['hotel']}>
                 <DashboardLayout>
-                  <BookingsPage />
+                  <HotelBookingsPage />
                 </DashboardLayout>
               </ProtectedRoute>
             }
@@ -282,7 +302,7 @@ function App() {
             element={
               <ProtectedRoute allowedRoles={['guest']}>
                 <DashboardLayout>
-                  <BookingsPage />
+                  <GuestBookingsPage />
                 </DashboardLayout>
               </ProtectedRoute>
             }
@@ -292,7 +312,7 @@ function App() {
             element={
               <ProtectedRoute allowedRoles={['guest']}>
                 <DashboardLayout>
-                  <EventsPage />
+                  <GuestEventsPage />
                 </DashboardLayout>
               </ProtectedRoute>
             }
@@ -314,7 +334,7 @@ function App() {
             element={
               <ProtectedRoute allowedRoles={['admin']}>
                 <DashboardLayout>
-                  <div className="card"><h2 className="text-2xl font-bold">Users</h2></div>
+                  <AdminUsersPage />
                 </DashboardLayout>
               </ProtectedRoute>
             }
@@ -324,7 +344,7 @@ function App() {
             element={
               <ProtectedRoute allowedRoles={['admin']}>
                 <DashboardLayout>
-                  <EventsPage />
+                  <AdminEventsPage />
                 </DashboardLayout>
               </ProtectedRoute>
             }
@@ -334,7 +354,7 @@ function App() {
             element={
               <ProtectedRoute allowedRoles={['admin']}>
                 <DashboardLayout>
-                  <AnalyticsPage />
+                  <AdminAnalyticsPage />
                 </DashboardLayout>
               </ProtectedRoute>
             }
@@ -344,7 +364,7 @@ function App() {
             element={
               <ProtectedRoute allowedRoles={['admin']}>
                 <DashboardLayout>
-                  <div className="card"><h2 className="text-2xl font-bold">Audit Logs</h2></div>
+                  <AdminLogsPage />
                 </DashboardLayout>
               </ProtectedRoute>
             }
