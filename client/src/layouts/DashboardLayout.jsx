@@ -83,7 +83,14 @@ export const DashboardLayout = ({ children }) => {
         <div className="flex h-full flex-col">
           {/* Logo */}
           <div className="flex h-16 items-center justify-between border-b px-6">
-            <h1 className="text-xl font-bold text-primary-600">GroupInv</h1>
+            <Link to="/" className="flex items-center gap-2">
+              <div className="bg-gradient-to-r from-primary-600 to-purple-600 p-2 rounded-lg">
+                <Calendar className="h-5 w-5 text-white" />
+              </div>
+              <span className="text-xl font-bold bg-gradient-to-r from-primary-600 to-purple-600 bg-clip-text text-transparent">
+                StaySync
+              </span>
+            </Link>
             <button
               onClick={() => setSidebarOpen(false)}
               className="lg:hidden"

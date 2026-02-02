@@ -64,10 +64,17 @@ export const MicrositeDashboardLayout = ({ children, event }) => {
         }`}
       >
         <div className="flex flex-col h-full">
-          {/* Event branding */}
-          <div className="p-6 border-b border-gray-200">
+          {/* StaySync Logo */}
+          <div className="px-6 pt-6 pb-2 border-b border-gray-200">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-bold text-gray-900">{event?.name}</h2>
+              <Link to="/" className="flex items-center gap-2">
+                <div className="bg-gradient-to-r from-primary-600 to-purple-600 p-2 rounded-lg">
+                  <Calendar className="h-5 w-5 text-white" />
+                </div>
+                <span className="text-xl font-bold bg-gradient-to-r from-primary-600 to-purple-600 bg-clip-text text-transparent">
+                  StaySync
+                </span>
+              </Link>
               <button
                 onClick={() => setSidebarOpen(false)}
                 className="lg:hidden text-gray-400 hover:text-gray-600"
@@ -75,6 +82,11 @@ export const MicrositeDashboardLayout = ({ children, event }) => {
                 <X className="h-6 w-6" />
               </button>
             </div>
+          </div>
+
+          {/* Event branding */}
+          <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
+            <h2 className="text-lg font-bold text-gray-900 mb-1">{event?.name}</h2>
             <div className="flex items-center gap-2 text-sm text-gray-600">
               <Calendar className="h-4 w-4" />
               <span>Event Dashboard</span>
