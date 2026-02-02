@@ -1,17 +1,21 @@
 import React, { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { eventService, inventoryService, bookingService } from '@/services/apiServices';
+import { eventService, inventoryService, bookingService, authService } from '@/services/apiServices';
 import { LoadingPage } from '@/components/LoadingSpinner';
 import { formatCurrency, formatDate } from '@/utils/helpers';
-import { Calendar, MapPin, Users, Hotel, Check, X } from 'lucide-react';
+import { Calendar, MapPin, Users, Hotel, Check, X, LogIn, UserPlus, LogOut, LayoutDashboard } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { useAuthStore } from '@/store/authStore';
 
 export const MicrositePage = () => {
   const { slug } = useParams();
   const navigate = useNavigate();
+  const { isAuthenticated, user, setAuth, clearAuth } = useAuthStore();
   const [selectedInventory, setSelectedInventory] = useState(null);
   const [showBookingForm, setShowBookingForm] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [authMode, setAuthMode] = useState('login'); // 'login' or 'register'
 
   const { data: eventData, isLoading: eventLoading } = useQuery({
     queryKey: ['microsite', slug],
@@ -45,8 +49,19 @@ export const MicrositePage = () => {
   const theme = event.micrositeConfig?.theme || {};
 
   const handleBookNow = (item) => {
+    if (!isAuthenticated) {
+      toast.error('Please login to book');
+      setAuthMode('login');
+      setShowAuthModal(true);
+      return;
+    }
     setSelectedInventory(item);
     setShowBookingForm(true);
+  };
+
+  const handleLogout = () => {
+    clearAuth();
+    toast.success('Logged out successfully');
   };
 
   return (
@@ -61,6 +76,58 @@ export const MicrositePage = () => {
         }}
       >
         <div className="absolute inset-0 bg-black bg-opacity-40" />
+        
+        {/* Auth Header Bar */}
+        <div className="absolute top-0 right-0 p-4 z-10">
+          {isAuthenticated ? (
+            <div className="flex items-center gap-3">
+              <div className="bg-white/90 backdrop-blur px-4 py-2 rounded-lg shadow-lg flex items-center gap-3">
+                <div className="text-right">
+                  <p className="text-sm font-semibold text-gray-900">{user?.name}</p>
+                  <p className="text-xs text-gray-600">{user?.email}</p>
+                </div>
+                <Link
+                  to="/dashboard"
+                  className="btn btn-sm bg-primary-600 text-white hover:bg-primary-700 flex items-center gap-2"
+                >
+                  <LayoutDashboard className="h-4 w-4" />
+                  Dashboard
+                </Link>
+                <button
+                  onClick={handleLogout}
+                  className="btn btn-sm bg-white text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+                >
+                  <LogOut className="h-4 w-4" />
+                  Logout
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  setAuthMode('login');
+                  setShowAuthModal(true);
+                }}
+                className="btn btn-sm bg-white text-gray-700 hover:bg-gray-100 flex items-center gap-2 shadow-lg"
+              >
+                <LogIn className="h-4 w-4" />
+                Login
+              </button>
+              <button
+                onClick={() => {
+                  setAuthMode('register');
+                  setShowAuthModal(true);
+                }}
+                className="btn btn-sm bg-primary-600 text-white hover:bg-primary-700 flex items-center gap-2 shadow-lg"
+              >
+                <UserPlus className="h-4 w-4" />
+                Register
+              </button>
+            </div>
+          )}
+        </div>
+        
         <div className="relative container mx-auto px-6 h-full flex flex-col justify-center">
           {theme.logo && (
             <img src={theme.logo} alt="Logo" className="h-16 mb-4" />
@@ -213,22 +280,37 @@ export const MicrositePage = () => {
         <BookingModal
           inventory={selectedInventory}
           event={event}
+          user={user}
           onClose={() => {
             setShowBookingForm(false);
             setSelectedInventory(null);
           }}
         />
       )}
+
+      {/* Auth Modal */}
+      {showAuthModal && (
+        <AuthModal
+          mode={authMode}
+          onClose={() => setShowAuthModal(false)}
+          onSuccess={(userData, token) => {
+            setAuth(userData, token);
+            setShowAuthModal(false);
+            toast.success(`${authMode === 'login' ? 'Logged in' : 'Registered'} successfully!`);
+          }}
+          onSwitchMode={() => setAuthMode(authMode === 'login' ? 'register' : 'login')}
+        />
+      )}
     </div>
   );
 };
 
-const BookingModal = ({ inventory, event, onClose }) => {
+const BookingModal = ({ inventory, event, user, onClose }) => {
   const [formData, setFormData] = useState({
     numberOfRooms: 1,
-    guestName: '',
-    guestEmail: '',
-    guestPhone: '',
+    guestName: user?.name || '',
+    guestEmail: user?.email || '',
+    guestPhone: user?.phone || '',
     specialRequests: '',
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -359,6 +441,151 @@ const BookingModal = ({ inventory, event, onClose }) => {
               </button>
             </div>
           </form>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const AuthModal = ({ mode, onClose, onSuccess, onSwitchMode }) => {
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    password: '',
+    phone: '',
+    organization: '',
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+
+    try {
+      let response;
+      if (mode === 'login') {
+        response = await authService.login({
+          email: formData.email,
+          password: formData.password,
+        });
+      } else {
+        response = await authService.register({
+          ...formData,
+          role: 'guest', // Default role for microsite registrations
+        });
+      }
+
+      onSuccess(response.data.user, response.data.token);
+    } catch (error) {
+      toast.error(error.message || `${mode === 'login' ? 'Login' : 'Registration'} failed`);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+        <div className="p-6">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl font-bold">
+              {mode === 'login' ? 'Login to Book' : 'Create Account'}
+            </h2>
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+              <X className="h-6 w-6" />
+            </button>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {mode === 'register' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Full Name</label>
+                <input
+                  type="text"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  className="input"
+                  required
+                />
+              </div>
+            )}
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
+              <input
+                type="email"
+                value={formData.email}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                className="input"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Password</label>
+              <input
+                type="password"
+                value={formData.password}
+                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                className="input"
+                minLength="6"
+                required
+              />
+            </div>
+
+            {mode === 'register' && (
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Phone</label>
+                  <input
+                    type="tel"
+                    value={formData.phone}
+                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                    className="input"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Organization (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.organization}
+                    onChange={(e) => setFormData({ ...formData, organization: e.target.value })}
+                    className="input"
+                  />
+                </div>
+              </>
+            )}
+
+            <button type="submit" disabled={isSubmitting} className="btn btn-primary w-full">
+              {isSubmitting
+                ? 'Please wait...'
+                : mode === 'login'
+                ? 'Login'
+                : 'Create Account'}
+            </button>
+          </form>
+
+          <div className="mt-4 text-center">
+            <button
+              onClick={onSwitchMode}
+              className="text-sm text-primary-600 hover:text-primary-700 font-medium"
+            >
+              {mode === 'login'
+                ? "Don't have an account? Register"
+                : 'Already have an account? Login'}
+            </button>
+          </div>
+
+          <div className="mt-4 p-4 bg-blue-50 rounded-lg">
+            <p className="text-sm text-gray-700">
+              <strong>Note:</strong> Your account will be synced with the main dashboard. After booking,
+              you can manage your bookings from the dashboard.
+            </p>
+          </div>
         </div>
       </div>
     </div>
