@@ -1,5 +1,5 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 import { Calendar, Package, CreditCard, TrendingUp, Users, DollarSign } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 import { useQuery } from '@tanstack/react-query';
@@ -9,6 +9,11 @@ import { formatCurrency } from '@/utils/helpers';
 
 export const DashboardPage = () => {
   const { user } = useAuthStore();
+
+  // Redirect hotel users to their specific dashboard
+  if (user?.role === 'hotel') {
+    return <Navigate to="/hotel/dashboard" replace />;
+  }
 
   const { data: events, isLoading: eventsLoading } = useQuery({
     queryKey: ['events'],

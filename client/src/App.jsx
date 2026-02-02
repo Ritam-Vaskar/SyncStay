@@ -21,6 +21,10 @@ import { CreateProposalPage } from './pages/CreateProposalPage';
 import { PlannerInventoryPage } from './pages/PlannerInventoryPage';
 import { PlannerBookingsPage } from './pages/PlannerBookingsPage';
 import { PlannerAnalyticsPage } from './pages/PlannerAnalyticsPage';
+import { HotelDashboardPage } from './pages/HotelDashboardPage';
+import { HotelRfpsPage } from './pages/HotelRfpsPage';
+import { HotelInventoryPage } from './pages/HotelInventoryPage';
+import { HotelBookingsPage } from './pages/HotelBookingsPage';
 import { eventService } from './services/apiServices';
 import { useAuthStore } from './store/authStore';
 
@@ -35,9 +39,6 @@ const queryClient = new QueryClient({
 
 // Placeholder pages for other roles
 const ProposalsPage = () => <div className="card"><h2 className="text-2xl font-bold">Proposals</h2><p className="mt-4">Proposals management coming soon...</p></div>;
-const HotelRfpsPage = () => <div className="card"><h2 className="text-2xl font-bold">Hotel RFPs</h2><p className="mt-4">Hotel RFP management coming soon...</p></div>;
-const HotelInventoryPage = () => <div className="card"><h2 className="text-2xl font-bold">Hotel Inventory</h2><p className="mt-4">Hotel inventory management coming soon...</p></div>;
-const HotelBookingsPage = () => <div className="card"><h2 className="text-2xl font-bold">Hotel Bookings</h2><p className="mt-4">Hotel bookings management coming soon...</p></div>;
 const GuestBookingsPage = () => <div className="card"><h2 className="text-2xl font-bold">My Bookings</h2><p className="mt-4">Guest bookings page coming soon...</p></div>;
 const GuestEventsPage = () => <div className="card"><h2 className="text-2xl font-bold">Browse Events</h2><p className="mt-4">Event browsing coming soon...</p></div>;
 const AdminUsersPage = () => <div className="card"><h2 className="text-2xl font-bold">Users Management</h2><p className="mt-4">User management coming soon...</p></div>;
@@ -265,6 +266,16 @@ function App() {
           />
 
           {/* Hotel Routes */}
+          <Route
+            path="/hotel/dashboard"
+            element={
+              <ProtectedRoute allowedRoles={['hotel']}>
+                <DashboardLayout>
+                  <HotelDashboardPage />
+                </DashboardLayout>
+              </ProtectedRoute>
+            }
+          />
           <Route
             path="/hotel/rfps"
             element={

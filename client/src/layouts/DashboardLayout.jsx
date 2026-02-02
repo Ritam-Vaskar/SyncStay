@@ -12,6 +12,7 @@ import {
   Menu,
   X,
   Users,
+  Home,
 } from 'lucide-react';
 
 export const DashboardLayout = ({ children }) => {
@@ -44,6 +45,7 @@ export const DashboardLayout = ({ children }) => {
     if (user?.role === 'hotel') {
       return [
         ...baseItems,
+        { name: 'Overview', href: '/hotel/dashboard', icon: Home },
         { name: 'RFPs', href: '/hotel/rfps', icon: FileText },
         { name: 'My Inventory', href: '/hotel/inventory', icon: Package },
         { name: 'Bookings', href: '/hotel/bookings', icon: CreditCard },
