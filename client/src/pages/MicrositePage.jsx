@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { eventService, inventoryService, bookingService, authService } from '@/services/apiServices';
+import { guestInvitationService } from '@/services/guestInvitationService';
 import { LoadingPage } from '@/components/LoadingSpinner';
 import { formatCurrency, formatDate } from '@/utils/helpers';
-import { Calendar, MapPin, Users, Hotel, Check, X, LogIn, UserPlus, LogOut, LayoutDashboard } from 'lucide-react';
+import { Calendar, MapPin, Users, Hotel, Check, X, LogIn, UserPlus, LogOut, LayoutDashboard, Lock, Mail } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '@/store/authStore';
 
@@ -16,6 +17,9 @@ export const MicrositePage = () => {
   const [showBookingForm, setShowBookingForm] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authMode, setAuthMode] = useState('login'); // 'login' or 'register'
+  const [showAccessModal, setShowAccessModal] = useState(false);
+  const [accessEmail, setAccessEmail] = useState('');
+  const [hasAccess, setHasAccess] = useState(null); // null = not checked, true = has access, false = denied
 
   const { data: eventData, isLoading: eventLoading } = useQuery({
     queryKey: ['microsite', slug],
@@ -27,6 +31,98 @@ export const MicrositePage = () => {
     queryFn: () => inventoryService.getAvailable(eventData.data._id),
     enabled: !!eventData?.data?._id,
   });
+
+  // Check access for private events
+  useEffect(() => {
+    const checkAccess = async () => {
+      if (eventData?.data) {
+        const event = eventData.data;
+        
+        // Public events - grant access immediately
+        if (!event.isPrivate) {
+          setHasAccess(true);
+          return;
+        }
+
+        // Wait a bit for Zustand to hydrate from localStorage on fresh page load
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        // Re-check authentication state after hydration
+        const token = localStorage.getItem('token');
+        const savedUser = localStorage.getItem('user');
+        const isUserAuthenticated = isAuthenticated || (token && savedUser);
+        const currentUser = user || (savedUser ? JSON.parse(savedUser) : null);
+
+        // Planners always have access to their own events
+        if (isUserAuthenticated && currentUser?.role === 'planner') {
+          setHasAccess(true);
+          return;
+        }
+
+        // Admins always have access
+        if (isUserAuthenticated && currentUser?.role === 'admin') {
+          setHasAccess(true);
+          return;
+        }
+
+        // Private events - check if guest is invited
+        if (isUserAuthenticated && currentUser?.email) {
+          try {
+            const response = await guestInvitationService.verifyGuestAccess(slug, currentUser.email);
+            if (response.data.hasAccess) {
+              setHasAccess(true);
+              localStorage.setItem(`access_${slug}`, currentUser.email);
+            } else {
+              setHasAccess(false);
+              setShowAccessModal(true);
+            }
+          } catch (error) {
+            setHasAccess(false);
+            setShowAccessModal(true);
+          }
+        } else {
+          // Not authenticated - check if previously verified
+          const savedEmail = localStorage.getItem(`access_${slug}`);
+          if (savedEmail) {
+            setAccessEmail(savedEmail);
+            try {
+              const response = await guestInvitationService.verifyGuestAccess(slug, savedEmail);
+              setHasAccess(response.data.hasAccess);
+              if (!response.data.hasAccess) {
+                setShowAccessModal(true);
+              }
+            } catch (error) {
+              setHasAccess(false);
+              setShowAccessModal(true);
+            }
+          } else {
+            setShowAccessModal(true);
+          }
+        }
+      }
+    };
+
+    if (!eventLoading && eventData?.data) {
+      checkAccess();
+    }
+  }, [eventData, eventLoading, slug, isAuthenticated, user]);
+
+  const handleAccessVerification = async (e) => {
+    e.preventDefault();
+    try {
+      const response = await guestInvitationService.verifyGuestAccess(slug, accessEmail);
+      if (response.data.hasAccess) {
+        setHasAccess(true);
+        setShowAccessModal(false);
+        localStorage.setItem(`access_${slug}`, accessEmail);
+        toast.success(`Welcome, ${response.data.guestInfo.name}!`);
+      } else {
+        toast.error('You are not invited to this private event');
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Access denied');
+    }
+  };
 
   if (eventLoading) return <LoadingPage />;
 
@@ -47,6 +143,72 @@ export const MicrositePage = () => {
   const event = eventData.data;
   const inventory = inventoryData?.data || [];
   const theme = event.micrositeConfig?.theme || {};
+
+  // Show loading while checking access for private events
+  if (event.isPrivate && hasAccess === null) {
+    return <LoadingPage />;
+  }
+
+  // Block content if private event and access denied
+  if (event.isPrivate && hasAccess === false) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        {showAccessModal && hasAccess === false && (
+          <div className="fixed inset-0 bg-black bg-opacity-75 z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl max-w-md w-full p-8 shadow-2xl">
+              <div className="text-center mb-6">
+                <div className="bg-purple-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Lock className="h-8 w-8 text-purple-600" />
+                </div>
+                <h2 className="text-2xl font-bold text-gray-900 mb-2">Private Event</h2>
+                <p className="text-gray-600">
+                  This is a private event. Please enter your email to verify your invitation.
+                </p>
+              </div>
+
+              <form onSubmit={handleAccessVerification} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Email Address
+                  </label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                    <input
+                      type="email"
+                      value={accessEmail}
+                      onChange={(e) => setAccessEmail(e.target.value)}
+                      placeholder="your.email@example.com"
+                      required
+                      className="input pl-10"
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  className="btn btn-primary w-full"
+                >
+                  Verify Access
+                </button>
+              </form>
+
+              <div className="mt-6 p-4 bg-blue-50 rounded-lg">
+                <p className="text-sm text-gray-700">
+                  <strong>Note:</strong> Only guests invited by the event planner can access this microsite.
+                  If you believe this is an error, please contact the event organizer.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Show loading while checking access for private events
+  if (event.isPrivate && hasAccess === null) {
+    return <LoadingPage />;
+  }
 
   const handleBookNow = (item) => {
     if (!isAuthenticated) {

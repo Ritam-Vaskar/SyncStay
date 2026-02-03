@@ -60,6 +60,10 @@ const bookingSchema = new mongoose.Schema(
       enum: ['unpaid', 'partial', 'paid', 'refunded'],
       default: 'unpaid',
     },
+    isPaidByPlanner: {
+      type: Boolean,
+      default: false,
+    },
     approvedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',

@@ -118,6 +118,9 @@ export const createBooking = asyncHandler(async (req, res) => {
   const discount = req.body.pricing?.discount || 0;
   const totalAmount = subtotal + tax - discount;
 
+  // Check if event is private - planner pays for all bookings
+  const isPaidByPlanner = eventDoc.isPrivate;
+
   // Create booking
   const booking = await Booking.create({
     event,
@@ -147,7 +150,8 @@ export const createBooking = asyncHandler(async (req, res) => {
     },
     specialRequests: req.body.specialRequests || '',
     status: 'pending',
-    paymentStatus: 'unpaid',
+    paymentStatus: isPaidByPlanner ? 'unpaid' : 'unpaid',
+    isPaidByPlanner,
   });
 
   // Update inventory
@@ -158,8 +162,11 @@ export const createBooking = asyncHandler(async (req, res) => {
   }
   await inventoryDoc.save();
 
-  // Update event stats
+  // Update event stats and total guest cost for private events
   eventDoc.totalBookings += 1;
+  if (isPaidByPlanner) {
+    eventDoc.totalGuestCost = (eventDoc.totalGuestCost || 0) + totalAmount;
+  }
   await eventDoc.save();
 
   // Log action
@@ -391,5 +398,82 @@ export const rejectBooking = asyncHandler(async (req, res) => {
     success: true,
     message: 'Booking rejected',
     data: populatedBooking,
+  });
+});
+
+/**
+ * @route   GET /api/bookings/planner/:eventId/billing
+ * @desc    Get aggregated billing for private event (planner view)
+ * @access  Private (Planner)
+ */
+export const getPlannerBilling = asyncHandler(async (req, res) => {
+  const { eventId } = req.params;
+
+  const event = await Event.findById(eventId);
+  
+  if (!event) {
+    return res.status(404).json({
+      success: false,
+      message: 'Event not found',
+    });
+  }
+
+  // Check if user is the planner
+  if (event.planner.toString() !== req.user.id) {
+    return res.status(403).json({
+      success: false,
+      message: 'Not authorized to view billing for this event',
+    });
+  }
+
+  if (!event.isPrivate) {
+    return res.status(400).json({
+      success: false,
+      message: 'This endpoint is only for private events',
+    });
+  }
+
+  // Get all bookings for this event
+  const bookings = await Booking.find({ event: eventId, isPaidByPlanner: true })
+    .populate('guest', 'name email')
+    .populate('inventory', 'hotelName roomType')
+    .sort('createdAt');
+
+  // Calculate totals
+  const totalCost = bookings.reduce((sum, booking) => sum + booking.pricing.totalAmount, 0);
+  const confirmedBookings = bookings.filter(b => b.status === 'confirmed');
+  const pendingBookings = bookings.filter(b => b.status === 'pending');
+  const totalConfirmedCost = confirmedBookings.reduce((sum, b) => sum + b.pricing.totalAmount, 0);
+  const totalPendingCost = pendingBookings.reduce((sum, b) => sum + b.pricing.totalAmount, 0);
+
+  res.status(200).json({
+    success: true,
+    data: {
+      eventName: event.name,
+      isPrivate: event.isPrivate,
+      totalGuests: event.invitedGuests.length,
+      bookingsCount: bookings.length,
+      confirmedCount: confirmedBookings.length,
+      pendingCount: pendingBookings.length,
+      totalCost,
+      totalConfirmedCost,
+      totalPendingCost,
+      plannerPaidAmount: event.plannerPaidAmount || 0,
+      remainingBalance: totalCost - (event.plannerPaidAmount || 0),
+      bookings: bookings.map(b => ({
+        bookingId: b.bookingId,
+        guest: b.guest,
+        hotel: b.roomDetails.hotelName,
+        roomType: b.roomDetails.roomType,
+        rooms: b.roomDetails.numberOfRooms,
+        nights: b.roomDetails.numberOfNights,
+        checkIn: b.roomDetails.checkIn,
+        checkOut: b.roomDetails.checkOut,
+        totalAmount: b.pricing.totalAmount,
+        status: b.status,
+        paymentStatus: b.paymentStatus,
+        createdAt: b.createdAt,
+      })),
+    },
   });
 });

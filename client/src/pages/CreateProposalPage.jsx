@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { Calendar, MapPin, Users, Clock, DollarSign, Hotel, FileText } from 'lucide-react';
+import { Calendar, MapPin, Users, Clock, DollarSign, Hotel, FileText, Lock, Unlock } from 'lucide-react';
 import { eventService } from '@/services/apiServices';
 import toast from 'react-hot-toast';
 
@@ -20,6 +20,7 @@ export const CreateProposalPage = () => {
     bookingDeadline: '',
     budget: '',
     specialRequirements: '',
+    isPrivate: false,
     accommodationNeeds: {
       totalRooms: '',
       roomTypes: {
@@ -200,6 +201,31 @@ export const CreateProposalPage = () => {
                 <option value="exhibition">Exhibition</option>
                 <option value="other">Other</option>
               </select>
+            </div>
+
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Event Privacy
+              </label>
+              <div className="flex items-center gap-4 p-4 border rounded-lg bg-gray-50">
+                <button
+                  type="button"
+                  onClick={() => setFormData(prev => ({ ...prev, isPrivate: !prev.isPrivate }))}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
+                    formData.isPrivate
+                      ? 'bg-primary-600 text-white'
+                      : 'bg-white text-gray-700 border-2 border-gray-300'
+                  }`}
+                >
+                  {formData.isPrivate ? <Lock className="h-5 w-5" /> : <Unlock className="h-5 w-5" />}
+                  {formData.isPrivate ? 'Private Event' : 'Public Event'}
+                </button>
+                <p className="text-sm text-gray-600">
+                  {formData.isPrivate
+                    ? 'Only invited guests can access and book. You\'ll manage the guest list after approval.'
+                    : 'Anyone can access the microsite and book accommodations.'}
+                </p>
+              </div>
             </div>
 
             <div>

@@ -18,9 +18,11 @@ import {
   Phone,
   MapPin
 } from 'lucide-react';
+import { useAuthStore } from '../store/authStore';
 
 export const LandingPage = () => {
   const navigate = useNavigate();
+  const { isAuthenticated, user } = useAuthStore();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [demoForm, setDemoForm] = useState({
     name: '',
@@ -117,8 +119,19 @@ export const LandingPage = () => {
               <a href="#how-it-works" className="text-gray-600 hover:text-primary-600 transition-colors">How It Works</a>
               <a href="#testimonials" className="text-gray-600 hover:text-primary-600 transition-colors">Testimonials</a>
               <a href="#contact" className="text-gray-600 hover:text-primary-600 transition-colors">Contact</a>
-              <Link to="/login" className="text-gray-600 hover:text-primary-600 transition-colors">Login</Link>
-              <Link to="/register" className="btn btn-primary">Get Started</Link>
+              {isAuthenticated ? (
+                <Link 
+                  to={user?.role === 'hotel' ? '/hotel/dashboard' : '/dashboard'} 
+                  className="btn btn-primary"
+                >
+                  Go to Dashboard
+                </Link>
+              ) : (
+                <>
+                  <Link to="/login" className="text-gray-600 hover:text-primary-600 transition-colors">Login</Link>
+                  <Link to="/register" className="btn btn-primary">Get Started</Link>
+                </>
+              )}
             </div>
 
             {/* Mobile Menu Button */}
@@ -137,8 +150,19 @@ export const LandingPage = () => {
               <a href="#how-it-works" className="block text-gray-600 hover:text-primary-600">How It Works</a>
               <a href="#testimonials" className="block text-gray-600 hover:text-primary-600">Testimonials</a>
               <a href="#contact" className="block text-gray-600 hover:text-primary-600">Contact</a>
-              <Link to="/login" className="block text-gray-600 hover:text-primary-600">Login</Link>
-              <Link to="/register" className="btn btn-primary w-full">Get Started</Link>
+              {isAuthenticated ? (
+                <Link 
+                  to={user?.role === 'hotel' ? '/hotel/dashboard' : '/dashboard'} 
+                  className="btn btn-primary w-full"
+                >
+                  Go to Dashboard
+                </Link>
+              ) : (
+                <>
+                  <Link to="/login" className="block text-gray-600 hover:text-primary-600">Login</Link>
+                  <Link to="/register" className="btn btn-primary w-full">Get Started</Link>
+                </>
+              )}
             </div>
           )}
         </div>

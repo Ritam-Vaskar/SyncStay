@@ -11,7 +11,9 @@ import {
   XCircle,
   AlertCircle,
   ExternalLink,
-  Copy
+  Copy,
+  Lock,
+  UserCog
 } from 'lucide-react';
 import { eventService } from '@/services/apiServices';
 import toast from 'react-hot-toast';
@@ -193,6 +195,12 @@ export const PlannerEventsPage = () => {
                         <StatusIcon className="h-3 w-3" />
                         {statusConfig.label}
                       </span>
+                      {event.isPrivate && (
+                        <span className="px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1 bg-purple-100 text-purple-800">
+                          <Lock className="h-3 w-3" />
+                          Private
+                        </span>
+                      )}
                     </div>
                     <p className="text-gray-600">{event.description}</p>
                   </div>
@@ -263,7 +271,7 @@ export const PlannerEventsPage = () => {
                       </button>
                       <Link
                         to={`/microsite/${event.micrositeUrl}/dashboard`}
-                        className="btn btn-sm bg-purple-600 text-white hover:bg-purple-700"
+                        className="btn btn-sm bg-indigo-600 text-white hover:bg-indigo-700"
                       >
                         Event Dashboard
                       </Link>

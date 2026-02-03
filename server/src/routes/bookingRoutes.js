@@ -7,6 +7,7 @@ import {
   cancelBooking,
   approveBooking,
   rejectBooking,
+  getPlannerBilling,
 } from '../controllers/bookingController.js';
 import { protect, authorize } from '../middlewares/auth.js';
 import { validateBooking, validateMongoId } from '../middlewares/validators.js';
@@ -55,6 +56,12 @@ router.put(
   validateMongoId,
   auditLogger('booking_cancel', 'Booking'),
   cancelBooking
+);
+
+router.get(
+  '/planner/:eventId/billing',
+  authorize('planner'),
+  getPlannerBilling
 );
 
 export default router;

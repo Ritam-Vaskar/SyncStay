@@ -19,6 +19,7 @@ import hotelProposalRoutes from './routes/hotelProposalRoutes.js';
 import bookingRoutes from './routes/bookingRoutes.js';
 import paymentRoutes from './routes/paymentRoutes.js';
 import analyticsRoutes from './routes/analyticsRoutes.js';
+import guestInvitationRoutes from './routes/guestInvitationRoutes.js';
 
 // Initialize Express app
 const app = express();
@@ -79,6 +80,7 @@ app.get('/health', (req, res) => {
 // API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/events', eventRoutes);
+app.use('/api/guest-invitations', guestInvitationRoutes);
 app.use('/api/inventory', inventoryRoutes);
 app.use('/api/proposals', proposalRoutes);
 app.use('/api/hotel-proposals', hotelProposalRoutes);

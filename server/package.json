@@ -7,24 +7,31 @@
   "scripts": {
     "start": "node src/app.js",
     "dev": "nodemon src/app.js",
-    "seed": "node src/utils/seeder.js"
+    "seed": "node src/utils/seeder.js",
+    "seed:private": "node src/scripts/seedPrivateEventFlow.js"
   },
-  "keywords": ["MERN", "inventory", "MICE", "events"],
+  "keywords": [
+    "MERN",
+    "inventory",
+    "MICE",
+    "events"
+  ],
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "express": "^4.18.2",
-    "mongoose": "^8.0.3",
-    "dotenv": "^16.3.1",
     "bcryptjs": "^2.4.3",
-    "jsonwebtoken": "^9.0.2",
-    "cors": "^2.8.5",
-    "express-validator": "^7.0.1",
-    "socket.io": "^4.6.1",
-    "morgan": "^1.10.0",
-    "helmet": "^7.1.0",
     "compression": "^1.7.4",
-    "express-rate-limit": "^7.1.5"
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "express-rate-limit": "^7.1.5",
+    "express-validator": "^7.0.1",
+    "helmet": "^7.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.0.3",
+    "morgan": "^1.10.0",
+    "socket.io": "^4.6.1",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "nodemon": "^3.0.2"

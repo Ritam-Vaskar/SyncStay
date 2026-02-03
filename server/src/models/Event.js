@@ -112,6 +112,43 @@ const eventSchema = new mongoose.Schema(
         default: 1,
       },
     },
+    // Private event management
+    isPrivate: {
+      type: Boolean,
+      default: false,
+    },
+    invitedGuests: [{
+      name: {
+        type: String,
+        required: true,
+      },
+      email: {
+        type: String,
+        required: true,
+      },
+      phone: String,
+      accessCode: {
+        type: String,
+        unique: true,
+        sparse: true,
+      },
+      hasAccessed: {
+        type: Boolean,
+        default: false,
+      },
+      addedAt: {
+        type: Date,
+        default: Date.now,
+      },
+    }],
+    totalGuestCost: {
+      type: Number,
+      default: 0,
+    },
+    plannerPaidAmount: {
+      type: Number,
+      default: 0,
+    },
     micrositeConfig: {
       isPublished: {
         type: Boolean,
