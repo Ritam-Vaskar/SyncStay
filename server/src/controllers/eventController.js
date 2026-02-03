@@ -231,11 +231,13 @@ export const approveEvent = asyncHandler(async (req, res) => {
     });
   }
 
-  // Approve and publish microsite
-  event.status = 'active';
+  // Approve event - change status to rfp-published (not active yet)
+  // Microsite will be published after planner selects hotels
+  event.status = 'rfp-published';
   event.approvedBy = req.user.id;
   event.approvedAt = new Date();
-  event.micrositeConfig.isPublished = true;
+  // Don't publish microsite yet - wait for hotel selection
+  // event.micrositeConfig.isPublished = true;
 
   await event.save();
 
@@ -246,14 +248,13 @@ export const approveEvent = asyncHandler(async (req, res) => {
     resource: 'Event',
     resourceId: event._id,
     status: 'success',
-    details: `Event approved and microsite published: ${event.micrositeConfig.customSlug}`,
+    details: `Event approved as RFP, now visible to hotels: ${event.name}`,
   });
 
   res.status(200).json({
     success: true,
-    message: 'Event approved and microsite published',
+    message: 'Event approved and published as RFP to hotels',
     data: event,
-    micrositeUrl: `/microsite/${event.micrositeConfig.customSlug}`,
   });
 });
 

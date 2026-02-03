@@ -18,6 +18,7 @@ import { MicrositePlannerGuests } from './pages/MicrositePlannerGuests';
 import { AdminApprovalsPage } from './pages/AdminApprovalsPage';
 import { PlannerEventsPage } from './pages/PlannerEventsPage';
 import { CreateProposalPage } from './pages/CreateProposalPage';
+import { PlannerProposalsPage } from './pages/PlannerProposalsPage';
 import { PlannerInventoryPage } from './pages/PlannerInventoryPage';
 import { PlannerBookingsPage } from './pages/PlannerBookingsPage';
 import { PlannerAnalyticsPage } from './pages/PlannerAnalyticsPage';
@@ -239,7 +240,7 @@ function App() {
             element={
               <ProtectedRoute allowedRoles={['planner']}>
                 <DashboardLayout>
-                  <ProposalsPage />
+                  <PlannerProposalsPage />
                 </DashboardLayout>
               </ProtectedRoute>
             }

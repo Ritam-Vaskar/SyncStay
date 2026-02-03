@@ -7,99 +7,162 @@ import {
   Users, 
   Hotel,
   CheckCircle,
-  XCircle,
   DollarSign,
-  Clock
+  Clock,
+  Send,
+  X
 } from 'lucide-react';
-import { eventService } from '@/services/apiServices';
+import { hotelProposalService } from '@/services/hotelProposalService';
+import { useAuthStore } from '@/store/authStore';
 import toast from 'react-hot-toast';
 
 export const HotelRfpsPage = () => {
   const queryClient = useQueryClient();
+  const { user } = useAuthStore();
   const [selectedRfp, setSelectedRfp] = useState(null);
-  const [showResponseModal, setShowResponseModal] = useState(false);
-  const [responseData, setResponseData] = useState({
-    pricePerRoom: '',
-    availableRooms: '',
-    proposedAmenities: [],
-    additionalNotes: ''
+  const [showProposalModal, setShowProposalModal] = useState(false);
+  
+  const [proposalData, setProposalData] = useState({
+    hotelName: user?.name || '',
+    pricing: {
+      singleRoom: { pricePerNight: '', availableRooms: '' },
+      doubleRoom: { pricePerNight: '', availableRooms: '' },
+      suite: { pricePerNight: '', availableRooms: '' },
+    },
+    totalRoomsOffered: '',
+    facilities: {
+      wifi: false,
+      parking: false,
+      breakfast: false,
+      gym: false,
+      pool: false,
+      spa: false,
+      restaurant: false,
+      conferenceRoom: false,
+      airportShuttle: false,
+      laundry: false,
+    },
+    additionalServices: {
+      transportation: { available: false, cost: '', description: '' },
+      catering: { available: false, costPerPerson: '', description: '' },
+      avEquipment: { available: false, cost: '', description: '' },
+      other: '',
+    },
+    specialOffer: '',
+    notes: '',
+    totalEstimatedCost: '',
   });
 
+  // Fetch RFPs (events with status 'rfp-published')
   const { data: rfpsData, isLoading } = useQuery({
     queryKey: ['hotel-rfps'],
-    queryFn: () => eventService.getAll(),
+    queryFn: () => hotelProposalService.getRFPs(),
   });
 
-  // Filter only pending approval or active events (RFPs)
-  const rfps = (rfpsData?.data || []).filter(e => 
-    e.status === 'pending-approval' || e.status === 'active'
-  );
+  // Fetch hotel's submitted proposals
+  const { data: myProposalsData } = useQuery({
+    queryKey: ['my-hotel-proposals'],
+    queryFn: () => hotelProposalService.getMyProposals(),
+  });
 
-  const respondToRfpMutation = useMutation({
-    mutationFn: async ({ eventId, response }) => {
-      // In a real app, this would be a separate API endpoint
-      toast.success('RFP response submitted successfully!');
-      return response;
-    },
+  const rfps = rfpsData?.data || [];
+  const myProposals = myProposalsData?.data || [];
+  
+  // Check if hotel has already submitted proposal for an event
+  const hasSubmittedProposal = (eventId) => {
+    return myProposals.some(p => p.event._id === eventId || p.event === eventId);
+  };
+
+  const submitProposalMutation = useMutation({
+    mutationFn: (data) => hotelProposalService.submitProposal(data),
     onSuccess: () => {
+      toast.success('Proposal submitted successfully!');
       queryClient.invalidateQueries(['hotel-rfps']);
-      setShowResponseModal(false);
+      queryClient.invalidateQueries(['my-hotel-proposals']);
+      setShowProposalModal(false);
       setSelectedRfp(null);
-      resetResponseForm();
+      resetForm();
     },
     onError: (error) => {
-      toast.error('Failed to submit RFP response');
+      toast.error(error.response?.data?.message || 'Failed to submit proposal');
     },
   });
 
-  const resetResponseForm = () => {
-    setResponseData({
-      pricePerRoom: '',
-      availableRooms: '',
-      proposedAmenities: [],
-      additionalNotes: ''
+  const resetForm = () => {
+    setProposalData({
+      hotelName: user?.name || '',
+      pricing: {
+        singleRoom: { pricePerNight: '', availableRooms: '' },
+        doubleRoom: { pricePerNight: '', availableRooms: '' },
+        suite: { pricePerNight: '', availableRooms: '' },
+      },
+      totalRoomsOffered: '',
+      facilities: {
+        wifi: false,
+        parking: false,
+        breakfast: false,
+        gym: false,
+        pool: false,
+        spa: false,
+        restaurant: false,
+        conferenceRoom: false,
+        airportShuttle: false,
+        laundry: false,
+      },
+      additionalServices: {
+        transportation: { available: false, cost: '', description: '' },
+        catering: { available: false, costPerPerson: '', description: '' },
+        avEquipment: { available: false, cost: '', description: '' },
+        other: '',
+      },
+      specialOffer: '',
+      notes: '',
+      totalEstimatedCost: '',
     });
   };
 
-  const handleRespondToRfp = (rfp) => {
-    setSelectedRfp(rfp);
-    setShowResponseModal(true);
-  };
-
-  const handleSubmitResponse = (e) => {
+  const handleSubmitProposal = (e) => {
     e.preventDefault();
-    respondToRfpMutation.mutate({
+    
+    // Calculate total rooms
+    const totalRooms = 
+      parseInt(proposalData.pricing.singleRoom.availableRooms || 0) +
+      parseInt(proposalData.pricing.doubleRoom.availableRooms || 0) +
+      parseInt(proposalData.pricing.suite.availableRooms || 0);
+
+    if (totalRooms === 0) {
+      toast.error('Please provide at least one room type with availability');
+      return;
+    }
+
+    submitProposalMutation.mutate({
       eventId: selectedRfp._id,
-      response: responseData
+      ...proposalData,
+      totalRoomsOffered: totalRooms,
     });
   };
 
-  const handleAmenityToggle = (amenity) => {
-    setResponseData(prev => ({
-      ...prev,
-      proposedAmenities: prev.proposedAmenities.includes(amenity)
-        ? prev.proposedAmenities.filter(a => a !== amenity)
-        : [...prev.proposedAmenities, amenity]
-    }));
+  const handleOpenProposal = (rfp) => {
+    if (hasSubmittedProposal(rfp._id)) {
+      toast.info('You have already submitted a proposal for this event');
+      return;
+    }
+    setSelectedRfp(rfp);
+    setShowProposalModal(true);
   };
 
-  const amenitiesOptions = [
-    'Free WiFi',
-    'Breakfast Included',
-    'Conference Rooms',
-    'Parking',
-    'Gym/Fitness Center',
-    'Swimming Pool',
-    'Business Center',
-    'Airport Shuttle',
-    'Room Service',
-    '24/7 Concierge'
-  ];
+  // Stats
+  const stats = {
+    total: rfps.length,
+    submitted: myProposals.length,
+    pending: myProposals.filter(p => p.status === 'submitted' || p.status === 'under-review').length,
+    selected: myProposals.filter(p => p.status === 'selected').length,
+  };
 
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
       </div>
     );
   }
@@ -108,43 +171,59 @@ export const HotelRfpsPage = () => {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold text-gray-900">RFP Management</h1>
-        <p className="text-gray-600 mt-1">Review and respond to event accommodation requests</p>
+        <h1 className="text-3xl font-bold text-gray-900">Event RFPs</h1>
+        <p className="text-gray-600 mt-2">
+          Review event requirements and submit your proposals
+        </p>
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid md:grid-cols-4 gap-6">
         <div className="card">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Total RFPs</p>
-              <p className="text-3xl font-bold text-gray-900 mt-2">{rfps.length}</p>
+              <p className="text-sm text-gray-600">Available RFPs</p>
+              <p className="text-3xl font-bold text-gray-900 mt-1">{stats.total}</p>
             </div>
-            <FileText className="h-12 w-12 text-primary-600 opacity-20" />
+            <div className="p-3 bg-blue-100 rounded-lg">
+              <FileText className="h-8 w-8 text-blue-600" />
+            </div>
           </div>
         </div>
 
         <div className="card">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Pending Review</p>
-              <p className="text-3xl font-bold text-yellow-600 mt-2">
-                {rfps.filter(r => r.status === 'pending-approval').length}
-              </p>
+              <p className="text-sm text-gray-600">My Proposals</p>
+              <p className="text-3xl font-bold text-gray-900 mt-1">{stats.submitted}</p>
             </div>
-            <Clock className="h-12 w-12 text-yellow-600 opacity-20" />
+            <div className="p-3 bg-purple-100 rounded-lg">
+              <Send className="h-8 w-8 text-purple-600" />
+            </div>
           </div>
         </div>
 
         <div className="card">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Active Events</p>
-              <p className="text-3xl font-bold text-green-600 mt-2">
-                {rfps.filter(r => r.status === 'active').length}
-              </p>
+              <p className="text-sm text-gray-600">Under Review</p>
+              <p className="text-3xl font-bold text-gray-900 mt-1">{stats.pending}</p>
             </div>
-            <CheckCircle className="h-12 w-12 text-green-600 opacity-20" />
+            <div className="p-3 bg-yellow-100 rounded-lg">
+              <Clock className="h-8 w-8 text-yellow-600" />
+            </div>
+          </div>
+        </div>
+
+        <div className="card">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-600">Selected</p>
+              <p className="text-3xl font-bold text-gray-900 mt-1">{stats.selected}</p>
+            </div>
+            <div className="p-3 bg-green-100 rounded-lg">
+              <CheckCircle className="h-8 w-8 text-green-600" />
+            </div>
           </div>
         </div>
       </div>
@@ -154,275 +233,322 @@ export const HotelRfpsPage = () => {
         <div className="card text-center py-12">
           <FileText className="h-16 w-16 text-gray-400 mx-auto mb-4" />
           <h3 className="text-xl font-semibold text-gray-900 mb-2">No RFPs Available</h3>
-          <p className="text-gray-600">There are currently no event accommodation requests to review.</p>
+          <p className="text-gray-600">
+            There are currently no open RFPs. Check back later for new opportunities.
+          </p>
         </div>
       ) : (
-        <div className="space-y-6">
-          {rfps.map((rfp) => (
-            <div key={rfp._id} className="card hover:shadow-lg transition-shadow">
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-2">
-                    <h3 className="text-xl font-bold text-gray-900">{rfp.name}</h3>
-                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                      rfp.status === 'active' 
-                        ? 'bg-green-100 text-green-800' 
-                        : 'bg-yellow-100 text-yellow-800'
-                    }`}>
-                      {rfp.status === 'active' ? 'Active' : 'Under Review'}
-                    </span>
-                  </div>
-                  <p className="text-gray-600">{rfp.description}</p>
-                </div>
-              </div>
-
-              {/* Event Details */}
-              <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-                <div className="flex items-center gap-2 text-gray-600">
-                  <Calendar className="h-5 w-5 text-primary-600" />
-                  <div>
-                    <p className="text-xs text-gray-500">Event Dates</p>
-                    <p className="text-sm font-medium">
-                      {new Date(rfp.startDate).toLocaleDateString()} - {new Date(rfp.endDate).toLocaleDateString()}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2 text-gray-600">
-                  <MapPin className="h-5 w-5 text-primary-600" />
-                  <div>
-                    <p className="text-xs text-gray-500">Location</p>
-                    <p className="text-sm font-medium">
-                      {typeof rfp.location === 'string' 
-                        ? rfp.location 
-                        : `${rfp.location?.city || 'N/A'}, ${rfp.location?.country || ''}`}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2 text-gray-600">
-                  <Users className="h-5 w-5 text-primary-600" />
-                  <div>
-                    <p className="text-xs text-gray-500">Expected Guests</p>
-                    <p className="text-sm font-medium">{rfp.expectedGuests || 0}</p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2 text-gray-600">
-                  <DollarSign className="h-5 w-5 text-primary-600" />
-                  <div>
-                    <p className="text-xs text-gray-500">Budget</p>
-                    <p className="text-sm font-medium">${rfp.budget?.toLocaleString() || 'N/A'}</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Accommodation Requirements */}
-              {rfp.accommodationNeeds && (
-                <div className="bg-gray-50 rounded-lg p-4 mb-4">
-                  <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                    <Hotel className="h-5 w-5 text-primary-600" />
-                    Accommodation Requirements
-                  </h4>
-                  <div className="grid md:grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-sm text-gray-600">
-                        <strong>Total Rooms:</strong> {rfp.accommodationNeeds.totalRooms || 'N/A'}
-                      </p>
-                      <p className="text-sm text-gray-600 mt-1">
-                        <strong>Room Types:</strong>
-                      </p>
-                      <ul className="text-sm text-gray-600 ml-4 mt-1">
-                        {rfp.accommodationNeeds.roomTypes?.single > 0 && (
-                          <li>Single: {rfp.accommodationNeeds.roomTypes.single}</li>
-                        )}
-                        {rfp.accommodationNeeds.roomTypes?.double > 0 && (
-                          <li>Double: {rfp.accommodationNeeds.roomTypes.double}</li>
-                        )}
-                        {rfp.accommodationNeeds.roomTypes?.suite > 0 && (
-                          <li>Suite: {rfp.accommodationNeeds.roomTypes.suite}</li>
-                        )}
-                      </ul>
+        <div className="space-y-4">
+          {rfps.map((rfp) => {
+            const alreadySubmitted = hasSubmittedProposal(rfp._id);
+            
+            return (
+              <div key={rfp._id} className="card hover:shadow-lg transition-shadow">
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3 mb-2">
+                      <h3 className="text-xl font-bold text-gray-900">{rfp.name}</h3>
+                      {alreadySubmitted && (
+                        <span className="px-3 py-1 bg-green-100 text-green-800 text-xs font-semibold rounded-full">
+                          Proposal Submitted
+                        </span>
+                      )}
                     </div>
+                    <p className="text-gray-600 mb-3">{rfp.description}</p>
+                    <div className="flex items-center gap-2 text-sm text-gray-500">
+                      <span>Posted: {new Date(rfp.approvedAt || rfp.createdAt).toLocaleDateString()}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Event Details */}
+                <div className="grid md:grid-cols-4 gap-4 mb-4 p-4 bg-gray-50 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <Calendar className="h-5 w-5 text-primary-600" />
                     <div>
-                      {rfp.accommodationNeeds.preferredHotels && (
-                        <p className="text-sm text-gray-600">
-                          <strong>Preferred Hotels:</strong> {rfp.accommodationNeeds.preferredHotels}
-                        </p>
+                      <p className="text-xs text-gray-500">Event Dates</p>
+                      <p className="text-sm font-medium">
+                        {new Date(rfp.startDate).toLocaleDateString()} - {new Date(rfp.endDate).toLocaleDateString()}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <MapPin className="h-5 w-5 text-primary-600" />
+                    <div>
+                      <p className="text-xs text-gray-500">Location</p>
+                      <p className="text-sm font-medium">
+                        {typeof rfp.location === 'string' 
+                          ? rfp.location 
+                          : `${rfp.location?.city || 'N/A'}, ${rfp.location?.country || ''}`}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <Users className="h-5 w-5 text-primary-600" />
+                    <div>
+                      <p className="text-xs text-gray-500">Expected Guests</p>
+                      <p className="text-sm font-medium">{rfp.expectedGuests || 0}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <DollarSign className="h-5 w-5 text-primary-600" />
+                    <div>
+                      <p className="text-xs text-gray-500">Budget</p>
+                      <p className="text-sm font-medium">${rfp.budget?.toLocaleString() || 'N/A'}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Accommodation Requirements */}
+                {rfp.accommodationNeeds && (
+                  <div className="mb-4 p-4 bg-blue-50 rounded-lg">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Hotel className="h-5 w-5 text-blue-600" />
+                      <h4 className="font-semibold text-gray-900">Accommodation Requirements</h4>
+                    </div>
+                    <div className="grid md:grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <span className="text-gray-600">Total Rooms Needed: </span>
+                        <span className="font-medium text-gray-900">
+                          {rfp.accommodationNeeds.totalRooms || 0}
+                        </span>
+                      </div>
+                      {rfp.accommodationNeeds.roomTypes && (
+                        <div>
+                          <span className="text-gray-600">Room Types: </span>
+                          <span className="font-medium text-gray-900">
+                            {Object.entries(rfp.accommodationNeeds.roomTypes)
+                              .filter(([_, count]) => count > 0)
+                              .map(([type, count]) => `${count} ${type}`)
+                              .join(', ') || 'N/A'}
+                          </span>
+                        </div>
                       )}
                       {rfp.accommodationNeeds.amenitiesRequired?.length > 0 && (
-                        <>
-                          <p className="text-sm text-gray-600 mt-1">
-                            <strong>Required Amenities:</strong>
-                          </p>
-                          <div className="flex flex-wrap gap-1 mt-1">
-                            {rfp.accommodationNeeds.amenitiesRequired.map((amenity, idx) => (
-                              <span key={idx} className="text-xs bg-primary-100 text-primary-800 px-2 py-1 rounded">
-                                {amenity}
-                              </span>
-                            ))}
-                          </div>
-                        </>
+                        <div className="md:col-span-2">
+                          <span className="text-gray-600">Required Amenities: </span>
+                          <span className="font-medium text-gray-900">
+                            {rfp.accommodationNeeds.amenitiesRequired.join(', ')}
+                          </span>
+                        </div>
                       )}
                     </div>
                   </div>
-                </div>
-              )}
+                )}
 
-              {/* Additional Services */}
-              {rfp.additionalServices && (
-                <div className="bg-blue-50 rounded-lg p-4 mb-4">
-                  <h4 className="font-semibold text-gray-900 mb-2">Additional Services Requested</h4>
-                  <div className="flex flex-wrap gap-2">
-                    {rfp.additionalServices.transportation && (
-                      <span className="text-xs bg-blue-200 text-blue-800 px-3 py-1 rounded-full">Transportation</span>
-                    )}
-                    {rfp.additionalServices.catering && (
-                      <span className="text-xs bg-blue-200 text-blue-800 px-3 py-1 rounded-full">Catering</span>
-                    )}
-                    {rfp.additionalServices.avEquipment && (
-                      <span className="text-xs bg-blue-200 text-blue-800 px-3 py-1 rounded-full">AV Equipment</span>
-                    )}
-                  </div>
-                  {rfp.additionalServices.other && (
-                    <p className="text-sm text-gray-600 mt-2">{rfp.additionalServices.other}</p>
-                  )}
+                {/* Action */}
+                <div className="flex items-center gap-3 pt-4 border-t border-gray-200">
+                  <button
+                    onClick={() => handleOpenProposal(rfp)}
+                    disabled={alreadySubmitted}
+                    className={`btn flex items-center gap-2 ${
+                      alreadySubmitted
+                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                        : 'btn-primary'
+                    }`}
+                  >
+                    <Send className="h-5 w-5" />
+                    {alreadySubmitted ? 'Proposal Submitted' : 'Submit Proposal'}
+                  </button>
                 </div>
-              )}
+              </div>
+            );
+          })}
+        </div>
+      )}
 
-              {/* Special Requirements */}
-              {rfp.specialRequirements && (
-                <div className="bg-yellow-50 rounded-lg p-4 mb-4">
-                  <h4 className="font-semibold text-gray-900 mb-2">Special Requirements</h4>
-                  <p className="text-sm text-gray-700">{rfp.specialRequirements}</p>
+      {/* Submit Proposal Modal */}
+      {showProposalModal && selectedRfp && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white border-b border-gray-200 p-6 flex items-center justify-between">
+              <h2 className="text-2xl font-bold text-gray-900">
+                Submit Proposal for {selectedRfp.name}
+              </h2>
+              <button
+                onClick={() => {
+                  setShowProposalModal(false);
+                  setSelectedRfp(null);
+                  resetForm();
+                }}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmitProposal} className="p-6 space-y-6">
+              {/* Hotel Name */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Hotel Name
+                </label>
+                <input
+                  type="text"
+                  value={proposalData.hotelName}
+                  onChange={(e) => setProposalData(prev => ({ ...prev, hotelName: e.target.value }))}
+                  className="input"
+                  required
+                />
+              </div>
+
+              {/* Pricing */}
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Pricing & Availability</h3>
+                <div className="grid md:grid-cols-3 gap-4">
+                  {['singleRoom', 'doubleRoom', 'suite'].map((roomType) => (
+                    <div key={roomType} className="p-4 border border-gray-200 rounded-lg">
+                      <h4 className="font-medium text-gray-900 mb-3 capitalize">
+                        {roomType.replace('Room', ' Room')}
+                      </h4>
+                      <div className="space-y-3">
+                        <div>
+                          <label className="block text-xs text-gray-600 mb-1">Price per Night ($)</label>
+                          <input
+                            type="number"
+                            value={proposalData.pricing[roomType].pricePerNight}
+                            onChange={(e) => setProposalData(prev => ({
+                              ...prev,
+                              pricing: {
+                                ...prev.pricing,
+                                [roomType]: {
+                                  ...prev.pricing[roomType],
+                                  pricePerNight: e.target.value
+                                }
+                              }
+                            }))}
+                            className="input"
+                            placeholder="0"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-gray-600 mb-1">Available Rooms</label>
+                          <input
+                            type="number"
+                            value={proposalData.pricing[roomType].availableRooms}
+                            onChange={(e) => setProposalData(prev => ({
+                              ...prev,
+                              pricing: {
+                                ...prev.pricing,
+                                [roomType]: {
+                                  ...prev.pricing[roomType],
+                                  availableRooms: e.target.value
+                                }
+                              }
+                            }))}
+                            className="input"
+                            placeholder="0"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              )}
+              </div>
+
+              {/* Facilities */}
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Available Facilities</h3>
+                <div className="grid md:grid-cols-3 gap-3">
+                  {Object.keys(proposalData.facilities).map((facility) => (
+                    <label key={facility} className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={proposalData.facilities[facility]}
+                        onChange={(e) => setProposalData(prev => ({
+                          ...prev,
+                          facilities: {
+                            ...prev.facilities,
+                            [facility]: e.target.checked
+                          }
+                        }))}
+                        className="rounded border-gray-300"
+                      />
+                      <span className="text-sm text-gray-700 capitalize">
+                        {facility.replace(/([A-Z])/g, ' $1').trim()}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Special Offer */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Special Offer (Optional)
+                </label>
+                <textarea
+                  value={proposalData.specialOffer}
+                  onChange={(e) => setProposalData(prev => ({ ...prev, specialOffer: e.target.value }))}
+                  className="input"
+                  rows="2"
+                  placeholder="e.g., 10% discount for early booking, free breakfast for groups over 50..."
+                />
+              </div>
+
+              {/* Notes */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Additional Notes
+                </label>
+                <textarea
+                  value={proposalData.notes}
+                  onChange={(e) => setProposalData(prev => ({ ...prev, notes: e.target.value }))}
+                  className="input"
+                  rows="3"
+                  placeholder="Any additional information about your proposal..."
+                />
+              </div>
+
+              {/* Total Estimated Cost */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Total Estimated Package Cost ($)
+                </label>
+                <input
+                  type="number"
+                  value={proposalData.totalEstimatedCost}
+                  onChange={(e) => setProposalData(prev => ({ ...prev, totalEstimatedCost: e.target.value }))}
+                  className="input"
+                  placeholder="Total cost for the entire event"
+                />
+              </div>
 
               {/* Actions */}
               <div className="flex items-center gap-3 pt-4 border-t border-gray-200">
                 <button
-                  onClick={() => handleRespondToRfp(rfp)}
+                  type="submit"
+                  disabled={submitProposalMutation.isPending}
                   className="btn btn-primary flex items-center gap-2"
                 >
-                  <CheckCircle className="h-5 w-5" />
-                  Submit Proposal
+                  {submitProposalMutation.isPending ? (
+                    <>
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                      Submitting...
+                    </>
+                  ) : (
+                    <>
+                      <Send className="h-5 w-5" />
+                      Submit Proposal
+                    </>
+                  )}
                 </button>
-                <button className="btn bg-gray-100 text-gray-700 hover:bg-gray-200">
-                  View Details
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Response Modal */}
-      {showResponseModal && selectedRfp && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold text-gray-900">Submit Proposal for {selectedRfp.name}</h2>
                 <button
+                  type="button"
                   onClick={() => {
-                    setShowResponseModal(false);
+                    setShowProposalModal(false);
                     setSelectedRfp(null);
-                    resetResponseForm();
+                    resetForm();
                   }}
-                  className="text-gray-400 hover:text-gray-600"
+                  className="btn bg-gray-100 text-gray-700 hover:bg-gray-200"
                 >
-                  <XCircle className="h-6 w-6" />
+                  Cancel
                 </button>
               </div>
-
-              <form onSubmit={handleSubmitResponse} className="space-y-6">
-                <div className="grid md:grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Price Per Room/Night (USD) *
-                    </label>
-                    <input
-                      type="number"
-                      value={responseData.pricePerRoom}
-                      onChange={(e) => setResponseData({ ...responseData, pricePerRoom: e.target.value })}
-                      required
-                      min="0"
-                      step="0.01"
-                      className="input"
-                      placeholder="e.g., 150.00"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Available Rooms *
-                    </label>
-                    <input
-                      type="number"
-                      value={responseData.availableRooms}
-                      onChange={(e) => setResponseData({ ...responseData, availableRooms: e.target.value })}
-                      required
-                      min="1"
-                      className="input"
-                      placeholder="e.g., 50"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-3">
-                    Amenities You Can Provide
-                  </label>
-                  <div className="grid md:grid-cols-3 gap-3">
-                    {amenitiesOptions.map((amenity) => (
-                      <label key={amenity} className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={responseData.proposedAmenities.includes(amenity)}
-                          onChange={() => handleAmenityToggle(amenity)}
-                          className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-                        />
-                        <span className="text-sm text-gray-700">{amenity}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Additional Notes
-                  </label>
-                  <textarea
-                    value={responseData.additionalNotes}
-                    onChange={(e) => setResponseData({ ...responseData, additionalNotes: e.target.value })}
-                    rows={4}
-                    className="input"
-                    placeholder="Any additional information about your proposal, special offers, or terms..."
-                  />
-                </div>
-
-                <div className="flex items-center justify-end gap-4 pt-4">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowResponseModal(false);
-                      setSelectedRfp(null);
-                      resetResponseForm();
-                    }}
-                    className="btn bg-gray-100 text-gray-700 hover:bg-gray-200"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={respondToRfpMutation.isPending}
-                    className="btn btn-primary"
-                  >
-                    {respondToRfpMutation.isPending ? 'Submitting...' : 'Submit Proposal'}
-                  </button>
-                </div>
-              </form>
-            </div>
+            </form>
           </div>
         </div>
       )}

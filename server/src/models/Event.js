@@ -45,7 +45,7 @@ const eventSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ['draft', 'pending-approval', 'active', 'completed', 'cancelled', 'rejected'],
+      enum: ['draft', 'pending-approval', 'rfp-published', 'reviewing-proposals', 'active', 'completed', 'cancelled', 'rejected'],
       default: 'draft',
     },
     approvedBy: {
@@ -57,6 +57,41 @@ const eventSchema = new mongoose.Schema(
     },
     rejectionReason: {
       type: String,
+    },
+    // Selected hotels for this event
+    selectedHotels: [{
+      hotel: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+      },
+      proposal: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'HotelProposal',
+      },
+    }],
+    // Accommodation requirements
+    accommodationNeeds: {
+      totalRooms: Number,
+      roomTypes: {
+        single: Number,
+        double: Number,
+        suite: Number,
+      },
+      preferredHotels: [String],
+      amenitiesRequired: [String],
+    },
+    // Additional services needed
+    additionalServices: {
+      transportation: Boolean,
+      catering: Boolean,
+      avEquipment: Boolean,
+      other: String,
+    },
+    specialRequirements: {
+      type: String,
+    },
+    budget: {
+      type: Number,
     },
     pricingTiers: [
       {

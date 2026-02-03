@@ -196,11 +196,11 @@ export const MicrositePlannerDashboard = () => {
                 <p className="text-sm text-gray-600 mb-2">Microsite URL</p>
                 <div className="flex items-center gap-2">
                   <code className="flex-1 px-3 py-2 bg-gray-100 rounded text-sm">
-                    {window.location.origin}/microsite/{event.micrositeConfig?.slug}
+                    {window.location.origin}/microsite/{event.micrositeConfig?.customSlug || slug}
                   </code>
                   <button
                     onClick={() => {
-                      navigator.clipboard.writeText(`${window.location.origin}/microsite/${event.micrositeConfig?.slug}`);
+                      navigator.clipboard.writeText(`${window.location.origin}/microsite/${event.micrositeConfig?.customSlug || slug}`);
                       toast.success('Link copied!');
                     }}
                     className="btn btn-sm btn-secondary"
