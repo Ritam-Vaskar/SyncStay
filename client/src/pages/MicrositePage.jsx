@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { eventService, inventoryService, bookingService, authService } from '@/services/apiServices';
 import { guestInvitationService } from '@/services/guestInvitationService';
+import { hotelProposalService } from '@/services/hotelProposalService';
 import { LoadingPage } from '@/components/LoadingSpinner';
 import { formatCurrency, formatDate } from '@/utils/helpers';
 import { Calendar, MapPin, Users, Hotel, Check, X, LogIn, UserPlus, LogOut, LayoutDashboard, Lock, Mail } from 'lucide-react';
@@ -21,15 +22,31 @@ export const MicrositePage = () => {
   const [accessEmail, setAccessEmail] = useState('');
   const [hasAccess, setHasAccess] = useState(null); // null = not checked, true = has access, false = denied
 
+  // Load Razorpay script
+  useEffect(() => {
+    const script = document.createElement('script');
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    script.async = true;
+    document.body.appendChild(script);
+
+    return () => {
+      if (document.body.contains(script)) {
+        document.body.removeChild(script);
+      }
+    };
+  }, []);
+
   const { data: eventData, isLoading: eventLoading } = useQuery({
     queryKey: ['microsite', slug],
     queryFn: () => eventService.getBySlug(slug),
   });
 
-  const { data: inventoryData } = useQuery({
-    queryKey: ['microsite-inventory', eventData?.data?._id],
-    queryFn: () => inventoryService.getAvailable(eventData.data._id),
-    enabled: !!eventData?.data?._id,
+  // Fetch selected hotel proposals for active events
+  const { data: proposalsData, refetch: refetchProposals } = useQuery({
+    queryKey: ['microsite-hotels', slug],
+    queryFn: () => hotelProposalService.getSelectedForMicrosite(slug),
+    enabled: !!slug,
+    refetchInterval: 30000, // Refetch every 30 seconds to show updated availability
   });
 
   // Check access for private events
@@ -141,7 +158,7 @@ export const MicrositePage = () => {
   }
 
   const event = eventData.data;
-  const inventory = inventoryData?.data || [];
+  const hotels = proposalsData?.data || [];
   const theme = event.micrositeConfig?.theme || {};
 
   // Show loading while checking access for private events
@@ -349,72 +366,139 @@ export const MicrositePage = () => {
         <div>
           <h2 className="text-3xl font-bold mb-6">Available Hotels & Rooms</h2>
           
-          {inventory.length === 0 ? (
+          {hotels.length === 0 ? (
             <div className="card text-center py-12">
               <Hotel className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">No Inventory Available</h3>
-              <p className="text-gray-600">Rooms will be available soon. Please check back later.</p>
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">No Hotels Available Yet</h3>
+              <p className="text-gray-600">
+                The event planner is still finalizing hotel selection. Please check back later.
+              </p>
             </div>
           ) : (
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {inventory.map((item) => (
-                <div key={item._id} className="card hover:shadow-lg transition-shadow">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-xl font-bold">{item.hotelName}</h3>
-                    {item.status === 'locked' && (
-                      <span className="badge badge-info">Reserved for Event</span>
+            <div className="space-y-8">
+              {hotels.map((proposal) => {
+                const checkInDate = new Date(event.startDate);
+                const checkOutDate = new Date(event.endDate);
+                const nights = Math.ceil((checkOutDate - checkInDate) / (1000 * 60 * 60 * 24));
+
+                return (
+                  <div key={proposal._id} className="card bg-white shadow-lg">
+                    {/* Hotel Header */}
+                    <div className="border-b border-gray-200 pb-4 mb-6">
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <h3 className="text-2xl font-bold text-gray-900 mb-2">
+                            {proposal.hotelName}
+                          </h3>
+                          {proposal.specialOffer && (
+                            <div className="inline-flex items-center gap-2 bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-sm font-medium">
+                              <span>⭐</span>
+                              <span>{proposal.specialOffer}</span>
+                            </div>
+                          )}
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm text-gray-600">Total Rooms</p>
+                          <p className="text-2xl font-bold text-primary-600">
+                            {proposal.totalRoomsOffered}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Facilities */}
+                    {proposal.facilities && Object.keys(proposal.facilities).some(key => proposal.facilities[key]) && (
+                      <div className="mb-6">
+                        <h4 className="font-semibold text-gray-900 mb-3">Hotel Facilities</h4>
+                        <div className="flex flex-wrap gap-2">
+                          {Object.entries(proposal.facilities).map(([key, value]) => 
+                            value && (
+                              <span key={key} className="text-xs bg-blue-100 text-blue-700 px-3 py-1 rounded-full capitalize">
+                                {key.replace(/([A-Z])/g, ' $1').trim()}
+                              </span>
+                            )
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Room Types */}
+                    <div>
+                      <h4 className="font-semibold text-gray-900 mb-4">Available Room Types</h4>
+                      <div className="grid md:grid-cols-3 gap-4">
+                        {['singleRoom', 'doubleRoom', 'suite'].map((roomType) => {
+                          const room = proposal.pricing[roomType];
+                          if (!room || !room.availableRooms || room.availableRooms === 0) return null;
+
+                          const totalPrice = room.pricePerNight * nights;
+                          const roomLabel = roomType === 'singleRoom' ? 'Single Room' : 
+                                          roomType === 'doubleRoom' ? 'Double Room' : 'Suite';
+
+                          return (
+                            <div key={roomType} className="card border border-gray-200 hover:border-primary-300 hover:shadow-md transition-all">
+                              <h5 className="font-semibold text-gray-900 mb-3">{roomLabel}</h5>
+                              
+                              <div className="space-y-2 mb-4">
+                                <div className="flex justify-between text-sm">
+                                  <span className="text-gray-600">Available:</span>
+                                  <span className={`font-semibold ${
+                                    room.availableRooms > 5 ? 'text-green-600' :
+                                    room.availableRooms > 2 ? 'text-yellow-600' :
+                                    'text-red-600'
+                                  }`}>
+                                    {room.availableRooms} room{room.availableRooms !== 1 ? 's' : ''} left
+                                  </span>
+                                </div>
+                                <div className="flex justify-between text-sm">
+                                  <span className="text-gray-600">Per Night:</span>
+                                  <span className="font-medium">
+                                    {formatCurrency(room.pricePerNight)}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between text-sm">
+                                  <span className="text-gray-600">Stay ({nights} nights):</span>
+                                  <span className="font-semibold text-primary-600">
+                                    {formatCurrency(totalPrice)}
+                                  </span>
+                                </div>
+                              </div>
+
+                              <div className="text-xs text-gray-500 mb-3">
+                                <p>Check-in: {formatDate(checkInDate)}</p>
+                                <p>Check-out: {formatDate(checkOutDate)}</p>
+                              </div>
+
+                              <button
+                                onClick={() => handleBookNow({
+                                  ...proposal,
+                                  roomType: roomLabel,
+                                  roomKey: roomType,
+                                  pricePerNight: room.pricePerNight,
+                                  availableRooms: room.availableRooms,
+                                  checkInDate: event.startDate,
+                                  checkOutDate: event.endDate,
+                                })}
+                                disabled={room.availableRooms === 0}
+                                className="btn btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                {room.availableRooms === 0 ? 'Sold Out' : 'Book Now'}
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Additional Notes */}
+                    {proposal.notes && (
+                      <div className="mt-6 p-4 bg-gray-50 rounded-lg">
+                        <h4 className="font-semibold text-gray-900 mb-2">Additional Information</h4>
+                        <p className="text-sm text-gray-700">{proposal.notes}</p>
+                      </div>
                     )}
                   </div>
-                  
-                  <div className="space-y-3">
-                    <div>
-                      <p className="text-sm text-gray-600">Room Type</p>
-                      <p className="font-semibold">{item.roomType}</p>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <p className="text-sm text-gray-600">Available</p>
-                        <p className="font-semibold text-green-600">{item.availableRooms} / {item.totalRooms}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-gray-600">Price/Night</p>
-                        <p className="font-semibold">{formatCurrency(item.pricePerNight)}</p>
-                      </div>
-                    </div>
-
-                    <div>
-                      <p className="text-sm text-gray-600 mb-2">Inclusions</p>
-                      <div className="flex flex-wrap gap-1">
-                        {item.inclusions?.map((inc, idx) => (
-                          <span key={idx} className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">
-                            {inc}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-2 text-sm">
-                      <div>
-                        <p className="text-gray-600">Check-in</p>
-                        <p className="font-medium">{formatDate(item.checkInDate)}</p>
-                      </div>
-                      <div>
-                        <p className="text-gray-600">Check-out</p>
-                        <p className="font-medium">{formatDate(item.checkOutDate)}</p>
-                      </div>
-                    </div>
-
-                    <button
-                      onClick={() => handleBookNow(item)}
-                      disabled={item.availableRooms === 0}
-                      className="btn btn-primary w-full mt-4 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {item.availableRooms === 0 ? 'Sold Out' : 'Book Now'}
-                    </button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
@@ -447,6 +531,9 @@ export const MicrositePage = () => {
             setShowBookingForm(false);
             setSelectedInventory(null);
           }}
+          onSuccess={() => {
+            refetchProposals(); // Refresh availability after booking
+          }}
         />
       )}
 
@@ -467,7 +554,7 @@ export const MicrositePage = () => {
   );
 };
 
-const BookingModal = ({ inventory, event, user, onClose }) => {
+const BookingModal = ({ inventory, event, user, onClose, onSuccess }) => {
   const [formData, setFormData] = useState({
     numberOfRooms: 1,
     guestName: user?.name || '',
@@ -476,15 +563,27 @@ const BookingModal = ({ inventory, event, user, onClose }) => {
     specialRequests: '',
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [paymentStatus, setPaymentStatus] = useState({ message: '', type: '' });
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    if (!window.Razorpay) {
+      toast.error('Payment system not loaded. Please refresh the page.');
+      return;
+    }
+
     setIsSubmitting(true);
+    setPaymentStatus({ message: 'Initiating payment...', type: 'info' });
+
+    const nights = Math.ceil((new Date(inventory.checkOutDate) - new Date(inventory.checkInDate)) / (1000 * 60 * 60 * 24));
+    const totalPrice = inventory.pricePerNight * formData.numberOfRooms * nights;
 
     try {
+      // Prepare booking data
       const bookingData = {
         event: event._id,
-        inventory: inventory._id,
+        hotelProposal: inventory._id,
         guestDetails: {
           name: formData.guestName,
           email: formData.guestEmail,
@@ -497,21 +596,111 @@ const BookingModal = ({ inventory, event, user, onClose }) => {
           checkIn: inventory.checkInDate,
           checkOut: inventory.checkOutDate,
         },
+        pricing: {
+          pricePerNight: inventory.pricePerNight,
+        },
         specialRequests: formData.specialRequests,
       };
 
-      await bookingService.create(bookingData);
-      toast.success('Booking created successfully!');
-      onClose();
+      // Create Razorpay order
+      const orderRes = await fetch(`${import.meta.env.VITE_API_URL}/payments/razorpay/create-order`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amount: totalPrice,
+          bookingData: bookingData,
+          customerEmail: formData.guestEmail,
+          customerName: formData.guestName,
+        }),
+      });
+
+      if (!orderRes.ok) {
+        throw new Error('Failed to create payment order');
+      }
+
+      const orderData = await orderRes.json();
+      const order = orderData.data;
+
+      // Razorpay options
+      const options = {
+        key: import.meta.env.VITE_RAZORPAY_KEY_ID,
+        amount: order.amount,
+        currency: 'INR',
+        name: 'SyncStay',
+        description: `${event.name} - ${inventory.hotelName}`,
+        order_id: order.id,
+        handler: async (response) => {
+          try {
+            setPaymentStatus({ message: 'Verifying payment...', type: 'info' });
+
+            // Verify payment
+            const verifyRes = await fetch(`${import.meta.env.VITE_API_URL}/payments/razorpay/verify`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature,
+                bookingData: bookingData,
+              }),
+            });
+
+            const verifyData = await verifyRes.json();
+
+            if (verifyData.success) {
+              setPaymentStatus({ message: 'Payment successful! Creating booking...', type: 'success' });
+
+              // Now create the booking with payment details
+              const finalBookingData = {
+                ...bookingData,
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                paymentStatus: 'paid',
+              };
+
+              await bookingService.create(finalBookingData);
+              toast.success('Booking created successfully!');
+              if (onSuccess) onSuccess();
+              onClose();
+            } else {
+              throw new Error(verifyData.message || 'Payment verification failed');
+            }
+          } catch (error) {
+            console.error('Payment verification error:', error);
+            setPaymentStatus({ message: error.message || 'Payment verification failed', type: 'error' });
+            toast.error('Payment verification failed. Please contact support.');
+          } finally {
+            setIsSubmitting(false);
+          }
+        },
+        prefill: {
+          name: formData.guestName,
+          email: formData.guestEmail,
+          contact: formData.guestPhone,
+        },
+        theme: {
+          color: '#6366f1',
+        },
+        modal: {
+          ondismiss: () => {
+            setIsSubmitting(false);
+            setPaymentStatus({ message: 'Payment cancelled', type: 'error' });
+          },
+        },
+      };
+
+      const rzp = new window.Razorpay(options);
+      rzp.open();
     } catch (error) {
-      toast.error(error.message || 'Booking failed');
-    } finally {
+      console.error('Booking error:', error);
+      toast.error(error.message || 'Failed to initiate payment');
+      setPaymentStatus({ message: error.message || 'Failed to initiate payment', type: 'error' });
       setIsSubmitting(false);
     }
   };
 
-  const totalPrice = inventory.pricePerNight * formData.numberOfRooms * 
-    Math.ceil((new Date(inventory.checkOutDate) - new Date(inventory.checkInDate)) / (1000 * 60 * 60 * 24));
+  const nights = Math.ceil((new Date(inventory.checkOutDate) - new Date(inventory.checkInDate)) / (1000 * 60 * 60 * 24));
+  const totalPrice = inventory.pricePerNight * formData.numberOfRooms * nights;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -587,6 +776,23 @@ const BookingModal = ({ inventory, event, user, onClose }) => {
               />
             </div>
 
+            {/* Payment Status */}
+            {paymentStatus.message && (
+              <div className={`card ${
+                paymentStatus.type === 'error' ? 'bg-red-50 border-red-200' :
+                paymentStatus.type === 'success' ? 'bg-green-50 border-green-200' :
+                'bg-blue-50 border-blue-200'
+              }`}>
+                <p className={`text-sm ${
+                  paymentStatus.type === 'error' ? 'text-red-800' :
+                  paymentStatus.type === 'success' ? 'text-green-800' :
+                  'text-blue-800'
+                }`}>
+                  {paymentStatus.message}
+                </p>
+              </div>
+            )}
+
             <div className="card bg-gray-100">
               <div className="flex justify-between items-center">
                 <span className="font-semibold">Total Amount</span>
@@ -599,8 +805,19 @@ const BookingModal = ({ inventory, event, user, onClose }) => {
                 Cancel
               </button>
               <button type="submit" disabled={isSubmitting} className="btn btn-primary flex-1">
-                {isSubmitting ? 'Processing...' : 'Confirm Booking'}
+                {isSubmitting ? 'Processing...' : `Pay ₹${totalPrice.toLocaleString('en-IN')}`}
               </button>
+            </div>
+
+            <div className="text-center">
+              <p className="text-xs text-gray-500">Secure payment powered by Razorpay</p>
+              <div className="flex justify-center gap-2 mt-1 text-xs text-gray-400">
+                <span>UPI</span>
+                <span>•</span>
+                <span>Cards</span>
+                <span>•</span>
+                <span>Net Banking</span>
+              </div>
             </div>
           </form>
         </div>

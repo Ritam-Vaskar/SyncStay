@@ -5,8 +5,19 @@ const errorHandler = (err, req, res, next) => {
   let error = { ...err };
   error.message = err.message;
 
-  // Log error for debugging
-  console.error('Error:', err);
+  // Log error for debugging with more context
+  console.error('\n❌ ERROR OCCURRED:');
+  console.error('Path:', req.method, req.path);
+  console.error('Error Name:', err.name);
+  console.error('Error Message:', err.message);
+  console.error('Error Code:', err.code);
+  if (req.body && Object.keys(req.body).length > 0) {
+    console.error('Request Body:', JSON.stringify(req.body, null, 2));
+  }
+  if (process.env.NODE_ENV === 'development') {
+    console.error('Stack:', err.stack);
+  }
+  console.error('---');
 
   // Mongoose bad ObjectId
   if (err.name === 'CastError') {
@@ -24,16 +35,25 @@ const errorHandler = (err, req, res, next) => {
 
   // Mongoose validation error
   if (err.name === 'ValidationError') {
-    const message = Object.values(err.errors).map((val) => val.message);
+    const messages = Object.values(err.errors).map((val) => val.message);
     error.statusCode = 400;
-    error.message = message;
+    error.message = messages.join(', ');
+    error.validationErrors = messages;
   }
 
-  res.status(error.statusCode || 500).json({
+  const errorResponse = {
     success: false,
     message: error.message || 'Server Error',
-    ...(process.env.NODE_ENV === 'development' && { stack: err.stack }),
-  });
+    ...(error.validationErrors && { validationErrors: error.validationErrors }),
+    ...(process.env.NODE_ENV === 'development' && { 
+      stack: err.stack,
+      errorName: err.name,
+      errorCode: err.code 
+    }),
+  };
+
+  console.error('Response:', JSON.stringify(errorResponse, null, 2));
+  res.status(error.statusCode || 500).json(errorResponse);
 };
 
 export default errorHandler;

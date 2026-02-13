@@ -5,18 +5,33 @@ import { createAuditLog } from '../middlewares/auditLogger.js';
 
 /**
  * @route   GET /api/hotel-proposals/rfps
- * @desc    Get all RFPs (events with status 'rfp-published') for hotels
+ * @desc    Get all RFPs (events with status 'rfp-published' or 'reviewing-proposals') for hotels
  * @access  Private (Hotel only)
  */
 export const getRFPs = asyncHandler(async (req, res) => {
-  const events = await Event.find({ status: 'rfp-published' })
-    .populate('planner', 'name email')
+  // Show events that are either newly published or already have some proposals
+  // This allows multiple hotels to submit proposals for the same event
+  const events = await Event.find({ 
+    status: { $in: ['rfp-published', 'reviewing-proposals'] } 
+  })
+    .populate('planner', 'name email organization')
     .sort({ createdAt: -1 });
+
+  // Add proposal count for each event
+  const eventsWithProposalCount = await Promise.all(
+    events.map(async (event) => {
+      const proposalCount = await HotelProposal.countDocuments({ event: event._id });
+      return {
+        ...event.toObject(),
+        proposalCount,
+      };
+    })
+  );
 
   res.status(200).json({
     success: true,
-    count: events.length,
-    data: events,
+    count: eventsWithProposalCount.length,
+    data: eventsWithProposalCount,
   });
 });
 
@@ -48,7 +63,8 @@ export const submitProposal = asyncHandler(async (req, res) => {
     });
   }
 
-  if (event.status !== 'rfp-published') {
+  // Allow proposals for both rfp-published and reviewing-proposals statuses
+  if (!['rfp-published', 'reviewing-proposals'].includes(event.status)) {
     return res.status(400).json({
       success: false,
       message: 'Event is not accepting proposals',
@@ -353,5 +369,69 @@ export const updateProposal = asyncHandler(async (req, res) => {
     success: true,
     message: 'Proposal updated successfully',
     data: proposal,
+  });
+});
+
+/**
+ * @route   GET /api/hotel-proposals/microsite/:slug/selected
+ * @desc    Get selected hotel proposals for a microsite (Public)
+ * @access  Public
+ */
+export const getSelectedProposalsForMicrosite = asyncHandler(async (req, res) => {
+  const { slug } = req.params;
+  
+  console.log(`🔍 Fetching selected proposals for microsite: ${slug}`);
+
+  // Find event by slug
+  const event = await Event.findOne({
+    'micrositeConfig.customSlug': slug,
+    'micrositeConfig.isPublished': true,
+  });
+
+  if (!event) {
+    console.warn(`⚠️ Event not found for slug: ${slug}`);
+    return res.status(404).json({
+      success: false,
+      message: 'Event not found or not published',
+    });
+  }
+
+  // Check if event is active
+  if (event.status !== 'active') {
+    console.warn(`⚠️ Event not active: ${event.status}`);
+    return res.status(200).json({
+      success: true,
+      count: 0,
+      data: [],
+      message: 'Event is not active yet. Selected hotels will be available soon.',
+    });
+  }
+
+  // Get selected hotel proposals
+  if (!event.selectedHotels || event.selectedHotels.length === 0) {
+    console.log('ℹ️ No hotels selected yet');
+    return res.status(200).json({
+      success: true,
+      count: 0,
+      data: [],
+      message: 'No hotels selected yet',
+    });
+  }
+
+  // Fetch full proposal details for selected hotels
+  const proposalIds = event.selectedHotels.map(sh => sh.proposal);
+  const selectedProposals = await HotelProposal.find({
+    _id: { $in: proposalIds },
+    selectedByPlanner: true,
+  })
+    .populate('hotel', 'name email phone organization')
+    .sort({ hotelName: 1 });
+
+  console.log(`✅ Found ${selectedProposals.length} selected proposals`);
+
+  res.status(200).json({
+    success: true,
+    count: selectedProposals.length,
+    data: selectedProposals,
   });
 });

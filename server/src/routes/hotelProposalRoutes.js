@@ -7,10 +7,14 @@ import {
   selectProposal,
   publishEventMicrosite,
   updateProposal,
+  getSelectedProposalsForMicrosite,
 } from '../controllers/hotelProposalController.js';
 import { protect, authorize } from '../middlewares/auth.js';
 
 const router = express.Router();
+
+// Public routes (must be before protected routes)
+router.get('/microsite/:slug/selected', getSelectedProposalsForMicrosite);
 
 // Hotel routes
 router.get('/rfps', protect, authorize('hotel'), getRFPs);

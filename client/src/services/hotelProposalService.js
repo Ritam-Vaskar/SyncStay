@@ -21,4 +21,7 @@ export const hotelProposalService = {
 
   // Publish microsite after selecting hotels (planner)
   publishMicrosite: (eventId) => api.put(`/hotel-proposals/event/${eventId}/publish-microsite`),
+
+  // Get selected hotel proposals for microsite (public)
+  getSelectedForMicrosite: (slug) => api.get(`/hotel-proposals/microsite/${slug}/selected`),
 };

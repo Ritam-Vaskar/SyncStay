@@ -64,11 +64,22 @@ export const getEvent = asyncHandler(async (req, res) => {
  * @access  Private (Planner only)
  */
 export const createEvent = asyncHandler(async (req, res) => {
+  console.log('📝 Creating event with data:', JSON.stringify(req.body, null, 2));
+  
   // Add planner to event
   req.body.planner = req.user.id;
   
   // Set status to pending-approval for planner-created events
   req.body.status = 'pending-approval';
+
+  // Handle location field - convert string to object if needed
+  if (req.body.location && typeof req.body.location === 'string') {
+    req.body.location = {
+      city: req.body.location,
+      country: '',
+      venue: ''
+    };
+  }
 
   // Generate custom slug if not provided
   if (!req.body.micrositeConfig?.customSlug) {
@@ -122,6 +133,15 @@ export const updateEvent = asyncHandler(async (req, res) => {
       success: false,
       message: 'Not authorized to update this event',
     });
+  }
+
+  // Handle location field - convert string to object if needed
+  if (req.body.location && typeof req.body.location === 'string') {
+    req.body.location = {
+      city: req.body.location,
+      country: '',
+      venue: ''
+    };
   }
 
   event = await Event.findByIdAndUpdate(req.params.id, req.body, {
@@ -191,22 +211,32 @@ export const deleteEvent = asyncHandler(async (req, res) => {
  * @access  Public
  */
 export const getEventBySlug = asyncHandler(async (req, res) => {
-  const event = await Event.findOne({
-    'micrositeConfig.customSlug': req.params.slug,
-    'micrositeConfig.isPublished': true,
-  }).populate('planner', 'name organization');
+  const { slug } = req.params;
+  console.log(`🔍 Fetching microsite for slug: ${slug}`);
+  
+  try {
+    const event = await Event.findOne({
+      'micrositeConfig.customSlug': slug,
+      'micrositeConfig.isPublished': true,
+    }).populate('planner', 'name organization');
 
-  if (!event) {
-    return res.status(404).json({
-      success: false,
-      message: 'Event microsite not found or not published',
+    if (!event) {
+      console.warn(`⚠️ Microsite not found or not published: ${slug}`);
+      return res.status(404).json({
+        success: false,
+        message: 'Event microsite not found or not published',
+      });
+    }
+
+    console.log(`✅ Microsite found: ${event.name}`);
+    res.status(200).json({
+      success: true,
+      data: event,
     });
+  } catch (error) {
+    console.error('❌ Error fetching microsite:', error);
+    throw error; // asyncHandler will handle this
   }
-
-  res.status(200).json({
-    success: true,
-    data: event,
-  });
 });
 
 /**

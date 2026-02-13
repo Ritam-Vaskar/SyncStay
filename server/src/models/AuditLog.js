@@ -17,6 +17,8 @@ const auditLogSchema = new mongoose.Schema(
         'event_create',
         'event_update',
         'event_delete',
+        'event_approve',
+        'event_reject',
         'inventory_create',
         'inventory_update',
         'inventory_lock',

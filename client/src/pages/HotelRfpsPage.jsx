@@ -250,13 +250,21 @@ export const HotelRfpsPage = () => {
                       <h3 className="text-xl font-bold text-gray-900">{rfp.name}</h3>
                       {alreadySubmitted && (
                         <span className="px-3 py-1 bg-green-100 text-green-800 text-xs font-semibold rounded-full">
-                          Proposal Submitted
+                          ✓ Proposal Submitted
+                        </span>
+                      )}
+                      {rfp.proposalCount > 0 && (
+                        <span className="px-3 py-1 bg-blue-100 text-blue-800 text-xs font-semibold rounded-full">
+                          {rfp.proposalCount} Proposal{rfp.proposalCount > 1 ? 's' : ''} Received
                         </span>
                       )}
                     </div>
                     <p className="text-gray-600 mb-3">{rfp.description}</p>
                     <div className="flex items-center gap-2 text-sm text-gray-500">
                       <span>Posted: {new Date(rfp.approvedAt || rfp.createdAt).toLocaleDateString()}</span>
+                      {rfp.proposalCount > 0 && !alreadySubmitted && (
+                        <span className="text-orange-600 font-medium">• Open for more proposals</span>
+                      )}
                     </div>
                   </div>
                 </div>

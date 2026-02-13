@@ -21,7 +21,10 @@ export const AdminApprovalsPage = () => {
     mutationFn: (eventId) => eventService.approve(eventId),
     onSuccess: (data) => {
       toast.success(`Event approved! Microsite: ${data.micrositeUrl}`);
+      // Invalidate all event-related queries to refresh planner dashboards
       queryClient.invalidateQueries(['events']);
+      queryClient.invalidateQueries(['planner-events']);
+      queryClient.invalidateQueries(['planner-proposals']);
     },
     onError: (error) => {
       toast.error(error.message || 'Failed to approve event');
@@ -32,7 +35,10 @@ export const AdminApprovalsPage = () => {
     mutationFn: ({ eventId, reason }) => eventService.reject(eventId, reason),
     onSuccess: () => {
       toast.success('Event rejected');
+      // Invalidate all event-related queries to refresh planner dashboards
       queryClient.invalidateQueries(['events']);
+      queryClient.invalidateQueries(['planner-events']);
+      queryClient.invalidateQueries(['planner-proposals']);
       setShowRejectModal(false);
       setSelectedEvent(null);
       setRejectionReason('');
