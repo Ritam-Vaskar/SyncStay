@@ -331,3 +331,168 @@ export const rejectEvent = asyncHandler(async (req, res) => {
     data: event,
   });
 });
+
+/**
+ * @route   POST /api/events/:id/select-hotels
+ * @desc    Planner selects hotels and calculates total cost for private event
+ * @access  Private (Planner only)
+ */
+export const selectHotelsForEvent = asyncHandler(async (req, res) => {
+  const { selectedHotelProposals } = req.body; // Array of proposal IDs
+
+  const event = await Event.findById(req.params.id);
+
+  if (!event) {
+    return res.status(404).json({
+      success: false,
+      message: 'Event not found',
+    });
+  }
+
+  // Verify planner owns this event
+  if (event.planner.toString() !== req.user.id) {
+    return res.status(403).json({
+      success: false,
+      message: 'Not authorized to modify this event',
+    });
+  }
+
+  if (!event.isPrivate) {
+    return res.status(400).json({
+      success: false,
+      message: 'This endpoint is only for private events',
+    });
+  }
+
+  // Import HotelProposal model
+  const HotelProposal = (await import('../models/HotelProposal.js')).default;
+
+  // Fetch selected proposals and calculate total cost
+  const proposals = await HotelProposal.find({ _id: { $in: selectedHotelProposals } });
+
+  if (proposals.length === 0) {
+    return res.status(400).json({
+      success: false,
+      message: 'No valid proposals selected',
+    });
+  }
+
+  // Calculate total cost for all selected hotels
+  let totalCost = 0;
+  const selectedHotels = [];
+
+  for (const proposal of proposals) {
+    // Calculate cost for this hotel (all room types × expected guests proportionally)
+    const hotelCost = 
+      (proposal.pricing.singleRoom?.pricePerNight || 0) * (proposal.pricing.singleRoom?.availableRooms || 0) +
+      (proposal.pricing.doubleRoom?.pricePerNight || 0) * (proposal.pricing.doubleRoom?.availableRooms || 0) +
+      (proposal.pricing.suite?.pricePerNight || 0) * (proposal.pricing.suite?.availableRooms || 0);
+
+    totalCost += hotelCost;
+
+    selectedHotels.push({
+      hotel: proposal.hotel,
+      proposal: proposal._id,
+    });
+  }
+
+  // Update event with selected hotels and payment amount
+  event.selectedHotels = selectedHotels;
+  event.plannerPaymentAmount = totalCost;
+  event.plannerPaymentStatus = 'pending';
+  await event.save();
+
+  console.log(`💰 Planner needs to pay ₹${totalCost} for ${selectedHotels.length} hotels`);
+
+  res.status(200).json({
+    success: true,
+    message: 'Hotels selected successfully',
+    data: {
+      selectedHotels,
+      totalAmount: totalCost,
+      currency: 'INR',
+    },
+  });
+});
+
+/**
+ * @route   POST /api/events/:id/planner-payment
+ * @desc    Process planner payment for private event (after Razorpay verification)
+ * @access  Private (Planner only)
+ */
+export const processPlannerPayment = asyncHandler(async (req, res) => {
+  const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
+
+  const event = await Event.findById(req.params.id);
+
+  if (!event) {
+    return res.status(404).json({
+      success: false,
+      message: 'Event not found',
+    });
+  }
+
+  // Verify planner owns this event
+  if (event.planner.toString() !== req.user.id) {
+    return res.status(403).json({
+      success: false,
+      message: 'Not authorized',
+    });
+  }
+
+  if (!event.isPrivate) {
+    return res.status(400).json({
+      success: false,
+      message: 'Payment not required for public events',
+    });
+  }
+
+  if (event.plannerPaymentStatus === 'paid') {
+    return res.status(400).json({
+      success: false,
+      message: 'Payment already completed',
+    });
+  }
+
+  // Update event with payment details
+  event.plannerPaymentStatus = 'paid';
+  event.plannerPaidAt = new Date();
+  event.plannerPaymentDetails = {
+    transactionId: razorpay_payment_id,
+    paymentMethod: 'razorpay',
+    paymentGateway: 'razorpay',
+    razorpay_order_id,
+    razorpay_payment_id,
+    razorpay_signature,
+  };
+
+  // Publish microsite and activate event after payment
+  if (!event.micrositeConfig.isPublished) {
+    event.micrositeConfig.isPublished = true;
+    console.log(`🌐 Microsite published for event: ${event.name}`);
+  }
+  
+  // Change status to active so event shows in "Manage Events"
+  event.status = 'active';
+  console.log(`✅ Event status changed to "active" for: ${event.name}`);
+
+  await event.save();
+
+  // Log action
+  await createAuditLog({
+    user: req.user.id,
+    action: 'planner_payment',
+    resource: 'Event',
+    resourceId: event._id,
+    status: 'success',
+    details: `Planner paid ₹${event.plannerPaymentAmount} for private event`,
+  });
+
+  console.log(`✅ Planner payment completed for event: ${event.name}`);
+
+  res.status(200).json({
+    success: true,
+    message: 'Payment processed successfully. Microsite is now published!',
+    data: event,
+  });
+});

@@ -14,7 +14,12 @@ export const hotelProposalService = {
   updateProposal: (proposalId, data) => api.put(`/hotel-proposals/${proposalId}/update`, data),
 
   // Get all proposals for an event (for planner)
-  getEventProposals: (eventId) => api.get(`/hotel-proposals/event/${eventId}`),
+  getEventProposals: (eventId) => api.get(`/hotel-proposals/event/${eventId}`, {
+    headers: {
+      'Cache-Control': 'no-cache',
+      'Pragma': 'no-cache'
+    }
+  }),
 
   // Select a hotel proposal (planner)
   selectProposal: (proposalId) => api.put(`/hotel-proposals/${proposalId}/select`),

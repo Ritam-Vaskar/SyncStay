@@ -238,7 +238,7 @@ export const selectProposal = asyncHandler(async (req, res) => {
 
 /**
  * @route   PUT /api/hotel-proposals/event/:eventId/publish-microsite
- * @desc    Finalize hotel selection and publish microsite
+ * @desc    Finalize hotel selection and publish microsite (for public events or after payment for private events)
  * @access  Private (Planner only)
  */
 export const publishEventMicrosite = asyncHandler(async (req, res) => {
@@ -266,6 +266,14 @@ export const publishEventMicrosite = asyncHandler(async (req, res) => {
     return res.status(400).json({
       success: false,
       message: 'Please select at least one hotel before publishing',
+    });
+  }
+
+  // For private events, require planner payment BEFORE publishing
+  if (event.isPrivate && event.plannerPaymentStatus !== 'paid') {
+    return res.status(400).json({
+      success: false,
+      message: 'Payment required for private events. Please complete payment via /api/events/:id/planner-payment before publishing microsite.',
     });
   }
 
@@ -301,8 +309,10 @@ export const publishEventMicrosite = asyncHandler(async (req, res) => {
     resource: 'Event',
     resourceId: event._id,
     status: 'success',
-    details: `Microsite published for event: ${event.name}`,
+    details: `Microsite published for event: ${event.name} (${event.isPrivate ? 'Private' : 'Public'})`,
   });
+
+  console.log(`🌐 Microsite published: ${event.name} (${event.isPrivate ? 'Private - Payment completed' : 'Public'})`);
 
   res.status(200).json({
     success: true,

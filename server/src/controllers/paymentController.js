@@ -203,11 +203,11 @@ export const refundPayment = asyncHandler(async (req, res) => {
 
 /**
  * @route   POST /api/payments/razorpay/create-order
- * @desc    Create Razorpay order for booking payment
+ * @desc    Create Razorpay order for booking payment or planner payment
  * @access  Public
  */
 export const createRazorpayOrder = asyncHandler(async (req, res) => {
-  const { amount, bookingData, customerEmail, customerName } = req.body;
+  const { amount, bookingData, customerEmail, customerName, currency, notes } = req.body;
 
   if (!amount || amount <= 0) {
     return res.status(400).json({
@@ -222,21 +222,39 @@ export const createRazorpayOrder = asyncHandler(async (req, res) => {
     key_secret: process.env.RAZORPAY_KEY_SECRET,
   });
 
-  // Create order
-  const order = await razorpay.orders.create({
-    amount: Math.round(amount * 100), // Convert to paise
-    currency: 'INR',
-    receipt: `receipt_${Date.now()}`,
-    notes: {
+  // Determine if this is a planner payment or guest booking payment
+  const isPlannerPayment = notes && notes.type === 'planner_payment';
+  
+  // Prepare order notes
+  let orderNotes = {};
+  if (isPlannerPayment) {
+    // Planner payment - use provided notes
+    orderNotes = notes;
+  } else {
+    // Guest booking payment - use booking data
+    orderNotes = {
       booking_type: 'event_hotel_booking',
       customer_email: customerEmail || '',
       customer_name: customerName || '',
       event_id: bookingData?.event || '',
-      hotel_name: bookingData?.hotelName || '',
-    },
+      hotel_name: bookingData?.roomDetails?.hotelName || '',
+    };
+  }
+
+  // Create order - amount should be in paise
+  // For planner payment: amount is in rupees, convert to paise
+  // For guest payment: amount is in rupees, convert to paise
+  const amountInPaise = Math.round(amount * 100);
+
+  const order = await razorpay.orders.create({
+    amount: amountInPaise,
+    currency: currency || 'INR',
+    receipt: `receipt_${Date.now()}`,
+    notes: orderNotes,
   });
 
-  console.log(`💳 Razorpay order created: ${order.id} for ₹${amount}`);
+  const displayAmount = (amountInPaise / 100).toFixed(2);
+  console.log(`💳 Razorpay order created: ${order.id} for ₹${displayAmount} (${isPlannerPayment ? 'Planner Payment' : 'Guest Booking'})`);
 
   res.status(200).json({
     success: true,

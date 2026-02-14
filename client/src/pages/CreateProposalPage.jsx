@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { Calendar, MapPin, Users, Clock, DollarSign, Hotel, FileText, Lock, Unlock } from 'lucide-react';
+import { Calendar, MapPin, Users, Clock, DollarSign, Hotel, FileText, Lock, Unlock, Mail, Plus, X } from 'lucide-react';
 import { eventService } from '@/services/apiServices';
 import toast from 'react-hot-toast';
 
@@ -21,6 +21,7 @@ export const CreateProposalPage = () => {
     budget: '',
     specialRequirements: '',
     isPrivate: false,
+    invitedGuests: [], // For private events
     accommodationNeeds: {
       totalRooms: '',
       roomTypes: {
@@ -38,6 +39,8 @@ export const CreateProposalPage = () => {
       other: ''
     }
   });
+
+  const [guestInput, setGuestInput] = useState({ name: '', email: '', phone: '' });
 
   const amenitiesOptions = [
     'Free WiFi',
@@ -112,8 +115,50 @@ export const CreateProposalPage = () => {
     }));
   };
 
+  const handleAddGuest = () => {
+    if (!guestInput.name || !guestInput.email) {
+      toast.error('Please provide guest name and email');
+      return;
+    }
+    
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(guestInput.email)) {
+      toast.error('Please provide a valid email address');
+      return;
+    }
+
+    // Check for duplicate emails
+    if (formData.invitedGuests.some(g => g.email === guestInput.email)) {
+      toast.error('This email is already in the guest list');
+      return;
+    }
+
+    setFormData(prev => ({
+      ...prev,
+      invitedGuests: [...prev.invitedGuests, { ...guestInput }]
+    }));
+    
+    setGuestInput({ name: '', email: '', phone: '' });
+    toast.success('Guest added to invitation list');
+  };
+
+  const handleRemoveGuest = (email) => {
+    setFormData(prev => ({
+      ...prev,
+      invitedGuests: prev.invitedGuests.filter(g => g.email !== email)
+    }));
+    toast.success('Guest removed from invitation list');
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
+    
+    // Validate private events
+    if (formData.isPrivate && formData.invitedGuests.length === 0) {
+      toast.error('Private events require at least one invited guest');
+      return;
+    }
     
     // Prepare data for submission
     const submitData = {
@@ -130,6 +175,11 @@ export const CreateProposalPage = () => {
         }
       }
     };
+
+    // Remove invitedGuests if not private event
+    if (!submitData.isPrivate) {
+      delete submitData.invitedGuests;
+    }
 
     createProposalMutation.mutate(submitData);
   };
@@ -222,11 +272,93 @@ export const CreateProposalPage = () => {
                 </button>
                 <p className="text-sm text-gray-600">
                   {formData.isPrivate
-                    ? 'Only invited guests can access and book. You\'ll manage the guest list after approval.'
+                    ? 'Only invited guests can access and book. Add guest emails below.'
                     : 'Anyone can access the microsite and book accommodations.'}
                 </p>
               </div>
             </div>
+
+            {/* Invited Guests Section - Only show for private events */}
+            {formData.isPrivate && (
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Invited Guests * (Private Event)
+                </label>
+                <div className="border rounded-lg p-4 bg-gray-50 space-y-4">
+                  {/* Add Guest Form */}
+                  <div className="grid md:grid-cols-4 gap-3">
+                    <input
+                      type="text"
+                      placeholder="Guest Name"
+                      value={guestInput.name}
+                      onChange={(e) => setGuestInput(prev => ({ ...prev, name: e.target.value }))}
+                      className="input"
+                    />
+                    <input
+                      type="email"
+                      placeholder="Email Address"
+                      value={guestInput.email}
+                      onChange={(e) => setGuestInput(prev => ({ ...prev, email: e.target.value }))}
+                      className="input"
+                    />
+                    <input
+                      type="tel"
+                      placeholder="Phone (optional)"
+                      value={guestInput.phone}
+                      onChange={(e) => setGuestInput(prev => ({ ...prev, phone: e.target.value }))}
+                      className="input"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAddGuest}
+                      className="btn-primary flex items-center justify-center gap-2"
+                    >
+                      <Plus className="h-5 w-5" />
+                      Add
+                    </button>
+                  </div>
+
+                  {/* Guest List */}
+                  {formData.invitedGuests.length > 0 ? (
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium text-gray-700">
+                        Invited Guests ({formData.invitedGuests.length})
+                      </p>
+                      <div className="space-y-2 max-h-60 overflow-y-auto">
+                        {formData.invitedGuests.map((guest, index) => (
+                          <div
+                            key={index}
+                            className="flex items-center justify-between bg-white p-3 rounded-lg border"
+                          >
+                            <div className="flex items-center gap-3">
+                              <Mail className="h-5 w-5 text-gray-400" />
+                              <div>
+                                <p className="font-medium text-gray-900">{guest.name}</p>
+                                <p className="text-sm text-gray-600">{guest.email}</p>
+                                {guest.phone && (
+                                  <p className="text-xs text-gray-500">{guest.phone}</p>
+                                )}
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveGuest(guest.email)}
+                              className="text-red-600 hover:text-red-700 p-1"
+                            >
+                              <X className="h-5 w-5" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-500 text-center py-4">
+                      No guests added yet. Add at least one guest for private events.
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">

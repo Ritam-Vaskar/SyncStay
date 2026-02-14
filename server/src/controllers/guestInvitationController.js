@@ -190,15 +190,24 @@ export const removeGuest = asyncHandler(async (req, res) => {
 export const verifyGuestAccess = asyncHandler(async (req, res) => {
   const { eventSlug, email } = req.body;
 
+  console.log('\n🔍 VERIFYING GUEST ACCESS:');
+  console.log('   Event Slug:', eventSlug);
+  console.log('   Email to verify:', email);
+
   const event = await Event.findOne({ 'micrositeConfig.customSlug': eventSlug })
     .select('isPrivate invitedGuests name');
 
   if (!event) {
+    console.log('   ❌ Event not found');
     return res.status(404).json({ message: 'Event not found' });
   }
 
+  console.log('   Event:', event.name);
+  console.log('   Is Private:', event.isPrivate);
+
   // Public events are accessible to all
   if (!event.isPrivate) {
+    console.log('   ✅ Public event - access granted');
     return res.status(200).json({
       success: true,
       hasAccess: true,
@@ -206,19 +215,32 @@ export const verifyGuestAccess = asyncHandler(async (req, res) => {
     });
   }
 
+  console.log('   Invited Guests List:');
+  event.invitedGuests.forEach((g, index) => {
+    console.log(`      ${index + 1}. ${g.name} <${g.email}> (hasAccessed: ${g.hasAccessed})`);
+  });
+
   // Check if email is in invited guests
   const guest = event.invitedGuests.find(
     g => g.email.toLowerCase() === email.toLowerCase()
   );
 
+  console.log('   Email comparison:');
+  console.log('      Looking for:', email.toLowerCase());
+  console.log('      Found match:', guest ? `YES - ${guest.name} <${guest.email}>` : 'NO');
+
   if (!guest) {
-    return res.status(403).json({
-      success: false,
+    console.log('   ❌ Access denied: Email not in invited guests list');
+    // Return 200 with hasAccess: false (not a server error, just not invited)
+    return res.status(200).json({
+      success: true,
       hasAccess: false,
       isPrivate: true,
       message: 'You are not invited to this private event',
     });
   }
+
+  console.log('   ✅ Access granted: Guest is invited');
 
   // Mark as accessed
   if (!guest.hasAccessed) {

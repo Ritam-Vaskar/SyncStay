@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate } from 'react-router-dom';
 import { 
@@ -28,7 +28,9 @@ import {
   Plane,
   ShirtIcon,
   X,
-  Check
+  Check,
+  CreditCard,
+  Lock
 } from 'lucide-react';
 import { eventService } from '@/services/apiServices';
 import { hotelProposalService } from '@/services/hotelProposalService';
@@ -42,6 +44,8 @@ export const PlannerProposalsPage = () => {
   const [showProposalsModal, setShowProposalsModal] = useState(false);
   const [selectedProposalForDetails, setSelectedProposalForDetails] = useState(null);
   const [showProposalDetailsModal, setShowProposalDetailsModal] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [paymentAmount, setPaymentAmount] = useState(0);
 
   const { data: eventsData, isLoading } = useQuery({
     queryKey: ['planner-proposals'],
@@ -121,6 +125,11 @@ export const PlannerProposalsPage = () => {
   const viewHotelProposals = async (event) => {
     setSelectedEvent(event);
     setShowProposalsModal(true);
+    
+    // If private event with selected hotels but not paid, trigger payment
+    if (event.isPrivate && event.selectedHotels?.length > 0 && event.plannerPaymentStatus !== 'paid') {
+      // Payment will be triggered when modal closes
+    }
   };
 
   const viewProposalDetails = (proposal) => {
@@ -149,7 +158,14 @@ export const PlannerProposalsPage = () => {
       setSelectedEvent(null);
     },
     onError: (error) => {
-      toast.error(error.response?.data?.message || 'Failed to publish microsite');
+      const errorMessage = error.response?.data?.message || 'Failed to publish microsite';
+      console.error('Publish microsite error:', errorMessage);
+      toast.error(errorMessage);
+      
+      // If private event needs payment, show payment modal
+      if (errorMessage.includes('Payment required') && selectedEvent?.isPrivate) {
+        handleInitiatePayment();
+      }
     },
   });
 
@@ -162,7 +178,91 @@ export const PlannerProposalsPage = () => {
       toast.error('Please select at least one hotel before publishing');
       return;
     }
+
+    // Check if private event and payment not completed
+    if (selectedEvent?.isPrivate && selectedEvent?.plannerPaymentStatus !== 'paid') {
+      handleInitiatePayment();
+      return;
+    }
+
+    // For public events or paid private events, publish directly
     publishMicrositeMutation.mutate(selectedEvent._id);
+  };
+
+  const handleInitiatePayment = async () => {
+    if (!selectedEvent?.selectedHotels || selectedEvent.selectedHotels.length === 0) {
+      toast.error('Please select at least one hotel first');
+      return;
+    }
+
+    try {
+      // Fetch hotel proposals for the event
+      const proposalsResponse = await hotelProposalService.getEventProposals(selectedEvent._id);
+      const hotelProposals = proposalsResponse?.data || [];
+
+      // Calculate total amount from selected proposals
+      const selectedProposals = hotelProposals.filter(p => 
+        selectedEvent.selectedHotels.some(sh => sh.proposal === p._id || sh.proposal?._id === p._id)
+      );
+      
+      const totalAmount = selectedProposals.reduce((sum, p) => sum + (p.totalCost || 0), 0);
+      
+      if (totalAmount === 0) {
+        toast.error('Unable to calculate payment amount. Please ensure hotels have been selected.');
+        console.error('Payment calculation failed:', {
+          selectedHotels: selectedEvent.selectedHotels,
+          hotelProposals,
+          selectedProposals
+        });
+        return;
+      }
+
+      setPaymentAmount(totalAmount);
+      setShowPaymentModal(true);
+    } catch (error) {
+      console.error('Error fetching proposals for payment:', error);
+      toast.error('Failed to calculate payment amount');
+    }
+  };
+
+  const handlePaymentSuccess = async (paymentDetails) => {
+    try {
+      const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
+      
+      // Call the planner payment endpoint
+      const response = await fetch(`${API_BASE_URL}/events/${selectedEvent._id}/planner-payment`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        },
+        body: JSON.stringify(paymentDetails)
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Payment verification response:', errorText);
+        throw new Error(`Payment verification failed: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('Payment verification response:', data);
+
+      if (data.success) {
+        toast.success('Payment successful! Microsite is now published.');
+        setShowPaymentModal(false);
+        queryClient.invalidateQueries(['planner-proposals']);
+        setShowProposalsModal(false);
+        setSelectedEvent(null);
+      } else {
+        throw new Error(data.message || 'Payment verification failed');
+      }
+    } catch (error) {
+      console.error('Payment error:', error);
+      toast.error(error.message || 'Failed to process payment');
+    }
   };
 
   const facilityIcons = {
@@ -479,8 +579,19 @@ export const PlannerProposalsPage = () => {
       {showProposalsModal && selectedEvent && (
         <HotelProposalsModal
           event={selectedEvent}
-          onClose={() => {
+          onClose={async (shouldTriggerPayment = false, paymentAmount = 0) => {
             setShowProposalsModal(false);
+            
+            // Refetch event data after selection
+            await queryClient.invalidateQueries(['planner-proposals']);
+            
+            // Trigger payment for private events after selection
+            if (shouldTriggerPayment && selectedEvent.isPrivate && paymentAmount > 0) {
+              // Set amount and show payment modal
+              setPaymentAmount(paymentAmount);
+              setShowPaymentModal(true);
+            }
+            
             setSelectedEvent(null);
           }}
           onSelectHotel={handleSelectHotel}
@@ -502,19 +613,108 @@ export const PlannerProposalsPage = () => {
           facilityIcons={facilityIcons}
         />
       )}
+
+      {/* Payment Modal for Private Events */}
+      {showPaymentModal && selectedEvent && (
+        <PaymentModal
+          event={selectedEvent}
+          amount={paymentAmount}
+          onClose={() => setShowPaymentModal(false)}
+          onSuccess={handlePaymentSuccess}
+        />
+      )}
     </div>
   );
 };
 
 // Hotel Proposals Modal Component
 const HotelProposalsModal = ({ event, onClose, onSelectHotel, onPublishMicrosite, onViewDetails, isPublishing, isSelecting }) => {
+  const [localSelectedProposals, setLocalSelectedProposals] = useState([]);
+  const [isConfirming, setIsConfirming] = useState(false);
+
   const { data: proposalsData, isLoading } = useQuery({
     queryKey: ['event-proposals', event._id],
     queryFn: () => hotelProposalService.getEventProposals(event._id),
+    refetchOnMount: 'always',
+    staleTime: 0,
   });
 
   const proposals = proposalsData?.data || [];
-  const selectedCount = proposals.filter(p => p.selectedByPlanner).length;
+  
+  // Initialize local selections from already selected hotels
+  useEffect(() => {
+    if (proposals.length > 0) {
+      const alreadySelected = proposals
+        .filter(p => p.selectedByPlanner)
+        .map(p => p._id);
+      setLocalSelectedProposals(alreadySelected);
+    }
+  }, [proposals]);
+
+  const toggleProposalSelection = (proposalId) => {
+    setLocalSelectedProposals(prev => {
+      if (prev.includes(proposalId)) {
+        return prev.filter(id => id !== proposalId);
+      } else {
+        return [...prev, proposalId];
+      }
+    });
+  };
+
+  const calculateTotalCost = () => {
+    const selectedProposals = proposals.filter(p => localSelectedProposals.includes(p._id));
+    const total = selectedProposals.reduce((sum, p) => sum + (p.totalEstimatedCost || 0), 0);
+    
+    console.log('💰 Payment Calculation:', {
+      selectedProposalIds: localSelectedProposals,
+      allProposals: proposals.map(p => ({ id: p._id, name: p.hotelName, cost: p.totalEstimatedCost })),
+      selectedProposals: selectedProposals.map(p => ({ id: p._id, name: p.hotelName, cost: p.totalEstimatedCost })),
+      totalCost: total
+    });
+    
+    return total;
+  };
+
+  const handleConfirmSelection = async () => {
+    if (localSelectedProposals.length === 0) {
+      toast.error('Please select at least one hotel');
+      return;
+    }
+
+    setIsConfirming(true);
+    try {
+      // Select all proposals via API
+      for (const proposalId of localSelectedProposals) {
+        await hotelProposalService.selectProposal(proposalId);
+      }
+      
+      toast.success(`${localSelectedProposals.length} hotel(s) selected successfully!`);
+      
+      // For public events, publish immediately
+      if (!event.isPrivate) {
+        onPublishMicrosite();
+      } else {
+        // For private events, close modal and trigger payment with calculated amount
+        const paymentAmount = calculateTotalCost();
+        
+        if (paymentAmount <= 0) {
+          toast.error('Unable to calculate payment amount. Please ensure hotels have valid pricing.');
+          setIsConfirming(false);
+          return;
+        }
+        
+        onClose(true, paymentAmount); // Pass true and amount to trigger payment
+      }
+    } catch (error) {
+      console.error('Error confirming selection:', error);
+      toast.error('Failed to confirm hotel selection');
+    } finally {
+      setIsConfirming(false);
+    }
+  };
+
+  const selectedCount = localSelectedProposals.length;
+  const totalCost = calculateTotalCost();
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -545,21 +745,33 @@ const HotelProposalsModal = ({ event, onClose, onSelectHotel, onPublishMicrosite
           ) : (
             <>
               <div className="grid md:grid-cols-2 gap-6 mb-6">
-                {proposals.map((proposal) => (
+                {proposals.map((proposal) => {
+                  const isSelected = localSelectedProposals.includes(proposal._id);
+                  return (
                   <div
                     key={proposal._id}
-                    className={`border rounded-lg p-6 transition-all ${
-                      proposal.selectedByPlanner
-                        ? 'border-green-500 bg-green-50 ring-2 ring-green-500'
+                    onClick={() => event.status !== 'active' && toggleProposalSelection(proposal._id)}
+                    className={`border rounded-lg p-6 transition-all cursor-pointer ${
+                      isSelected
+                        ? 'border-primary-500 bg-primary-50 ring-2 ring-primary-500'
                         : 'border-gray-200 hover:border-primary-300 hover:shadow-md'
                     }`}
                   >
                     <div className="flex items-start justify-between mb-4">
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-2">
+                          {event.status !== 'active' && (
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => toggleProposalSelection(proposal._id)}
+                              onClick={(e) => e.stopPropagation()}
+                              className="h-5 w-5 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+                            />
+                          )}
                           <h3 className="text-lg font-bold text-gray-900">{proposal.hotelName}</h3>
-                          {proposal.selectedByPlanner && (
-                            <span className="px-2 py-1 bg-green-600 text-white text-xs font-semibold rounded-full flex items-center gap-1">
+                          {isSelected && (
+                            <span className="px-2 py-1 bg-primary-600 text-white text-xs font-semibold rounded-full flex items-center gap-1">
                               <Check className="h-3 w-3" />
                               Selected
                             </span>
@@ -624,50 +836,63 @@ const HotelProposalsModal = ({ event, onClose, onSelectHotel, onPublishMicrosite
                     {/* Actions */}
                     <div className="flex items-center gap-3">
                       <button
-                        onClick={() => onViewDetails(proposal)}
-                        className="btn btn-sm bg-gray-100 text-gray-700 hover:bg-gray-200 flex items-center gap-2 flex-1"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onViewDetails(proposal);
+                        }}
+                        className="btn btn-sm bg-gray-100 text-gray-700 hover:bg-gray-200 flex items-center gap-2 w-full"
                       >
                         <Eye className="h-4 w-4" />
-                        View Details
+                        View Full Details
                       </button>
-                      {!proposal.selectedByPlanner && event.status !== 'active' && (
-                        <button
-                          onClick={() => onSelectHotel(proposal._id)}
-                          disabled={isSelecting}
-                          className="btn btn-sm btn-primary flex items-center gap-2 flex-1"
-                        >
-                          <Check className="h-4 w-4" />
-                          Select Hotel
-                        </button>
-                      )}
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
 
-              {/* Publish Microsite Button */}
+              {/* Confirm Selection Button */}
               {selectedCount > 0 && event.status !== 'active' && (
                 <div className="sticky bottom-0 bg-white border-t border-gray-200 pt-6">
-                  <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
-                    <p className="text-sm text-green-800">
-                      You have selected {selectedCount} hotel{selectedCount > 1 ? 's' : ''}. 
-                      Click "Publish Microsite" to finalize your selection and activate the event.
-                    </p>
+                  <div className={`${event.isPrivate ? 'bg-blue-50 border-blue-200' : 'bg-green-50 border-green-200'} border rounded-lg p-4 mb-4`}>
+                    <div className="flex items-start gap-3">
+                      {event.isPrivate && <Lock className="h-5 w-5 text-blue-600 mt-0.5" />}
+                      <div className="flex-1">
+                        <p className={`text-sm font-medium ${event.isPrivate ? 'text-blue-900' : 'text-green-900'} mb-1`}>
+                          {selectedCount} hotel{selectedCount > 1 ? 's' : ''} selected • Total Cost: ₹{totalCost.toLocaleString('en-IN')}
+                        </p>
+                        <p className={`text-xs ${event.isPrivate ? 'text-blue-700' : 'text-green-700'}`}>
+                          {event.isPrivate 
+                            ? '💳 Private Event: You will pay upfront for all accommodations. After payment, your microsite will be published and invited guests can book for free.'
+                            : '✅ Public Event: Microsite will be published immediately. Guests will pay individually when booking.'
+                          }
+                        </p>
+                      </div>
+                    </div>
                   </div>
                   <button
-                    onClick={onPublishMicrosite}
-                    disabled={isPublishing}
+                    onClick={handleConfirmSelection}
+                    disabled={isConfirming || isPublishing}
                     className="btn btn-primary w-full flex items-center justify-center gap-2 text-lg py-3"
                   >
-                    {isPublishing ? (
+                    {(isConfirming || isPublishing) ? (
                       <>
                         <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                        Publishing...
+                        {event.isPrivate ? 'Processing...' : 'Publishing...'}
                       </>
                     ) : (
                       <>
-                        <CheckCircle className="h-6 w-6" />
-                        Publish Microsite & Activate Event
+                        {event.isPrivate ? (
+                          <>
+                            <CreditCard className="h-6 w-6" />
+                            Proceed to Payment (₹{totalCost.toLocaleString('en-IN')})
+                          </>
+                        ) : (
+                          <>
+                            <CheckCircle className="h-6 w-6" />
+                            Confirm & Publish Microsite
+                          </>
+                        )}
                       </>
                     )}
                   </button>
@@ -774,6 +999,217 @@ const ProposalDetailsModal = ({ proposal, onClose, facilityIcons }) => {
               </div>
             </div>
           )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Payment Modal Component for Private Events
+const PaymentModal = ({ event, amount, onClose, onSuccess }) => {
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  useEffect(() => {
+    // Load Razorpay script
+    const script = document.createElement('script');
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    script.async = true;
+    script.onload = () => console.log('✅ Razorpay script loaded');
+    script.onerror = () => console.error('❌ Failed to load Razorpay script');
+    document.body.appendChild(script);
+
+    return () => {
+      if (document.body.contains(script)) {
+        document.body.removeChild(script);
+      }
+    };
+  }, []);
+
+  const handlePayment = async () => {
+    if (!window.Razorpay) {
+      toast.error('Payment system not loaded. Please refresh the page.');
+      return;
+    }
+
+    try {
+      setIsProcessing(true);
+      // toast.info('Initiating payment...');
+
+      const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
+
+      // 1. Create Razorpay order
+      const orderResponse = await fetch(`${API_BASE_URL}/payments/razorpay/create-order`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        },
+        body: JSON.stringify({
+          amount: amount,
+          currency: 'INR',
+          notes: {
+            eventId: event._id,
+            eventName: event.name,
+            type: 'planner_payment'
+          }
+        })
+      });
+
+      if (!orderResponse.ok) {
+        const errorText = await orderResponse.text();
+        throw new Error(`Payment order creation failed: ${errorText}`);
+      }
+
+      const orderData = await orderResponse.json();
+
+      if (!orderData.success) {
+        throw new Error(orderData.message || 'Failed to create payment order');
+      }
+
+      // 2. Open Razorpay checkout
+      const options = {
+        key: import.meta.env.VITE_RAZORPAY_KEY_ID,
+        amount: orderData.data.amount,
+        currency: orderData.data.currency,
+        order_id: orderData.data.id,
+        name: 'SyncStay',
+        description: `Payment for ${event.name}`,
+        config: {
+          display: {
+            blocks: {
+              banks: {
+                name: 'All payment methods',
+                instruments: [
+                  { method: 'upi' },
+                  { method: 'card' },
+                  { method: 'netbanking' },
+                  { method: 'wallet' },
+                ],
+              },
+            },
+            sequence: ['block.banks'],
+            preferences: {
+              show_default_blocks: true,
+            },
+          },
+        },
+        handler: async function(response) {
+          try {
+            // toast.info('Verifying payment...');
+            // 3. Verify and process payment
+            await onSuccess({
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature
+            });
+          } catch (error) {
+            console.error('Payment handler error:', error);
+            toast.error('Payment processing failed');
+            setIsProcessing(false);
+          }
+        },
+        prefill: {
+          name: event.planner?.name || '',
+          email: event.planner?.email || '',
+          contact: event.planner?.phone || ''
+        },
+        notify: {
+          email: true,
+          sms: false,
+        },
+        reminder_enable: true,
+        theme: {
+          color: '#3b82f6'
+        },
+        modal: {
+          ondismiss: function() {
+            setIsProcessing(false);
+            toast.error('Payment cancelled');
+          }
+        }
+      };
+
+      const razorpay = new window.Razorpay(options);
+      razorpay.open();
+
+    } catch (error) {
+      console.error('Payment initiation error:', error);
+      toast.error(error.message || 'Failed to initiate payment');
+      setIsProcessing(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[70] p-4">
+      <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+        <div className="border-b border-gray-200 p-6 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="bg-primary-100 p-2 rounded-lg">
+              <Lock className="h-6 w-6 text-primary-600" />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-gray-900">Complete Payment</h2>
+              <p className="text-sm text-gray-600">Private Event Payment</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <X className="h-6 w-6" />
+          </button>
+        </div>
+
+        <div className="p-6 space-y-6">
+          {/* Event Details */}
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <h3 className="font-semibold text-gray-900 mb-2">{event.name}</h3>
+            <div className="text-sm text-gray-600 space-y-1">
+              <p>📅 {new Date(event.startDate).toLocaleDateString()} - {new Date(event.endDate).toLocaleDateString()}</p>
+              <p>📍 {event.location?.city || 'Location TBD'}</p>
+              <p>👥 {event.expectedGuests} expected guests</p>
+            </div>
+          </div>
+
+          {/* Payment Amount */}
+          <div className="border-2 border-primary-500 rounded-lg p-6 text-center">
+            <p className="text-sm text-gray-600 mb-2">Total Amount</p>
+            <p className="text-4xl font-bold text-primary-600">₹{amount.toLocaleString('en-IN')}</p>
+            <p className="text-xs text-gray-500 mt-2">Includes all selected hotel costs</p>
+          </div>
+
+          {/* Info Box */}
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+            <div className="flex gap-3">
+              <AlertCircle className="h-5 w-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+              <div className="text-sm text-yellow-800">
+                <p className="font-medium mb-1">Private Event Payment</p>
+                <p>You're paying upfront for all accommodations. After payment, your microsite will be published and invited guests can book without additional charges.</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Payment Button */}
+          <button
+            onClick={handlePayment}
+            disabled={isProcessing}
+            className="btn-primary w-full flex items-center justify-center gap-2 text-lg py-3"
+          >
+            {isProcessing ? (
+              <>
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                Processing...
+              </>
+            ) : (
+              <>
+                <CreditCard className="h-6 w-6" />
+                Pay ₹{amount.toLocaleString('en-IN')}
+              </>
+            )}
+          </button>
+
+          <p className="text-xs text-center text-gray-500">
+            Secure payment powered by Razorpay
+          </p>
         </div>
       </div>
     </div>

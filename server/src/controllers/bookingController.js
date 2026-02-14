@@ -83,7 +83,8 @@ export const getBooking = asyncHandler(async (req, res) => {
  * @access  Private (Guest) or Public with guest details
  */
 export const createBooking = asyncHandler(async (req, res) => {
-  const { event, inventory, hotelProposal, roomDetails, guestDetails, pricing, specialRequests } = req.body;
+  const { event, inventory, hotelProposal, roomDetails, pricing, specialRequests } = req.body;
+  let { guestDetails } = req.body;
 
   console.log('📝 Creating booking with data:', JSON.stringify(req.body, null, 2));
 
@@ -157,9 +158,73 @@ export const createBooking = asyncHandler(async (req, res) => {
   // Check if event is private - planner pays for all bookings
   const isPaidByPlanner = eventDoc.isPrivate;
 
+  // For private events, enforce using the authenticated user's details (prevent email spoofing)
+  if (eventDoc.isPrivate && req.user) {
+    guestDetails = {
+      name: req.user.name,
+      email: req.user.email,
+      phone: req.user.phone || guestDetails?.phone,
+    };
+  }
+
+  // For private events, verify guest is invited
+  if (eventDoc.isPrivate && req.user) {
+    console.log('\n🔍 BOOKING ACCESS CHECK (Backend):');
+    console.log('   Event:', eventDoc.name);
+    console.log('   User Email:', req.user.email);
+    console.log('   User Role:', req.user.role);
+    console.log('   Planner ID:', eventDoc.planner.toString());
+    console.log('   User ID:', req.user.id);
+    
+    console.log('   Invited Guests:');
+    eventDoc.invitedGuests.forEach((g, index) => {
+      console.log(`      ${index + 1}. ${g.name} <${g.email}>`);
+    });
+    
+    const isInvited = eventDoc.invitedGuests.some(
+      (guest) => guest.email.toLowerCase() === req.user.email.toLowerCase()
+    );
+    
+    console.log('   Email comparison:');
+    console.log('      Looking for:', req.user.email.toLowerCase());
+    console.log('      Is invited:', isInvited);
+    console.log('      Is planner:', eventDoc.planner.toString() === req.user.id);
+    
+    if (!isInvited && eventDoc.planner.toString() !== req.user.id) {
+      console.log('   ❌ Access denied: Not invited and not planner');
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied. You are not invited to this private event.',
+      });
+    }
+
+    console.log('   ✅ Access granted');
+
+    // Mark guest as accessed when they make their first booking
+    if (isInvited) {
+      const guest = eventDoc.invitedGuests.find(
+        (g) => g.email.toLowerCase() === req.user.email.toLowerCase()
+      );
+      if (guest && !guest.hasAccessed) {
+        guest.hasAccessed = true;
+        console.log(`   → Marking guest ${guest.email} as hasAccessed=true`);
+      }
+    }
+  }
+
+  // For private events, ensure planner has paid before guests can book
+  if (eventDoc.isPrivate && eventDoc.plannerPaymentStatus !== 'paid') {
+    return res.status(400).json({
+      success: false,
+      message: 'This private event is not yet active. Planner payment is pending.',
+    });
+  }
+
   // Check if Razorpay payment was made
   const hasRazorpayPayment = req.body.razorpay_payment_id && req.body.razorpay_order_id;
-  const bookingPaymentStatus = hasRazorpayPayment ? 'paid' : (isPaidByPlanner ? 'unpaid' : 'unpaid');
+  // For private events, planner already paid — mark as 'paid'
+  // For public events, only mark as 'paid' if Razorpay payment was made
+  const bookingPaymentStatus = isPaidByPlanner ? 'paid' : (hasRazorpayPayment ? 'paid' : 'unpaid');
 
   // Create booking
   const booking = await Booking.create({

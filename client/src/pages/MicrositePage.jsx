@@ -6,7 +6,7 @@ import { guestInvitationService } from '@/services/guestInvitationService';
 import { hotelProposalService } from '@/services/hotelProposalService';
 import { LoadingPage } from '@/components/LoadingSpinner';
 import { formatCurrency, formatDate } from '@/utils/helpers';
-import { Calendar, MapPin, Users, Hotel, Check, X, LogIn, UserPlus, LogOut, LayoutDashboard, Lock, Mail } from 'lucide-react';
+import { Calendar, MapPin, Users, Hotel, Check, X, LogIn, UserPlus, LogOut, LayoutDashboard, Lock, Mail, CheckCircle, CreditCard, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '@/store/authStore';
 
@@ -21,6 +21,7 @@ export const MicrositePage = () => {
   const [showAccessModal, setShowAccessModal] = useState(false);
   const [accessEmail, setAccessEmail] = useState('');
   const [hasAccess, setHasAccess] = useState(null); // null = not checked, true = has access, false = denied
+  const [isInvitedGuest, setIsInvitedGuest] = useState(false); // tracks if current user is invited
 
   // Load Razorpay script
   useEffect(() => {
@@ -49,72 +50,49 @@ export const MicrositePage = () => {
     refetchInterval: 30000, // Refetch every 30 seconds to show updated availability
   });
 
-  // Check access for private events
+  // Check access for private events - simplified to allow viewing for everyone
   useEffect(() => {
     const checkAccess = async () => {
       if (eventData?.data) {
         const event = eventData.data;
         
-        // Public events - grant access immediately
+        // Public events - everyone can view and book (after login)
         if (!event.isPrivate) {
           setHasAccess(true);
           return;
         }
 
-        // Wait a bit for Zustand to hydrate from localStorage on fresh page load
-        await new Promise(resolve => setTimeout(resolve, 100));
-        
-        // Re-check authentication state after hydration
+        // Private events - everyone can VIEW the microsite, but only invited guests can BOOK
+        // Planners and admins always have full access
         const token = localStorage.getItem('token');
         const savedUser = localStorage.getItem('user');
-        const isUserAuthenticated = isAuthenticated || (token && savedUser);
         const currentUser = user || (savedUser ? JSON.parse(savedUser) : null);
 
-        // Planners always have access to their own events
-        if (isUserAuthenticated && currentUser?.role === 'planner') {
+        // Check if current user is the event planner (compare IDs)
+        if (currentUser?.role === 'planner' && event.planner?._id === currentUser.id) {
           setHasAccess(true);
           return;
         }
 
         // Admins always have access
-        if (isUserAuthenticated && currentUser?.role === 'admin') {
+        if (currentUser?.role === 'admin') {
           setHasAccess(true);
           return;
         }
 
-        // Private events - check if guest is invited
-        if (isUserAuthenticated && currentUser?.email) {
+        // For private events, allow viewing but we'll check booking permission at booking time
+        // Also pre-check if current user is an invited guest so we can show proper UI
+        setHasAccess(true);
+
+        if (currentUser?.email) {
           try {
             const response = await guestInvitationService.verifyGuestAccess(slug, currentUser.email);
-            if (response.data.hasAccess) {
-              setHasAccess(true);
-              localStorage.setItem(`access_${slug}`, currentUser.email);
-            } else {
-              setHasAccess(false);
-              setShowAccessModal(true);
-            }
-          } catch (error) {
-            setHasAccess(false);
-            setShowAccessModal(true);
+            setIsInvitedGuest(response.hasAccess === true);
+          } catch {
+            setIsInvitedGuest(false);
           }
         } else {
-          // Not authenticated - check if previously verified
-          const savedEmail = localStorage.getItem(`access_${slug}`);
-          if (savedEmail) {
-            setAccessEmail(savedEmail);
-            try {
-              const response = await guestInvitationService.verifyGuestAccess(slug, savedEmail);
-              setHasAccess(response.data.hasAccess);
-              if (!response.data.hasAccess) {
-                setShowAccessModal(true);
-              }
-            } catch (error) {
-              setHasAccess(false);
-              setShowAccessModal(true);
-            }
-          } else {
-            setShowAccessModal(true);
-          }
+          setIsInvitedGuest(false);
         }
       }
     };
@@ -161,81 +139,77 @@ export const MicrositePage = () => {
   const hotels = proposalsData?.data || [];
   const theme = event.micrositeConfig?.theme || {};
 
-  // Show loading while checking access for private events
-  if (event.isPrivate && hasAccess === null) {
-    return <LoadingPage />;
-  }
+  // Note: We removed the blocking access check for private events
+  // Everyone can VIEW the microsite, but only invited guests can BOOK rooms
+  // The booking permission is checked in handleBookNow function
 
-  // Block content if private event and access denied
-  if (event.isPrivate && hasAccess === false) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        {showAccessModal && hasAccess === false && (
-          <div className="fixed inset-0 bg-black bg-opacity-75 z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl max-w-md w-full p-8 shadow-2xl">
-              <div className="text-center mb-6">
-                <div className="bg-purple-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Lock className="h-8 w-8 text-purple-600" />
-                </div>
-                <h2 className="text-2xl font-bold text-gray-900 mb-2">Private Event</h2>
-                <p className="text-gray-600">
-                  This is a private event. Please enter your email to verify your invitation.
-                </p>
-              </div>
-
-              <form onSubmit={handleAccessVerification} className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Email Address
-                  </label>
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-                    <input
-                      type="email"
-                      value={accessEmail}
-                      onChange={(e) => setAccessEmail(e.target.value)}
-                      placeholder="your.email@example.com"
-                      required
-                      className="input pl-10"
-                    />
-                  </div>
-                </div>
-
-                <button
-                  type="submit"
-                  className="btn btn-primary w-full"
-                >
-                  Verify Access
-                </button>
-              </form>
-
-              <div className="mt-6 p-4 bg-blue-50 rounded-lg">
-                <p className="text-sm text-gray-700">
-                  <strong>Note:</strong> Only guests invited by the event planner can access this microsite.
-                  If you believe this is an error, please contact the event organizer.
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  // Show loading while checking access for private events
-  if (event.isPrivate && hasAccess === null) {
-    return <LoadingPage />;
-  }
-
-  const handleBookNow = (item) => {
+  const handleBookNow = async (item) => {
+    // Check if user is authenticated
     if (!isAuthenticated) {
-      toast.error('Please login to book');
+      toast.error('Please login to book a room');
       setAuthMode('login');
       setShowAuthModal(true);
       return;
     }
-    setSelectedInventory(item);
-    setShowBookingForm(true);
+
+    console.log('🔍 BOOKING ACCESS CHECK:');
+    console.log('   User Details:', {
+      email: user?.email,
+      name: user?.name,
+      role: user?.role,
+      id: user?.id
+    });
+    console.log('   Event Details:', {
+      name: event.name,
+      isPrivate: event.isPrivate,
+      plannerId: event.planner?._id,
+      slug: slug
+    });
+
+    // For private events, verify guest access before allowing booking
+    if (event.isPrivate) {
+      console.log('   ✓ Private event - checking access...');
+      
+      // Planners and admins can always book
+      if (user?.role === 'planner' && event.planner?._id === user.id) {
+        console.log('   ✅ Access granted: User is the planner');
+        setSelectedInventory(item);
+        setShowBookingForm(true);
+        return;
+      }
+
+      if (user?.role === 'admin') {
+        console.log('   ✅ Access granted: User is admin');
+        setSelectedInventory(item);
+        setShowBookingForm(true);
+        return;
+      }
+
+      // For other users, check if they're invited
+      console.log('   → Verifying guest invitation for email:', user.email);
+      try {
+        const response = await guestInvitationService.verifyGuestAccess(slug, user.email);
+        console.log('   → Verification response:', response);
+        
+        if (response.hasAccess) {
+          console.log('   ✅ Access granted: Guest is invited');
+          toast.success(`Welcome, ${response.guestInfo.name}!`);
+          setSelectedInventory(item);
+          setShowBookingForm(true);
+        } else {
+          console.log('   ❌ Access denied: Guest not invited');
+          toast.error('This is a private event. Only invited guests can book rooms.');
+        }
+      } catch (error) {
+        console.error('   ❌ Verification error:', error);
+        toast.error('You are not invited to this private event');
+      }
+    } else {
+      console.log('   ✓ Public event - access granted');
+      // Public event - allow booking for any authenticated user
+      setSelectedInventory(item);
+      setShowBookingForm(true);
+    }
   };
 
   const handleLogout = () => {
@@ -317,6 +291,30 @@ export const MicrositePage = () => {
       </div>
 
       <div className="container mx-auto px-6 py-12">
+        {/* Private Event Notice - Show for private events */}
+        {event.isPrivate && (
+          <div className="card mb-8 bg-purple-50 border-2 border-purple-200">
+            <div className="flex items-start gap-4">
+              <div className="flex-shrink-0">
+                <div className="bg-purple-100 p-3 rounded-lg">
+                  <Lock className="h-6 w-6 text-purple-600" />
+                </div>
+              </div>
+              <div className="flex-1">
+                <h3 className="text-lg font-semibold text-purple-900 mb-2">Private Event</h3>
+                <p className="text-purple-800 mb-2">
+                  This is a private event. You can view the available hotels and rooms, but only invited guests can book accommodations.
+                </p>
+                <p className="text-sm text-purple-700">
+                  {isAuthenticated 
+                    ? '✓ You are logged in. Click "Book Now" to check if you have access.' 
+                    : '→ Please login with your invited email address to book a room.'}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Event Details */}
         <div className="grid md:grid-cols-3 gap-6 mb-12">
           <div className="card flex items-start gap-4">
@@ -365,6 +363,31 @@ export const MicrositePage = () => {
         {/* Available Hotels/Inventory */}
         <div>
           <h2 className="text-3xl font-bold mb-6">Available Hotels & Rooms</h2>
+          
+          {/* Private event notice for non-invited users */}
+          {event.isPrivate && isAuthenticated && !isInvitedGuest && user?.role !== 'admin' && event.planner?._id !== user?.id && (
+            <div className="card bg-amber-50 border-2 border-amber-200 mb-6">
+              <div className="flex items-center gap-3">
+                <Lock className="h-5 w-5 text-amber-600 flex-shrink-0" />
+                <div>
+                  <p className="text-sm font-semibold text-amber-900">Private Event — Invited Guests Only</p>
+                  <p className="text-xs text-amber-700">You can view the hotels and rooms, but only invited guests can make bookings. Contact the event planner if you believe you should have access.</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {event.isPrivate && !isAuthenticated && (
+            <div className="card bg-blue-50 border-2 border-blue-200 mb-6">
+              <div className="flex items-center gap-3">
+                <LogIn className="h-5 w-5 text-blue-600 flex-shrink-0" />
+                <div>
+                  <p className="text-sm font-semibold text-blue-900">Login Required to Book</p>
+                  <p className="text-xs text-blue-700">This is a private event. Please login with your invited email address to make bookings.</p>
+                </div>
+              </div>
+            </div>
+          )}
           
           {hotels.length === 0 ? (
             <div className="card text-center py-12">
@@ -478,10 +501,22 @@ export const MicrositePage = () => {
                                   checkInDate: event.startDate,
                                   checkOutDate: event.endDate,
                                 })}
-                                disabled={room.availableRooms === 0}
+                                disabled={room.availableRooms === 0 || (event.isPrivate && isAuthenticated && !isInvitedGuest && user?.role !== 'admin' && event.planner?._id !== user?.id)}
                                 className="btn btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
                               >
-                                {room.availableRooms === 0 ? 'Sold Out' : 'Book Now'}
+                                {room.availableRooms === 0 ? 'Sold Out' : 
+                                  event.isPrivate && !isAuthenticated ? (
+                                    <span className="flex items-center justify-center gap-1">
+                                      <Lock className="h-4 w-4" /> Login to Book
+                                    </span>
+                                  ) : 
+                                  event.isPrivate && isAuthenticated && !isInvitedGuest && user?.role !== 'admin' && event.planner?._id !== user?.id ? (
+                                    <span className="flex items-center justify-center gap-1">
+                                      <Lock className="h-4 w-4" /> Invited Guests Only
+                                    </span>
+                                  ) : 
+                                  event.isPrivate ? 'Book Now (Free)' : 'Book Now'
+                                }
                               </button>
                             </div>
                           );
@@ -567,14 +602,8 @@ const BookingModal = ({ inventory, event, user, onClose, onSuccess }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    if (!window.Razorpay) {
-      toast.error('Payment system not loaded. Please refresh the page.');
-      return;
-    }
 
     setIsSubmitting(true);
-    setPaymentStatus({ message: 'Initiating payment...', type: 'info' });
 
     const nights = Math.ceil((new Date(inventory.checkOutDate) - new Date(inventory.checkInDate)) / (1000 * 60 * 60 * 24));
     const totalPrice = inventory.pricePerNight * formData.numberOfRooms * nights;
@@ -601,6 +630,31 @@ const BookingModal = ({ inventory, event, user, onClose, onSuccess }) => {
         },
         specialRequests: formData.specialRequests,
       };
+
+      // For PRIVATE events - planner already paid, guests book for FREE
+      if (event.isPrivate) {
+        console.log('🎫 Private event - Creating FREE booking (planner already paid)');
+        setPaymentStatus({ message: 'Creating your booking...', type: 'info' });
+
+        await bookingService.create(bookingData);
+        
+        setPaymentStatus({ message: 'Booking confirmed!', type: 'success' });
+        toast.success('Booking created successfully! No payment required.');
+        if (onSuccess) onSuccess();
+        setTimeout(() => onClose(), 1500);
+        return;
+      }
+
+      // For PUBLIC events - guest must pay
+      console.log('💳 Public event - Processing payment');
+      
+      if (!window.Razorpay) {
+        toast.error('Payment system not loaded. Please refresh the page.');
+        setIsSubmitting(false);
+        return;
+      }
+
+      setPaymentStatus({ message: 'Initiating payment...', type: 'info' });
 
       // Create Razorpay order
       const orderRes = await fetch(`${import.meta.env.VITE_API_URL}/payments/razorpay/create-order`, {
@@ -738,8 +792,9 @@ const BookingModal = ({ inventory, event, user, onClose, onSuccess }) => {
               <input
                 type="text"
                 value={formData.guestName}
-                onChange={(e) => setFormData({ ...formData, guestName: e.target.value })}
-                className="input"
+                onChange={(e) => !event.isPrivate && setFormData({ ...formData, guestName: e.target.value })}
+                className={`input ${event.isPrivate ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                readOnly={event.isPrivate}
                 required
               />
             </div>
@@ -749,10 +804,17 @@ const BookingModal = ({ inventory, event, user, onClose, onSuccess }) => {
               <input
                 type="email"
                 value={formData.guestEmail}
-                onChange={(e) => setFormData({ ...formData, guestEmail: e.target.value })}
-                className="input"
+                onChange={(e) => !event.isPrivate && setFormData({ ...formData, guestEmail: e.target.value })}
+                className={`input ${event.isPrivate ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                readOnly={event.isPrivate}
                 required
               />
+              {event.isPrivate && (
+                <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
+                  <Lock className="h-3 w-3" />
+                  Private event — booking is linked to your registered email
+                </p>
+              )}
             </div>
 
             <div>
@@ -793,10 +855,30 @@ const BookingModal = ({ inventory, event, user, onClose, onSuccess }) => {
               </div>
             )}
 
+            {/* Private Event - Free Booking Notice */}
+            {event.isPrivate && (
+              <div className="card bg-green-50 border-2 border-green-200">
+                <div className="flex items-center gap-3">
+                  <div className="bg-green-100 p-2 rounded-lg">
+                    <CheckCircle className="h-5 w-5 text-green-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-green-900">Free Booking - Already Paid</p>
+                    <p className="text-xs text-green-700">The event planner has covered all costs. No payment required from you!</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="card bg-gray-100">
               <div className="flex justify-between items-center">
                 <span className="font-semibold">Total Amount</span>
-                <span className="text-2xl font-bold text-primary-600">{formatCurrency(totalPrice)}</span>
+                <div className="text-right">
+                  <span className="text-2xl font-bold text-primary-600">{formatCurrency(totalPrice)}</span>
+                  {event.isPrivate && (
+                    <p className="text-xs text-green-600 font-medium">✓ Paid by planner</p>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -805,20 +887,37 @@ const BookingModal = ({ inventory, event, user, onClose, onSuccess }) => {
                 Cancel
               </button>
               <button type="submit" disabled={isSubmitting} className="btn btn-primary flex-1">
-                {isSubmitting ? 'Processing...' : `Pay ₹${totalPrice.toLocaleString('en-IN')}`}
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="animate-spin h-5 w-5 mr-2 inline" />
+                    Processing...
+                  </>
+                ) : event.isPrivate ? (
+                  <>
+                    <CheckCircle className="h-5 w-5 mr-2 inline" />
+                    Confirm Free Booking
+                  </>
+                ) : (
+                  <>
+                    <CreditCard className="h-5 w-5 mr-2 inline" />
+                    Pay ₹{totalPrice.toLocaleString('en-IN')}
+                  </>
+                )}
               </button>
             </div>
 
-            <div className="text-center">
-              <p className="text-xs text-gray-500">Secure payment powered by Razorpay</p>
-              <div className="flex justify-center gap-2 mt-1 text-xs text-gray-400">
-                <span>UPI</span>
-                <span>•</span>
-                <span>Cards</span>
-                <span>•</span>
-                <span>Net Banking</span>
+            {!event.isPrivate && (
+              <div className="text-center">
+                <p className="text-xs text-gray-500">Secure payment powered by Razorpay</p>
+                <div className="flex justify-center gap-2 mt-1 text-xs text-gray-400">
+                  <span>UPI</span>
+                  <span>•</span>
+                  <span>Cards</span>
+                  <span>•</span>
+                  <span>Net Banking</span>
+                </div>
               </div>
-            </div>
+            )}
           </form>
         </div>
       </div>
