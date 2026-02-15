@@ -2,10 +2,10 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-# Accept build-time env vars (explicit backend URLs)
-ARG VITE_API_URL=http://31.97.236.171:5001/api
-ARG VITE_SOCKET_URL=http://31.97.236.171:5001
-ARG VITE_RAZORPAY_KEY_ID=rzp_test_RsOdHaU8fEaxRF
+# Accept build-time env vars (values provided by docker-compose.yml)
+ARG VITE_API_URL
+ARG VITE_SOCKET_URL
+ARG VITE_RAZORPAY_KEY_ID
 
 # Vite inlines these at build time
 ENV VITE_API_URL=$VITE_API_URL

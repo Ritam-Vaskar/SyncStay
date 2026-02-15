@@ -44,8 +44,8 @@ services:
       context: ./client
       dockerfile: Dockerfile
       args:
-        - VITE_API_URL=http://localhost:5001/api
-        - VITE_SOCKET_URL=http://localhost:5001
+        - VITE_API_URL=http://31.97.236.171:5001/api
+        - VITE_SOCKET_URL=http://31.97.236.171:5001
         - VITE_RAZORPAY_KEY_ID=rzp_test_RsOdHaU8fEaxRF
     container_name: syncstay-frontend
     restart: unless-stopped
