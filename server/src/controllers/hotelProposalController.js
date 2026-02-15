@@ -3,6 +3,7 @@ import Event from '../models/Event.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import { createAuditLog } from '../middlewares/auditLogger.js';
 import sendEmail from '../utils/mail.js';
+import config from '../config/index.js';
 
 /**
  * @route   GET /api/hotel-proposals/rfps
@@ -422,6 +423,36 @@ export const publishEventMicrosite = asyncHandler(async (req, res) => {
   });
 
   console.log(`🌐 Microsite published: ${event.name} (${event.isPrivate ? 'Private - Payment completed' : 'Public'})`);
+
+  // Create embedding for public events only (private events are not discoverable)
+  if (!event.isPrivate) {
+    try {
+      const mlUrl = config.mlServerUrl;
+      const response = await fetch(`${mlUrl}/event/embedding`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: event._id.toString(),
+          name: event.name,
+          type: event.type || '',
+          description: event.description || '',
+          startDate: event.startDate?.toISOString() || '',
+          endDate: event.endDate?.toISOString() || '',
+          location: {
+            city: event.location?.city || '',
+            country: event.location?.country || '',
+            venue: event.location?.venue || '',
+          },
+        }),
+      });
+
+      const result = await response.json();
+      console.log(`🧠 Event embedding created: ${result.chunks_created} chunks`);
+    } catch (err) {
+      // Non-blocking — log but don't fail the publish
+      console.error('⚠️ Failed to create event embedding:', err.message);
+    }
+  }
 
   res.status(200).json({
     success: true,

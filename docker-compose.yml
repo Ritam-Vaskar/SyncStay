@@ -54,8 +54,35 @@ services:
     networks:
       - syncstay-net
 
+  # ── ML Server (FastAPI) ─────────────────────────────
+  ml-server:
+    build:
+      context: ./ml-server
+      dockerfile: Dockerfile
+    container_name: syncstay-ml-server
+    restart: unless-stopped
+    env_file:
+      - ./ml-server/.env.docker
+    environment:
+      - QDRANT_URL=http://qdrant:6333
+    depends_on:
+      - qdrant
+    networks:
+      - syncstay-net
+
+  # ── Qdrant (Vector DB) ──────────────────────────────
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: syncstay-qdrant
+    restart: unless-stopped
+    volumes:
+      - qdrant_storage:/qdrant/storage
+    networks:
+      - syncstay-net
+
 volumes:
   mongo_data:
+  qdrant_storage:
 
 networks:
   syncstay-net:
