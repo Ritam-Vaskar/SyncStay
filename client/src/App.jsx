@@ -28,6 +28,7 @@ import { HotelInventoryPage } from './pages/HotelInventoryPage';
 import { HotelBookingsPage } from './pages/HotelBookingsPage';
 import { eventService } from './services/apiServices';
 import { useAuthStore } from './store/authStore';
+import ChatBot from './components/ChatBot';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -387,6 +388,7 @@ function App() {
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </BrowserRouter>
+      {isAuthenticated && <ChatBot />}
       <Toaster position="top-right" />
     </QueryClientProvider>
   );

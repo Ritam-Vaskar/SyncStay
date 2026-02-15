@@ -21,6 +21,7 @@ import bookingRoutes from './routes/bookingRoutes.js';
 import paymentRoutes from './routes/paymentRoutes.js';
 import analyticsRoutes from './routes/analyticsRoutes.js';
 import guestInvitationRoutes from './routes/guestInvitationRoutes.js';
+import agentRoutes from './routes/agentRoutes.js';
 
 // Initialize Express app
 const app = express();
@@ -108,6 +109,7 @@ app.use('/api/hotel-proposals', hotelProposalRoutes);
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/analytics', analyticsRoutes);
+app.use('/api/agent', agentRoutes);
 
 // Root Route
 app.get('/', (req, res) => {

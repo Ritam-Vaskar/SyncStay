@@ -26,4 +26,5 @@ export default {
     keyId: process.env.RAZORPAY_KEY_ID,
     keySecret: process.env.RAZORPAY_KEY_SECRET,
   },
+  mlServerUrl: process.env.ML_SERVER_URL || 'http://localhost:8020',
 };
