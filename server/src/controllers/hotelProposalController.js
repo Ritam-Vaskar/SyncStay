@@ -223,39 +223,125 @@ export const selectProposal = asyncHandler(async (req, res) => {
     });
   }
 
-  // Update proposal status
-  proposal.status = 'selected';
-  proposal.selectedByPlanner = true;
-  proposal.selectionDate = new Date();
+  // Toggle selection
+  const wasSelected = proposal.selectedByPlanner;
+  proposal.status = wasSelected ? 'submitted' : 'selected';
+  proposal.selectedByPlanner = !wasSelected;
+  proposal.selectionDate = wasSelected ? null : new Date();
   await proposal.save();
 
-  // Add hotel to event's selectedHotels array
+  // Rebuild event's selectedHotels from all currently selected proposals
   const event = await Event.findById(proposal.event._id);
-  if (!event.selectedHotels) {
-    event.selectedHotels = [];
-  }
-  
-  event.selectedHotels.push({
-    hotel: proposal.hotel,
-    proposal: proposal._id,
-  });
-  
+  const allSelected = await HotelProposal.find({ event: event._id, selectedByPlanner: true });
+  event.selectedHotels = allSelected.map(p => ({
+    hotel: p.hotel,
+    proposal: p._id,
+  }));
   await event.save();
 
   // Log action
   await createAuditLog({
     user: req.user.id,
-    action: 'hotel_proposal_select',
+    action: wasSelected ? 'hotel_proposal_deselect' : 'hotel_proposal_select',
     resource: 'HotelProposal',
     resourceId: proposal._id,
     status: 'success',
-    details: `Planner selected hotel proposal for event: ${event.name}`,
+    details: `Planner ${wasSelected ? 'deselected' : 'selected'} hotel proposal for event: ${event.name}`,
   });
 
   res.status(200).json({
     success: true,
-    message: 'Hotel proposal selected successfully',
+    message: `Hotel proposal ${wasSelected ? 'deselected' : 'selected'} successfully`,
     data: proposal,
+  });
+});
+
+/**
+ * @route   POST /api/hotel-proposals/event/:eventId/confirm-selection
+ * @desc    Confirm hotel selection - replaces all selections atomically (works for public & private)
+ * @access  Private (Planner only)
+ */
+export const confirmHotelSelection = asyncHandler(async (req, res) => {
+  const { eventId } = req.params;
+  const { selectedProposalIds } = req.body; // Array of proposal IDs
+
+  if (!selectedProposalIds || !Array.isArray(selectedProposalIds) || selectedProposalIds.length === 0) {
+    return res.status(400).json({
+      success: false,
+      message: 'Please select at least one hotel proposal',
+    });
+  }
+
+  const event = await Event.findById(eventId);
+  if (!event) {
+    return res.status(404).json({ success: false, message: 'Event not found' });
+  }
+
+  if (event.planner.toString() !== req.user.id) {
+    return res.status(403).json({ success: false, message: 'Not authorized' });
+  }
+
+  // Don't allow re-selection if already active (already paid/published)
+  if (event.status === 'active') {
+    return res.status(400).json({
+      success: false,
+      message: 'Event is already active. Hotels cannot be changed.',
+    });
+  }
+
+  // Reset ALL proposals for this event first
+  await HotelProposal.updateMany(
+    { event: eventId },
+    { $set: { selectedByPlanner: false, status: 'submitted', selectionDate: null } }
+  );
+
+  // Mark the selected ones
+  const proposals = await HotelProposal.find({ _id: { $in: selectedProposalIds }, event: eventId });
+  if (proposals.length === 0) {
+    return res.status(400).json({ success: false, message: 'No valid proposals found' });
+  }
+
+  await HotelProposal.updateMany(
+    { _id: { $in: selectedProposalIds }, event: eventId },
+    { $set: { selectedByPlanner: true, status: 'selected', selectionDate: new Date() } }
+  );
+
+  // Calculate total cost
+  let totalCost = 0;
+  const selectedHotels = [];
+  for (const proposal of proposals) {
+    totalCost += proposal.totalEstimatedCost || 0;
+    selectedHotels.push({ hotel: proposal.hotel, proposal: proposal._id });
+  }
+
+  // Replace event.selectedHotels entirely (no duplicates ever)
+  event.selectedHotels = selectedHotels;
+
+  if (event.isPrivate) {
+    event.plannerPaymentAmount = totalCost;
+    event.plannerPaymentStatus = 'pending';
+  }
+
+  await event.save();
+
+  await createAuditLog({
+    user: req.user.id,
+    action: 'hotel_selection_confirmed',
+    resource: 'Event',
+    resourceId: event._id,
+    status: 'success',
+    details: `Confirmed ${selectedHotels.length} hotel(s) for event: ${event.name}`,
+  });
+
+  res.status(200).json({
+    success: true,
+    message: `${selectedHotels.length} hotel(s) confirmed successfully`,
+    data: {
+      selectedHotels,
+      totalAmount: totalCost,
+      currency: 'INR',
+      isPrivate: event.isPrivate,
+    },
   });
 });
 

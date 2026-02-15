@@ -122,32 +122,15 @@ export const PlannerProposalsPage = () => {
     return configs[status] || configs['pending-approval'];
   };
 
-  const viewHotelProposals = async (event) => {
+  const viewHotelProposals = (event) => {
     setSelectedEvent(event);
     setShowProposalsModal(true);
-    
-    // If private event with selected hotels but not paid, trigger payment
-    if (event.isPrivate && event.selectedHotels?.length > 0 && event.plannerPaymentStatus !== 'paid') {
-      // Payment will be triggered when modal closes
-    }
   };
 
   const viewProposalDetails = (proposal) => {
     setSelectedProposalForDetails(proposal);
     setShowProposalDetailsModal(true);
   };
-
-  const selectProposalMutation = useMutation({
-    mutationFn: (proposalId) => hotelProposalService.selectProposal(proposalId),
-    onSuccess: () => {
-      toast.success('Hotel selected successfully!');
-      queryClient.invalidateQueries(['planner-proposals']);
-      queryClient.invalidateQueries(['event-proposals']);
-    },
-    onError: (error) => {
-      toast.error(error.response?.data?.message || 'Failed to select hotel');
-    },
-  });
 
   const publishMicrositeMutation = useMutation({
     mutationFn: (eventId) => hotelProposalService.publishMicrosite(eventId),
@@ -158,97 +141,24 @@ export const PlannerProposalsPage = () => {
       setSelectedEvent(null);
     },
     onError: (error) => {
-      const errorMessage = error.response?.data?.message || 'Failed to publish microsite';
-      console.error('Publish microsite error:', errorMessage);
-      toast.error(errorMessage);
-      
-      // If private event needs payment, show payment modal
-      if (errorMessage.includes('Payment required') && selectedEvent?.isPrivate) {
-        handleInitiatePayment();
-      }
+      toast.error(error.response?.data?.message || 'Failed to publish microsite');
     },
   });
-
-  const handleSelectHotel = (proposalId) => {
-    selectProposalMutation.mutate(proposalId);
-  };
-
-  const handlePublishMicrosite = () => {
-    if (selectedEvent?.selectedHotels?.length === 0) {
-      toast.error('Please select at least one hotel before publishing');
-      return;
-    }
-
-    // Check if private event and payment not completed
-    if (selectedEvent?.isPrivate && selectedEvent?.plannerPaymentStatus !== 'paid') {
-      handleInitiatePayment();
-      return;
-    }
-
-    // For public events or paid private events, publish directly
-    publishMicrositeMutation.mutate(selectedEvent._id);
-  };
-
-  const handleInitiatePayment = async () => {
-    if (!selectedEvent?.selectedHotels || selectedEvent.selectedHotels.length === 0) {
-      toast.error('Please select at least one hotel first');
-      return;
-    }
-
-    try {
-      // Fetch hotel proposals for the event
-      const proposalsResponse = await hotelProposalService.getEventProposals(selectedEvent._id);
-      const hotelProposals = proposalsResponse?.data || [];
-
-      // Calculate total amount from selected proposals
-      const selectedProposals = hotelProposals.filter(p => 
-        selectedEvent.selectedHotels.some(sh => sh.proposal === p._id || sh.proposal?._id === p._id)
-      );
-      
-      const totalAmount = selectedProposals.reduce((sum, p) => sum + (p.totalCost || 0), 0);
-      
-      if (totalAmount === 0) {
-        toast.error('Unable to calculate payment amount. Please ensure hotels have been selected.');
-        console.error('Payment calculation failed:', {
-          selectedHotels: selectedEvent.selectedHotels,
-          hotelProposals,
-          selectedProposals
-        });
-        return;
-      }
-
-      setPaymentAmount(totalAmount);
-      setShowPaymentModal(true);
-    } catch (error) {
-      console.error('Error fetching proposals for payment:', error);
-      toast.error('Failed to calculate payment amount');
-    }
-  };
 
   const handlePaymentSuccess = async (paymentDetails) => {
     try {
       const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
       
-      // Call the planner payment endpoint
       const response = await fetch(`${API_BASE_URL}/events/${selectedEvent._id}/planner-payment`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          'Cache-Control': 'no-cache',
-          'Pragma': 'no-cache'
         },
         body: JSON.stringify(paymentDetails)
       });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Payment verification response:', errorText);
-        throw new Error(`Payment verification failed: ${response.status}`);
-      }
-
       const data = await response.json();
-      console.log('Payment verification response:', data);
 
       if (data.success) {
         toast.success('Payment successful! Microsite is now published.');
@@ -579,26 +489,25 @@ export const PlannerProposalsPage = () => {
       {showProposalsModal && selectedEvent && (
         <HotelProposalsModal
           event={selectedEvent}
-          onClose={async (shouldTriggerPayment = false, paymentAmount = 0) => {
+          onClose={() => {
             setShowProposalsModal(false);
-            
-            // Refetch event data after selection
-            await queryClient.invalidateQueries(['planner-proposals']);
-            
-            // Trigger payment for private events after selection
-            if (shouldTriggerPayment && selectedEvent.isPrivate && paymentAmount > 0) {
-              // Set amount and show payment modal
-              setPaymentAmount(paymentAmount);
-              setShowPaymentModal(true);
-            }
-            
             setSelectedEvent(null);
           }}
-          onSelectHotel={handleSelectHotel}
-          onPublishMicrosite={handlePublishMicrosite}
+          onConfirmed={(result) => {
+            // result = { selectedHotels, totalAmount, isPrivate }
+            queryClient.invalidateQueries(['planner-proposals']);
+
+            if (result.isPrivate) {
+              // Private → trigger payment
+              setPaymentAmount(result.totalAmount);
+              setShowPaymentModal(true);
+            } else {
+              // Public → publish microsite immediately
+              publishMicrositeMutation.mutate(selectedEvent._id);
+            }
+          }}
           onViewDetails={viewProposalDetails}
           isPublishing={publishMicrositeMutation.isPending}
-          isSelecting={selectProposalMutation.isPending}
         />
       )}
 
@@ -628,9 +537,10 @@ export const PlannerProposalsPage = () => {
 };
 
 // Hotel Proposals Modal Component
-const HotelProposalsModal = ({ event, onClose, onSelectHotel, onPublishMicrosite, onViewDetails, isPublishing, isSelecting }) => {
-  const [localSelectedProposals, setLocalSelectedProposals] = useState([]);
+const HotelProposalsModal = ({ event, onClose, onConfirmed, onViewDetails, isPublishing }) => {
+  const [localSelected, setLocalSelected] = useState([]);
   const [isConfirming, setIsConfirming] = useState(false);
+  const queryClient = useQueryClient();
 
   const { data: proposalsData, isLoading } = useQuery({
     queryKey: ['event-proposals', event._id],
@@ -640,90 +550,70 @@ const HotelProposalsModal = ({ event, onClose, onSelectHotel, onPublishMicrosite
   });
 
   const proposals = proposalsData?.data || [];
-  
-  // Initialize local selections from already selected hotels
+  const isActive = event.status === 'active';
+
+  // Initialize local selections from already-selected proposals (only once when data loads)
   useEffect(() => {
     if (proposals.length > 0) {
       const alreadySelected = proposals
         .filter(p => p.selectedByPlanner)
         .map(p => p._id);
-      setLocalSelectedProposals(alreadySelected);
+      setLocalSelected(alreadySelected);
     }
   }, [proposals]);
 
-  const toggleProposalSelection = (proposalId) => {
-    setLocalSelectedProposals(prev => {
-      if (prev.includes(proposalId)) {
-        return prev.filter(id => id !== proposalId);
-      } else {
-        return [...prev, proposalId];
-      }
-    });
+  const toggleSelection = (proposalId) => {
+    if (isActive) return; // Can't change after active
+    setLocalSelected(prev =>
+      prev.includes(proposalId)
+        ? prev.filter(id => id !== proposalId)
+        : [...prev, proposalId]
+    );
   };
 
-  const calculateTotalCost = () => {
-    const selectedProposals = proposals.filter(p => localSelectedProposals.includes(p._id));
-    const total = selectedProposals.reduce((sum, p) => sum + (p.totalEstimatedCost || 0), 0);
-    
-    console.log('💰 Payment Calculation:', {
-      selectedProposalIds: localSelectedProposals,
-      allProposals: proposals.map(p => ({ id: p._id, name: p.hotelName, cost: p.totalEstimatedCost })),
-      selectedProposals: selectedProposals.map(p => ({ id: p._id, name: p.hotelName, cost: p.totalEstimatedCost })),
-      totalCost: total
-    });
-    
-    return total;
-  };
+  const totalCost = proposals
+    .filter(p => localSelected.includes(p._id))
+    .reduce((sum, p) => sum + (p.totalEstimatedCost || 0), 0);
 
-  const handleConfirmSelection = async () => {
-    if (localSelectedProposals.length === 0) {
+  const handleConfirm = async () => {
+    if (localSelected.length === 0) {
       toast.error('Please select at least one hotel');
       return;
     }
 
     setIsConfirming(true);
     try {
-      // Select all proposals via API
-      for (const proposalId of localSelectedProposals) {
-        await hotelProposalService.selectProposal(proposalId);
-      }
-      
-      toast.success(`${localSelectedProposals.length} hotel(s) selected successfully!`);
-      
-      // For public events, publish immediately
-      if (!event.isPrivate) {
-        onPublishMicrosite();
-      } else {
-        // For private events, close modal and trigger payment with calculated amount
-        const paymentAmount = calculateTotalCost();
-        
-        if (paymentAmount <= 0) {
-          toast.error('Unable to calculate payment amount. Please ensure hotels have valid pricing.');
-          setIsConfirming(false);
-          return;
-        }
-        
-        onClose(true, paymentAmount); // Pass true and amount to trigger payment
-      }
+      const result = await hotelProposalService.confirmSelection(event._id, localSelected);
+      const data = result?.data || result;
+
+      toast.success(`${localSelected.length} hotel(s) confirmed!`);
+      queryClient.invalidateQueries(['event-proposals', event._id]);
+
+      onConfirmed({
+        selectedHotels: data.selectedHotels || [],
+        totalAmount: data.totalAmount || totalCost,
+        isPrivate: event.isPrivate,
+      });
     } catch (error) {
       console.error('Error confirming selection:', error);
-      toast.error('Failed to confirm hotel selection');
+      toast.error(error.response?.data?.message || 'Failed to confirm hotel selection');
     } finally {
       setIsConfirming(false);
     }
   };
 
-  const selectedCount = localSelectedProposals.length;
-  const totalCost = calculateTotalCost();
-
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg shadow-xl max-w-6xl w-full max-h-[90vh] overflow-y-auto">
+        {/* Header */}
         <div className="sticky top-0 bg-white border-b border-gray-200 p-6 flex items-center justify-between z-10">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">Hotel Proposals for {event.name}</h2>
+            <h2 className="text-2xl font-bold text-gray-900">
+              {isActive ? 'Selected Hotels' : 'Review Hotel Proposals'} — {event.name}
+            </h2>
             <p className="text-sm text-gray-600 mt-1">
-              {proposals.length} proposals received • {selectedCount} selected
+              {proposals.length} proposal{proposals.length !== 1 ? 's' : ''} received
+              {!isActive && ` • ${localSelected.length} selected`}
             </p>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
@@ -744,97 +634,107 @@ const HotelProposalsModal = ({ event, onClose, onSelectHotel, onPublishMicrosite
             </div>
           ) : (
             <>
+              {/* Proposals Grid */}
               <div className="grid md:grid-cols-2 gap-6 mb-6">
                 {proposals.map((proposal) => {
-                  const isSelected = localSelectedProposals.includes(proposal._id);
+                  const isSelected = localSelected.includes(proposal._id);
                   return (
-                  <div
-                    key={proposal._id}
-                    onClick={() => event.status !== 'active' && toggleProposalSelection(proposal._id)}
-                    className={`border rounded-lg p-6 transition-all cursor-pointer ${
-                      isSelected
-                        ? 'border-primary-500 bg-primary-50 ring-2 ring-primary-500'
-                        : 'border-gray-200 hover:border-primary-300 hover:shadow-md'
-                    }`}
-                  >
-                    <div className="flex items-start justify-between mb-4">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-2">
-                          {event.status !== 'active' && (
-                            <input
-                              type="checkbox"
-                              checked={isSelected}
-                              onChange={() => toggleProposalSelection(proposal._id)}
-                              onClick={(e) => e.stopPropagation()}
-                              className="h-5 w-5 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
-                            />
+                    <div
+                      key={proposal._id}
+                      onClick={() => toggleSelection(proposal._id)}
+                      className={`border rounded-lg p-6 transition-all ${
+                        isActive ? 'cursor-default' : 'cursor-pointer'
+                      } ${
+                        isSelected
+                          ? 'border-primary-500 bg-primary-50 ring-2 ring-primary-500'
+                          : 'border-gray-200 hover:border-primary-300 hover:shadow-md'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2">
+                            {!isActive && (
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={() => toggleSelection(proposal._id)}
+                                onClick={(e) => e.stopPropagation()}
+                                className="h-5 w-5 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+                              />
+                            )}
+                            <h3 className="text-lg font-bold text-gray-900">{proposal.hotelName}</h3>
+                            {isSelected && (
+                              <span className="px-2 py-1 bg-primary-600 text-white text-xs font-semibold rounded-full flex items-center gap-1">
+                                <Check className="h-3 w-3" />
+                                Selected
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-sm text-gray-600">
+                            Submitted: {new Date(proposal.createdAt).toLocaleDateString()}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Pricing Summary */}
+                      <div className="bg-white rounded-lg p-4 mb-4">
+                        <h4 className="font-semibold text-gray-900 mb-3">Pricing</h4>
+                        <div className="space-y-2 text-sm">
+                          {proposal.pricing.singleRoom?.availableRooms > 0 && (
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">
+                                Single Room ({proposal.pricing.singleRoom.availableRooms} available):
+                              </span>
+                              <span className="font-medium">₹{proposal.pricing.singleRoom.pricePerNight}/night</span>
+                            </div>
                           )}
-                          <h3 className="text-lg font-bold text-gray-900">{proposal.hotelName}</h3>
-                          {isSelected && (
-                            <span className="px-2 py-1 bg-primary-600 text-white text-xs font-semibold rounded-full flex items-center gap-1">
-                              <Check className="h-3 w-3" />
-                              Selected
-                            </span>
+                          {proposal.pricing.doubleRoom?.availableRooms > 0 && (
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">
+                                Double Room ({proposal.pricing.doubleRoom.availableRooms} available):
+                              </span>
+                              <span className="font-medium">₹{proposal.pricing.doubleRoom.pricePerNight}/night</span>
+                            </div>
+                          )}
+                          {proposal.pricing.suite?.availableRooms > 0 && (
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">
+                                Suite ({proposal.pricing.suite.availableRooms} available):
+                              </span>
+                              <span className="font-medium">₹{proposal.pricing.suite.pricePerNight}/night</span>
+                            </div>
                           )}
                         </div>
-                        <p className="text-sm text-gray-600">
-                          Submitted: {new Date(proposal.createdAt).toLocaleDateString()}
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Pricing Summary */}
-                    <div className="bg-white rounded-lg p-4 mb-4">
-                      <h4 className="font-semibold text-gray-900 mb-3">Pricing</h4>
-                      <div className="space-y-2 text-sm">
-                        {proposal.pricing.singleRoom?.availableRooms > 0 && (
-                          <div className="flex justify-between">
-                            <span className="text-gray-600">Single Room ({proposal.pricing.singleRoom.availableRooms} available):</span>
-                            <span className="font-medium">${proposal.pricing.singleRoom.pricePerNight}/night</span>
+                        <div className="pt-3 mt-3 border-t border-gray-200">
+                          <div className="flex justify-between items-center">
+                            <span className="font-semibold text-gray-900">Total Rooms:</span>
+                            <span className="text-lg font-bold text-primary-600">{proposal.totalRoomsOffered}</span>
                           </div>
-                        )}
-                        {proposal.pricing.doubleRoom?.availableRooms > 0 && (
-                          <div className="flex justify-between">
-                            <span className="text-gray-600">Double Room ({proposal.pricing.doubleRoom.availableRooms} available):</span>
-                            <span className="font-medium">${proposal.pricing.doubleRoom.pricePerNight}/night</span>
-                          </div>
-                        )}
-                        {proposal.pricing.suite?.availableRooms > 0 && (
-                          <div className="flex justify-between">
-                            <span className="text-gray-600">Suite ({proposal.pricing.suite.availableRooms} available):</span>
-                            <span className="font-medium">${proposal.pricing.suite.pricePerNight}/night</span>
-                          </div>
-                        )}
-                      </div>
-                      <div className="pt-3 mt-3 border-t border-gray-200">
-                        <div className="flex justify-between items-center">
-                          <span className="font-semibold text-gray-900">Total Rooms:</span>
-                          <span className="text-lg font-bold text-primary-600">{proposal.totalRoomsOffered}</span>
-                        </div>
-                        {proposal.totalEstimatedCost && (
-                          <div className="flex justify-between items-center mt-2">
-                            <span className="font-semibold text-gray-900">Package Cost:</span>
-                            <span className="text-lg font-bold text-primary-600">${proposal.totalEstimatedCost.toLocaleString()}</span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Special Offer */}
-                    {proposal.specialOffer && (
-                      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
-                        <div className="flex items-start gap-2">
-                          <Star className="h-4 w-4 text-yellow-600 mt-0.5" />
-                          <div>
-                            <h5 className="text-sm font-semibold text-yellow-900">Special Offer</h5>
-                            <p className="text-xs text-yellow-800 mt-1">{proposal.specialOffer}</p>
-                          </div>
+                          {proposal.totalEstimatedCost > 0 && (
+                            <div className="flex justify-between items-center mt-2">
+                              <span className="font-semibold text-gray-900">Package Cost:</span>
+                              <span className="text-lg font-bold text-primary-600">
+                                ₹{proposal.totalEstimatedCost.toLocaleString('en-IN')}
+                              </span>
+                            </div>
+                          )}
                         </div>
                       </div>
-                    )}
 
-                    {/* Actions */}
-                    <div className="flex items-center gap-3">
+                      {/* Special Offer */}
+                      {proposal.specialOffer && (
+                        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
+                          <div className="flex items-start gap-2">
+                            <Star className="h-4 w-4 text-yellow-600 mt-0.5" />
+                            <div>
+                              <h5 className="text-sm font-semibold text-yellow-900">Special Offer</h5>
+                              <p className="text-xs text-yellow-800 mt-1">{proposal.specialOffer}</p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* View Details */}
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -846,53 +746,59 @@ const HotelProposalsModal = ({ event, onClose, onSelectHotel, onPublishMicrosite
                         View Full Details
                       </button>
                     </div>
-                  </div>
                   );
                 })}
               </div>
 
-              {/* Confirm Selection Button */}
-              {selectedCount > 0 && event.status !== 'active' && (
+              {/* Confirm Bar (only when not already active) */}
+              {!isActive && localSelected.length > 0 && (
                 <div className="sticky bottom-0 bg-white border-t border-gray-200 pt-6">
-                  <div className={`${event.isPrivate ? 'bg-blue-50 border-blue-200' : 'bg-green-50 border-green-200'} border rounded-lg p-4 mb-4`}>
+                  <div
+                    className={`${
+                      event.isPrivate ? 'bg-blue-50 border-blue-200' : 'bg-green-50 border-green-200'
+                    } border rounded-lg p-4 mb-4`}
+                  >
                     <div className="flex items-start gap-3">
                       {event.isPrivate && <Lock className="h-5 w-5 text-blue-600 mt-0.5" />}
                       <div className="flex-1">
-                        <p className={`text-sm font-medium ${event.isPrivate ? 'text-blue-900' : 'text-green-900'} mb-1`}>
-                          {selectedCount} hotel{selectedCount > 1 ? 's' : ''} selected • Total Cost: ₹{totalCost.toLocaleString('en-IN')}
+                        <p
+                          className={`text-sm font-medium ${
+                            event.isPrivate ? 'text-blue-900' : 'text-green-900'
+                          } mb-1`}
+                        >
+                          {localSelected.length} hotel{localSelected.length > 1 ? 's' : ''} selected
+                          {totalCost > 0 && ` • Total: ₹${totalCost.toLocaleString('en-IN')}`}
                         </p>
-                        <p className={`text-xs ${event.isPrivate ? 'text-blue-700' : 'text-green-700'}`}>
-                          {event.isPrivate 
-                            ? '💳 Private Event: You will pay upfront for all accommodations. After payment, your microsite will be published and invited guests can book for free.'
-                            : '✅ Public Event: Microsite will be published immediately. Guests will pay individually when booking.'
-                          }
+                        <p
+                          className={`text-xs ${event.isPrivate ? 'text-blue-700' : 'text-green-700'}`}
+                        >
+                          {event.isPrivate
+                            ? '💳 Private Event: After payment your microsite will be published and invited guests can book for free.'
+                            : '✅ Public Event: Microsite will be published immediately. Guests pay individually.'}
                         </p>
                       </div>
                     </div>
                   </div>
                   <button
-                    onClick={handleConfirmSelection}
+                    onClick={handleConfirm}
                     disabled={isConfirming || isPublishing}
                     className="btn btn-primary w-full flex items-center justify-center gap-2 text-lg py-3"
                   >
-                    {(isConfirming || isPublishing) ? (
+                    {isConfirming || isPublishing ? (
                       <>
                         <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                        {event.isPrivate ? 'Processing...' : 'Publishing...'}
+                        Processing...
+                      </>
+                    ) : event.isPrivate ? (
+                      <>
+                        <CreditCard className="h-6 w-6" />
+                        Confirm & Proceed to Payment
+                        {totalCost > 0 && ` (₹${totalCost.toLocaleString('en-IN')})`}
                       </>
                     ) : (
                       <>
-                        {event.isPrivate ? (
-                          <>
-                            <CreditCard className="h-6 w-6" />
-                            Proceed to Payment (₹{totalCost.toLocaleString('en-IN')})
-                          </>
-                        ) : (
-                          <>
-                            <CheckCircle className="h-6 w-6" />
-                            Confirm & Publish Microsite
-                          </>
-                        )}
+                        <CheckCircle className="h-6 w-6" />
+                        Confirm & Publish Microsite
                       </>
                     )}
                   </button>

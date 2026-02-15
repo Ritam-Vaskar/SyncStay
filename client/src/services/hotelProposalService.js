@@ -24,6 +24,10 @@ export const hotelProposalService = {
   // Select a hotel proposal (planner)
   selectProposal: (proposalId) => api.put(`/hotel-proposals/${proposalId}/select`),
 
+  // Confirm hotel selection - replaces all selections atomically
+  confirmSelection: (eventId, selectedProposalIds) =>
+    api.post(`/hotel-proposals/event/${eventId}/confirm-selection`, { selectedProposalIds }),
+
   // Publish microsite after selecting hotels (planner)
   publishMicrosite: (eventId) => api.put(`/hotel-proposals/event/${eventId}/publish-microsite`),
 

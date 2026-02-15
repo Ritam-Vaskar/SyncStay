@@ -5,6 +5,7 @@ import {
   getMyProposals,
   getEventProposals,
   selectProposal,
+  confirmHotelSelection,
   publishEventMicrosite,
   updateProposal,
   getSelectedProposalsForMicrosite,
@@ -25,6 +26,7 @@ router.put('/:proposalId/update', protect, authorize('hotel'), updateProposal);
 // Planner routes
 router.get('/event/:eventId', protect, authorize('planner'), getEventProposals);
 router.put('/:proposalId/select', protect, authorize('planner'), selectProposal);
+router.post('/event/:eventId/confirm-selection', protect, authorize('planner'), confirmHotelSelection);
 router.put('/event/:eventId/publish-microsite', protect, authorize('planner'), publishEventMicrosite);
 
 export default router;
