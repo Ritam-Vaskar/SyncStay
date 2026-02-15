@@ -4,12 +4,18 @@ import {
   getPayment,
   processPayment,
   refundPayment,
+  createRazorpayOrder,
+  verifyRazorpayPayment,
 } from '../controllers/paymentController.js';
 import { protect, authorize } from '../middlewares/auth.js';
 import { validateMongoId } from '../middlewares/validators.js';
 import { auditLogger } from '../middlewares/auditLogger.js';
 
 const router = express.Router();
+
+// Public Razorpay routes (no auth required for payment gateway)
+router.post('/razorpay/create-order', createRazorpayOrder);
+router.post('/razorpay/verify', verifyRazorpayPayment);
 
 router.use(protect);
 

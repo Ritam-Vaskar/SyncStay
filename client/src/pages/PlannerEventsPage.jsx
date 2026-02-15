@@ -35,11 +35,29 @@ export const PlannerEventsPage = () => {
 
   const getStatusConfig = (status) => {
     const configs = {
+      'draft': {
+        label: 'Draft',
+        color: 'bg-gray-100 text-gray-800',
+        icon: Clock,
+        iconColor: 'text-gray-600'
+      },
       'pending-approval': { 
         label: 'Pending Approval', 
         color: 'bg-yellow-100 text-yellow-800',
         icon: AlertCircle,
         iconColor: 'text-yellow-600'
+      },
+      'rfp-published': {
+        label: 'RFP Published - Awaiting Hotels',
+        color: 'bg-blue-100 text-blue-800',
+        icon: Clock,
+        iconColor: 'text-blue-600'
+      },
+      'reviewing-proposals': {
+        label: 'Review Hotel Proposals',
+        color: 'bg-purple-100 text-purple-800',
+        icon: UserCog,
+        iconColor: 'text-purple-600'
       },
       'active': { 
         label: 'Active', 
@@ -59,6 +77,12 @@ export const PlannerEventsPage = () => {
         icon: CheckCircle,
         iconColor: 'text-gray-600'
       },
+      'cancelled': {
+        label: 'Cancelled',
+        color: 'bg-red-100 text-red-800',
+        icon: XCircle,
+        iconColor: 'text-red-600'
+      },
     };
     return configs[status] || configs['pending-approval'];
   };
@@ -72,6 +96,8 @@ export const PlannerEventsPage = () => {
   const stats = {
     total: events.length,
     pending: events.filter(e => e.status === 'pending-approval').length,
+    rfpPublished: events.filter(e => e.status === 'rfp-published').length,
+    reviewing: events.filter(e => e.status === 'reviewing-proposals').length,
     active: events.filter(e => e.status === 'active').length,
     rejected: events.filter(e => e.status === 'rejected').length,
   };
@@ -99,64 +125,87 @@ export const PlannerEventsPage = () => {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
         <div className="card">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Total Events</p>
-              <p className="text-3xl font-bold text-gray-900 mt-2">{stats.total}</p>
+              <p className="text-xs font-medium text-gray-600">Total</p>
+              <p className="text-2xl font-bold text-gray-900 mt-1">{stats.total}</p>
             </div>
-            <Calendar className="h-12 w-12 text-primary-600 opacity-20" />
+            <Calendar className="h-10 w-10 text-primary-600 opacity-20" />
           </div>
         </div>
 
         <div className="card">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Pending Approval</p>
-              <p className="text-3xl font-bold text-yellow-600 mt-2">{stats.pending}</p>
+              <p className="text-xs font-medium text-gray-600">Pending</p>
+              <p className="text-2xl font-bold text-yellow-600 mt-1">{stats.pending}</p>
             </div>
-            <AlertCircle className="h-12 w-12 text-yellow-600 opacity-20" />
+            <AlertCircle className="h-10 w-10 text-yellow-600 opacity-20" />
           </div>
         </div>
 
         <div className="card">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Active Events</p>
-              <p className="text-3xl font-bold text-green-600 mt-2">{stats.active}</p>
+              <p className="text-xs font-medium text-gray-600">RFP Sent</p>
+              <p className="text-2xl font-bold text-blue-600 mt-1">{stats.rfpPublished}</p>
             </div>
-            <CheckCircle className="h-12 w-12 text-green-600 opacity-20" />
+            <Clock className="h-10 w-10 text-blue-600 opacity-20" />
           </div>
         </div>
 
         <div className="card">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Rejected</p>
-              <p className="text-3xl font-bold text-red-600 mt-2">{stats.rejected}</p>
+              <p className="text-xs font-medium text-gray-600">Review</p>
+              <p className="text-2xl font-bold text-purple-600 mt-1">{stats.reviewing}</p>
             </div>
-            <XCircle className="h-12 w-12 text-red-600 opacity-20" />
+            <UserCog className="h-10 w-10 text-purple-600 opacity-20" />
+          </div>
+        </div>
+
+        <div className="card">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs font-medium text-gray-600">Active</p>
+              <p className="text-2xl font-bold text-green-600 mt-1">{stats.active}</p>
+            </div>
+            <CheckCircle className="h-10 w-10 text-green-600 opacity-20" />
+          </div>
+        </div>
+
+        <div className="card">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs font-medium text-gray-600">Rejected</p>
+              <p className="text-2xl font-bold text-red-600 mt-1">{stats.rejected}</p>
+            </div>
+            <XCircle className="h-10 w-10 text-red-600 opacity-20" />
           </div>
         </div>
       </div>
 
       {/* Filter */}
       <div className="card">
-        <div className="flex items-center gap-4">
-          <span className="text-sm font-medium text-gray-700">Filter by status:</span>
-          <div className="flex gap-2">
-            {['all', 'pending-approval', 'active', 'rejected', 'completed'].map((status) => (
+        <div className="flex items-center gap-4 overflow-x-auto">
+          <span className="text-sm font-medium text-gray-700 whitespace-nowrap">Filter:</span>
+          <div className="flex gap-2 flex-wrap">
+            {['all', 'pending-approval', 'rfp-published', 'reviewing-proposals', 'active', 'rejected', 'completed'].map((status) => (
               <button
                 key={status}
                 onClick={() => setStatusFilter(status)}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${
                   statusFilter === status
                     ? 'bg-primary-600 text-white'
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                 }`}
               >
-                {status === 'all' ? 'All' : status.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
+                {status === 'all' ? 'All' : 
+                 status === 'rfp-published' ? 'RFP Sent' :
+                 status === 'reviewing-proposals' ? 'Reviewing' :
+                 status.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
               </button>
             ))}
           </div>

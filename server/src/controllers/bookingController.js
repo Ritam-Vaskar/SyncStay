@@ -1,8 +1,11 @@
 import Booking from '../models/Booking.js';
 import Inventory from '../models/Inventory.js';
+import HotelProposal from '../models/HotelProposal.js';
 import Event from '../models/Event.js';
+import Payment from '../models/Payment.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import { createAuditLog } from '../middlewares/auditLogger.js';
+import sendEmail from '../utils/mail.js';
 
 /**
  * @route   GET /api/bookings
@@ -81,10 +84,13 @@ export const getBooking = asyncHandler(async (req, res) => {
  * @access  Private (Guest) or Public with guest details
  */
 export const createBooking = asyncHandler(async (req, res) => {
-  const { event, inventory, roomDetails, guestDetails } = req.body;
+  const { event, inventory, hotelProposal, roomDetails, pricing, specialRequests } = req.body;
+  let { guestDetails } = req.body;
 
-  // Verify event and inventory
-  const eventDoc = await Event.findById(event);
+  console.log('📝 Creating booking with data:', JSON.stringify(req.body, null, 2));
+
+  // Verify event
+  const eventDoc = await Event.findById(event).populate('planner', 'name email');
   if (!eventDoc) {
     return res.status(404).json({
       success: false,
@@ -92,75 +98,200 @@ export const createBooking = asyncHandler(async (req, res) => {
     });
   }
 
-  const inventoryDoc = await Inventory.findById(inventory);
-  if (!inventoryDoc) {
-    return res.status(404).json({
-      success: false,
-      message: 'Inventory not found',
-    });
+  const plannerId = eventDoc.planner?._id?.toString() || eventDoc.planner?.toString();
+
+  let inventoryDoc = null;
+  let proposalDoc = null;
+  let pricePerNight = 0;
+  let hotelName = '';
+  let roomType = '';
+
+  // Handle both inventory-based and hotel proposal-based bookings
+  if (hotelProposal) {
+    // Booking from microsite with hotel proposal
+    proposalDoc = await HotelProposal.findById(hotelProposal);
+    if (!proposalDoc) {
+      return res.status(404).json({
+        success: false,
+        message: 'Hotel proposal not found',
+      });
+    }
+
+    // Use pricing from the request (already calculated in frontend)
+    pricePerNight = pricing?.pricePerNight || 0;
+    hotelName = roomDetails.hotelName || proposalDoc.hotelName;
+    roomType = roomDetails.roomType;
+
+    console.log(`✅ Booking with hotel proposal: ${hotelName} - ${roomType}`);
+  } else if (inventory) {
+    // Traditional inventory-based booking
+    inventoryDoc = await Inventory.findById(inventory);
+    if (!inventoryDoc) {
+      return res.status(404).json({
+        success: false,
+        message: 'Inventory not found',
+      });
+    }
+
+    // Check availability
+    if (inventoryDoc.availableRooms < roomDetails.numberOfRooms) {
+      return res.status(400).json({
+        success: false,
+        message: 'Not enough rooms available',
+      });
+    }
+
+    pricePerNight = inventoryDoc.pricePerNight;
+    hotelName = inventoryDoc.hotelName;
+    roomType = inventoryDoc.roomType;
+
+    console.log(`✅ Booking with inventory: ${hotelName} - ${roomType}`);
   }
 
-  // Check availability
-  if (inventoryDoc.availableRooms < roomDetails.numberOfRooms) {
-    return res.status(400).json({
-      success: false,
-      message: 'Not enough rooms available',
-    });
-  }
-
-  // Calculate pricing
-  const checkIn = new Date(roomDetails.checkIn || inventoryDoc.checkInDate);
-  const checkOut = new Date(roomDetails.checkOut || inventoryDoc.checkOutDate);
+  // Calculate pricing if not provided
+  const checkIn = new Date(roomDetails.checkIn);
+  const checkOut = new Date(roomDetails.checkOut);
   const numberOfNights = Math.ceil((checkOut - checkIn) / (1000 * 60 * 60 * 24));
   
-  const subtotal = inventoryDoc.pricePerNight * roomDetails.numberOfRooms * numberOfNights;
+  const subtotal = pricing?.totalPrice || (pricePerNight * roomDetails.numberOfRooms * numberOfNights);
   const tax = subtotal * 0.1; // 10% tax
-  const discount = req.body.pricing?.discount || 0;
+  const discount = pricing?.discount || 0;
   const totalAmount = subtotal + tax - discount;
 
   // Check if event is private - planner pays for all bookings
   const isPaidByPlanner = eventDoc.isPrivate;
 
+  // For private events, enforce using the authenticated user's details (prevent email spoofing)
+  if (eventDoc.isPrivate && req.user) {
+    guestDetails = {
+      name: req.user.name,
+      email: req.user.email,
+      phone: req.user.phone || guestDetails?.phone,
+    };
+  }
+
+  // For private events, verify guest is invited
+  if (eventDoc.isPrivate && req.user) {
+    console.log('\n🔍 BOOKING ACCESS CHECK (Backend):');
+    console.log('   Event:', eventDoc.name);
+    console.log('   User Email:', req.user.email);
+    console.log('   User Role:', req.user.role);
+    console.log('   Planner ID:', plannerId);
+    console.log('   User ID:', req.user.id);
+    
+    console.log('   Invited Guests:');
+    eventDoc.invitedGuests.forEach((g, index) => {
+      console.log(`      ${index + 1}. ${g.name} <${g.email}>`);
+    });
+    
+    const isInvited = eventDoc.invitedGuests.some(
+      (guest) => guest.email.toLowerCase() === req.user.email.toLowerCase()
+    );
+    
+    console.log('   Email comparison:');
+    console.log('      Looking for:', req.user.email.toLowerCase());
+    console.log('      Is invited:', isInvited);
+    console.log('      Is planner:', plannerId === req.user.id);
+    
+    if (!isInvited && plannerId !== req.user.id) {
+      console.log('   ❌ Access denied: Not invited and not planner');
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied. You are not invited to this private event.',
+      });
+    }
+
+    console.log('   ✅ Access granted');
+
+    // Mark guest as accessed when they make their first booking
+    if (isInvited) {
+      const guest = eventDoc.invitedGuests.find(
+        (g) => g.email.toLowerCase() === req.user.email.toLowerCase()
+      );
+      if (guest && !guest.hasAccessed) {
+        guest.hasAccessed = true;
+        console.log(`   → Marking guest ${guest.email} as hasAccessed=true`);
+      }
+    }
+  }
+
+  // For private events, ensure planner has paid before guests can book
+  if (eventDoc.isPrivate && eventDoc.plannerPaymentStatus !== 'paid') {
+    return res.status(400).json({
+      success: false,
+      message: 'This private event is not yet active. Planner payment is pending.',
+    });
+  }
+
+  // Check if Razorpay payment was made
+  const hasRazorpayPayment = req.body.razorpay_payment_id && req.body.razorpay_order_id;
+  // For private events, planner already paid — mark as 'paid'
+  // For public events, only mark as 'paid' if Razorpay payment was made
+  const bookingPaymentStatus = isPaidByPlanner ? 'paid' : (hasRazorpayPayment ? 'paid' : 'unpaid');
+
   // Create booking
   const booking = await Booking.create({
     event,
-    inventory,
-    guest: req.user.id,
+    inventory: inventory || null,
+    hotelProposal: hotelProposal || null,
+    guest: req.user?.id || null,
     guestDetails: guestDetails || {
-      name: req.user.name,
-      email: req.user.email,
-      phone: req.user.phone,
+      name: req.user?.name,
+      email: req.user?.email,
+      phone: req.user?.phone,
     },
     roomDetails: {
-      hotelName: inventoryDoc.hotelName,
-      roomType: inventoryDoc.roomType,
+      hotelName,
+      roomType,
       numberOfRooms: roomDetails.numberOfRooms,
       checkIn,
       checkOut,
       numberOfNights,
     },
     pricing: {
-      pricePerNight: inventoryDoc.pricePerNight,
+      pricePerNight,
       totalNights: numberOfNights,
       subtotal,
       tax,
       discount,
       totalAmount,
-      currency: inventoryDoc.currency,
+      currency: 'INR',
     },
-    specialRequests: req.body.specialRequests || '',
+    specialRequests: specialRequests || req.body.specialRequests || '',
     status: 'pending',
-    paymentStatus: isPaidByPlanner ? 'unpaid' : 'unpaid',
+    paymentStatus: bookingPaymentStatus,
     isPaidByPlanner,
+    // Razorpay payment details if provided
+    razorpay_order_id: req.body.razorpay_order_id || undefined,
+    razorpay_payment_id: req.body.razorpay_payment_id || undefined,
+    razorpay_signature: req.body.razorpay_signature || undefined,
   });
 
-  // Update inventory
-  inventoryDoc.availableRooms -= roomDetails.numberOfRooms;
-  inventoryDoc.lastBookedAt = new Date();
-  if (inventoryDoc.availableRooms === 0) {
-    inventoryDoc.status = 'sold-out';
+  // Create Payment record if Razorpay payment was made
+  if (hasRazorpayPayment) {
+    await Payment.create({
+      booking: booking._id,
+      event: event,
+      payer: req.user?.id || booking._id,
+      amount: totalAmount,
+      currency: 'INR',
+      paymentMethod: 'card', // Razorpay supports multiple methods
+      paymentType: 'full',
+      status: 'completed',
+      gatewayResponse: {
+        gateway: 'razorpay',
+        order_id: req.body.razorpay_order_id,
+        payment_id: req.body.razorpay_payment_id,
+        signature: req.body.razorpay_signature,
+      },
+      processedAt: new Date(),
+    });
+    console.log(`💳 Payment record created for booking ${booking.bookingId}`);
   }
-  await inventoryDoc.save();
+
+  // Note: Room availability is NOT decremented here - only when booking is APPROVED
+  // This prevents issues with pending bookings that might get rejected
+  console.log(`📝 Booking created with status: ${booking.status} (rooms will be decremented on approval)`);
 
   // Update event stats and total guest cost for private events
   eventDoc.totalBookings += 1;
@@ -171,19 +302,69 @@ export const createBooking = asyncHandler(async (req, res) => {
 
   // Log action
   await createAuditLog({
-    user: req.user.id,
+    user: req.user?.id || booking._id, // Use booking ID if no user
     action: 'booking_create',
     resource: 'Booking',
     resourceId: booking._id,
     status: 'success',
   });
 
+  try {
+    const guestEmail = booking.guestDetails?.email;
+    const plannerEmail = eventDoc.planner?.email;
+    const eventName = eventDoc.name;
+
+    if (guestEmail) {
+      await sendEmail({
+        to: guestEmail,
+        subject: `Booking received for ${eventName}`,
+        html: `
+          <p>Hi ${booking.guestDetails?.name || 'Guest'},</p>
+          <p>Your booking request has been received for <strong>${eventName}</strong>.</p>
+          <ul>
+            <li><strong>Hotel:</strong> ${booking.roomDetails.hotelName}</li>
+            <li><strong>Room Type:</strong> ${booking.roomDetails.roomType}</li>
+            <li><strong>Rooms:</strong> ${booking.roomDetails.numberOfRooms}</li>
+            <li><strong>Check-in:</strong> ${new Date(booking.roomDetails.checkIn).toLocaleDateString()}</li>
+            <li><strong>Check-out:</strong> ${new Date(booking.roomDetails.checkOut).toLocaleDateString()}</li>
+          </ul>
+          <p>We will notify you once the planner confirms your booking.</p>
+        `,
+        text: `Booking received for ${eventName}. Hotel: ${booking.roomDetails.hotelName}, Room: ${booking.roomDetails.roomType}.`,
+      });
+    }
+
+    if (plannerEmail) {
+      await sendEmail({
+        to: plannerEmail,
+        subject: `New booking request for ${eventName}`,
+        html: `
+          <p>Hi ${eventDoc.planner?.name || 'Planner'},</p>
+          <p>A new booking request has been created for <strong>${eventName}</strong>.</p>
+          <ul>
+            <li><strong>Guest:</strong> ${booking.guestDetails?.name || 'N/A'} (${booking.guestDetails?.email || 'N/A'})</li>
+            <li><strong>Hotel:</strong> ${booking.roomDetails.hotelName}</li>
+            <li><strong>Room Type:</strong> ${booking.roomDetails.roomType}</li>
+            <li><strong>Rooms:</strong> ${booking.roomDetails.numberOfRooms}</li>
+          </ul>
+          <p>Please review and approve in your dashboard.</p>
+        `,
+        text: `New booking request for ${eventName}. Guest: ${booking.guestDetails?.name || 'N/A'} (${booking.guestDetails?.email || 'N/A'}).`,
+      });
+    }
+  } catch (error) {
+    console.error('Error sending booking notification emails:', error);
+  }
+
+  console.log(`✅ Booking created successfully: ${booking.bookingId || booking._id}`);
+
   // Emit socket event (will be handled by socket service)
   if (req.io) {
     req.io.to(`event-${event}`).emit('booking-created', {
       booking: booking._id,
       inventory: inventory,
-      availableRooms: inventoryDoc.availableRooms,
+      hotelProposal: hotelProposal,
+      status: 'pending', // Room availability unchanged until approval
     });
   }
 
@@ -242,14 +423,34 @@ export const cancelBooking = asyncHandler(async (req, res) => {
     });
   }
 
-  // Restore inventory
-  const inventory = await Inventory.findById(booking.inventory);
-  if (inventory) {
-    inventory.availableRooms += booking.roomDetails.numberOfRooms;
-    if (inventory.status === 'sold-out') {
-      inventory.status = 'locked';
+  // Restore availability (only if booking was confirmed)
+  if (booking.status === 'confirmed') {
+    if (booking.inventory) {
+      const inventory = await Inventory.findById(booking.inventory);
+      if (inventory) {
+        inventory.availableRooms += booking.roomDetails.numberOfRooms;
+        if (inventory.status === 'sold-out') {
+          inventory.status = 'locked';
+        }
+        await inventory.save();
+        console.log(`↩️ Restored inventory: ${inventory.availableRooms} rooms`);
+      }
     }
-    await inventory.save();
+
+    if (booking.hotelProposal) {
+      const proposalDoc = await HotelProposal.findById(booking.hotelProposal);
+      if (proposalDoc) {
+        const roomTypeKey = booking.roomDetails.roomType === 'Single Room' ? 'singleRoom' : 
+                            booking.roomDetails.roomType === 'Double Room' ? 'doubleRoom' : 'suite';
+        
+        if (proposalDoc.pricing[roomTypeKey]) {
+          proposalDoc.pricing[roomTypeKey].availableRooms += booking.roomDetails.numberOfRooms;
+          proposalDoc.totalRoomsOffered += booking.roomDetails.numberOfRooms;
+          await proposalDoc.save();
+          console.log(`↩️ Restored ${booking.roomDetails.roomType}: ${proposalDoc.pricing[roomTypeKey].availableRooms} rooms`);
+        }
+      }
+    }
   }
 
   // Update booking
@@ -316,6 +517,35 @@ export const approveBooking = asyncHandler(async (req, res) => {
   booking.approvedAt = new Date();
   await booking.save();
 
+  // Decrement room availability NOW (when confirmed)
+  if (booking.inventory) {
+    const inventoryDoc = await Inventory.findById(booking.inventory);
+    if (inventoryDoc) {
+      inventoryDoc.availableRooms -= booking.roomDetails.numberOfRooms;
+      inventoryDoc.lastBookedAt = new Date();
+      if (inventoryDoc.availableRooms === 0) {
+        inventoryDoc.status = 'sold-out';
+      }
+      await inventoryDoc.save();
+      console.log(`✅ Confirmed: Decremented inventory to ${inventoryDoc.availableRooms} rooms`);
+    }
+  }
+
+  if (booking.hotelProposal) {
+    const proposalDoc = await HotelProposal.findById(booking.hotelProposal);
+    if (proposalDoc) {
+      const roomTypeKey = booking.roomDetails.roomType === 'Single Room' ? 'singleRoom' : 
+                          booking.roomDetails.roomType === 'Double Room' ? 'doubleRoom' : 'suite';
+      
+      if (proposalDoc.pricing[roomTypeKey]) {
+        proposalDoc.pricing[roomTypeKey].availableRooms -= booking.roomDetails.numberOfRooms;
+        proposalDoc.totalRoomsOffered -= booking.roomDetails.numberOfRooms;
+        await proposalDoc.save();
+        console.log(`✅ Confirmed: Decremented ${booking.roomDetails.roomType} to ${proposalDoc.pricing[roomTypeKey].availableRooms} rooms`);
+      }
+    }
+  }
+
   // Log action
   await createAuditLog({
     user: req.user.id,
@@ -328,6 +558,31 @@ export const approveBooking = asyncHandler(async (req, res) => {
   const populatedBooking = await Booking.findById(booking._id)
     .populate('event', 'name')
     .populate('guest', 'name email');
+
+  try {
+    const guestEmail = populatedBooking.guest?.email || populatedBooking.guestDetails?.email;
+    if (guestEmail) {
+      await sendEmail({
+        to: guestEmail,
+        subject: `Booking confirmed for ${populatedBooking.event?.name || 'your event'}`,
+        html: `
+          <p>Hi ${populatedBooking.guest?.name || populatedBooking.guestDetails?.name || 'Guest'},</p>
+          <p>Your booking has been confirmed.</p>
+          <ul>
+            <li><strong>Event:</strong> ${populatedBooking.event?.name || 'N/A'}</li>
+            <li><strong>Hotel:</strong> ${populatedBooking.roomDetails.hotelName}</li>
+            <li><strong>Room Type:</strong> ${populatedBooking.roomDetails.roomType}</li>
+            <li><strong>Rooms:</strong> ${populatedBooking.roomDetails.numberOfRooms}</li>
+            <li><strong>Check-in:</strong> ${new Date(populatedBooking.roomDetails.checkIn).toLocaleDateString()}</li>
+            <li><strong>Check-out:</strong> ${new Date(populatedBooking.roomDetails.checkOut).toLocaleDateString()}</li>
+          </ul>
+        `,
+        text: `Your booking has been confirmed for ${populatedBooking.event?.name || 'your event'}.`,
+      });
+    }
+  } catch (error) {
+    console.error('Error sending booking confirmation email:', error);
+  }
 
   res.status(200).json({
     success: true,
@@ -367,15 +622,8 @@ export const rejectBooking = asyncHandler(async (req, res) => {
     });
   }
 
-  // Restore inventory
-  const inventory = await Inventory.findById(booking.inventory);
-  if (inventory) {
-    inventory.availableRooms += booking.roomDetails.numberOfRooms;
-    if (inventory.status === 'sold-out') {
-      inventory.status = 'locked';
-    }
-    await inventory.save();
-  }
+  // No need to restore inventory - pending bookings never decremented availability
+  console.log(`❌ Rejecting pending booking - no inventory changes needed`);
 
   booking.status = 'rejected';
   booking.rejectionReason = reason || 'No reason provided';

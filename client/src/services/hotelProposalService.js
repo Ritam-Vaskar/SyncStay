@@ -14,11 +14,23 @@ export const hotelProposalService = {
   updateProposal: (proposalId, data) => api.put(`/hotel-proposals/${proposalId}/update`, data),
 
   // Get all proposals for an event (for planner)
-  getEventProposals: (eventId) => api.get(`/hotel-proposals/event/${eventId}`),
+  getEventProposals: (eventId) => api.get(`/hotel-proposals/event/${eventId}`, {
+    headers: {
+      'Cache-Control': 'no-cache',
+      'Pragma': 'no-cache'
+    }
+  }),
 
   // Select a hotel proposal (planner)
   selectProposal: (proposalId) => api.put(`/hotel-proposals/${proposalId}/select`),
 
+  // Confirm hotel selection - replaces all selections atomically
+  confirmSelection: (eventId, selectedProposalIds) =>
+    api.post(`/hotel-proposals/event/${eventId}/confirm-selection`, { selectedProposalIds }),
+
   // Publish microsite after selecting hotels (planner)
   publishMicrosite: (eventId) => api.put(`/hotel-proposals/event/${eventId}/publish-microsite`),
+
+  // Get selected hotel proposals for microsite (public)
+  getSelectedForMicrosite: (slug) => api.get(`/hotel-proposals/microsite/${slug}/selected`),
 };

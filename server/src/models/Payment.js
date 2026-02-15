@@ -57,6 +57,10 @@ const paymentSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    processedAt: {
+      type: Date,
+      default: null,
+    },
     refundedAt: {
       type: Date,
       default: null,

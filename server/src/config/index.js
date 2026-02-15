@@ -22,4 +22,8 @@ export default {
     apiKey: process.env.PAYMENT_API_KEY,
     secret: process.env.PAYMENT_SECRET,
   },
+  razorpay: {
+    keyId: process.env.RAZORPAY_KEY_ID,
+    keySecret: process.env.RAZORPAY_KEY_SECRET,
+  },
 };

@@ -145,9 +145,26 @@ const eventSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
-    plannerPaidAmount: {
+    // Planner payment for private events (upfront payment to hotels)
+    plannerPaymentStatus: {
+      type: String,
+      enum: ['pending', 'paid', 'not-required'],
+      default: 'not-required',
+    },
+    plannerPaymentAmount: {
       type: Number,
       default: 0,
+    },
+    plannerPaidAt: {
+      type: Date,
+    },
+    plannerPaymentDetails: {
+      transactionId: String,
+      paymentMethod: String,
+      paymentGateway: String,
+      razorpay_order_id: String,
+      razorpay_payment_id: String,
+      razorpay_signature: String,
     },
     micrositeConfig: {
       isPublished: {

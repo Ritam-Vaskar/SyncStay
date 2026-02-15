@@ -14,12 +14,17 @@ const bookingSchema = new mongoose.Schema(
     inventory: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Inventory',
-      required: true,
+      required: false, // Optional - for traditional inventory bookings
+    },
+    hotelProposal: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'HotelProposal',
+      required: false, // Optional - for microsite bookings with hotel proposals
     },
     guest: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
-      required: true,
+      required: false, // Optional - guests can book without accounts
     },
     guestDetails: {
       name: String,
@@ -90,6 +95,19 @@ const bookingSchema = new mongoose.Schema(
     cancellationReason: {
       type: String,
       default: '',
+    },
+    // Razorpay payment details
+    razorpay_order_id: {
+      type: String,
+      sparse: true,
+    },
+    razorpay_payment_id: {
+      type: String,
+      sparse: true,
+    },
+    razorpay_signature: {
+      type: String,
+      sparse: true,
     },
   },
   {

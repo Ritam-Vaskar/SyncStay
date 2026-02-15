@@ -26,14 +26,19 @@ api.interceptors.response.use(
   (response) => response.data,
   (error) => {
     if (error.response?.status === 401) {
-      // Unauthorized - clear token and redirect to login
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      localStorage.removeItem('auth-storage');
+      // Don't auto-logout for microsite routes - let the page handle it
+      const isMicrositeRoute = window.location.pathname.includes('/microsite/');
       
-      // Only redirect if not already on login page
-      if (!window.location.pathname.includes('/login')) {
-        window.location.href = '/login';
+      if (!isMicrositeRoute) {
+        // Unauthorized - clear token and redirect to login
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        localStorage.removeItem('auth-storage');
+        
+        // Only redirect if not already on login page
+        if (!window.location.pathname.includes('/login')) {
+          window.location.href = '/login';
+        }
       }
     }
     return Promise.reject(error.response?.data || error.message);

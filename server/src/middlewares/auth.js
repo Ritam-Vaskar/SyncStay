@@ -71,3 +71,40 @@ export const authorize = (...roles) => {
     next();
   };
 };
+
+/**
+ * Optional authentication - doesn't fail if no token
+ * Useful for public routes that want to know if user is authenticated
+ */
+export const optionalAuth = async (req, res, next) => {
+  try {
+    let token;
+
+    // Check for token in Authorization header
+    if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+      token = req.headers.authorization.split(' ')[1];
+    }
+
+    if (token) {
+      try {
+        // Verify token
+        const decoded = jwt.verify(token, config.jwt.secret);
+
+        // Get user from token
+        req.user = await User.findById(decoded.id).select('-password');
+
+        if (req.user && !req.user.isActive) {
+          req.user = null; // Clear user if account is deactivated
+        }
+      } catch (error) {
+        // Token invalid - just continue without user
+        req.user = null;
+      }
+    }
+
+    next();
+  } catch (error) {
+    // Don't fail - just continue without user
+    next();
+  }
+};

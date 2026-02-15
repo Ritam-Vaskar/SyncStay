@@ -190,6 +190,7 @@ export const MicrositePlannerBookings = () => {
                     <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">Hotel</th>
                     <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">Rooms</th>
                     <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">Amount</th>
+                    <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">Payment</th>
                     <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">Status</th>
                     <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">
                       Actions
@@ -213,8 +214,30 @@ export const MicrositePlannerBookings = () => {
                         <p className="text-sm text-gray-600">{booking.roomDetails?.roomType}</p>
                       </td>
                       <td className="py-3 px-4">{booking.roomDetails?.numberOfRooms}</td>
-                      <td className="py-3 px-4 font-semibold">
-                        {formatCurrency(booking.pricing?.totalAmount || 0)}
+                      <td className="py-3 px-4">
+                        <p className="font-semibold">{formatCurrency(booking.pricing?.totalAmount || 0)}</p>
+                        <p className="text-xs text-gray-500">{booking.pricing?.currency || 'INR'}</p>
+                      </td>
+                      <td className="py-3 px-4">
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`badge ${
+                              booking.paymentStatus === 'paid'
+                                ? 'badge-success'
+                                : booking.paymentStatus === 'partial'
+                                ? 'badge-warning'
+                                : 'badge-secondary'
+                            }`}
+                          >
+                            {booking.paymentStatus === 'paid' ? '✅ Paid' : 
+                             booking.paymentStatus === 'partial' ? 'Partial' : 'Unpaid'}
+                          </span>
+                        </div>
+                        {booking.razorpay_payment_id && (
+                          <p className="text-xs text-gray-500 mt-1 font-mono">
+                            ID: {booking.razorpay_payment_id.substring(0, 15)}...
+                          </p>
+                        )}
                       </td>
                       <td className="py-3 px-4">
                         <span

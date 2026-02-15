@@ -2,21 +2,37 @@ import HotelProposal from '../models/HotelProposal.js';
 import Event from '../models/Event.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import { createAuditLog } from '../middlewares/auditLogger.js';
+import sendEmail from '../utils/mail.js';
 
 /**
  * @route   GET /api/hotel-proposals/rfps
- * @desc    Get all RFPs (events with status 'rfp-published') for hotels
+ * @desc    Get all RFPs (events with status 'rfp-published' or 'reviewing-proposals') for hotels
  * @access  Private (Hotel only)
  */
 export const getRFPs = asyncHandler(async (req, res) => {
-  const events = await Event.find({ status: 'rfp-published' })
-    .populate('planner', 'name email')
+  // Show events that are either newly published or already have some proposals
+  // This allows multiple hotels to submit proposals for the same event
+  const events = await Event.find({ 
+    status: { $in: ['rfp-published', 'reviewing-proposals'] } 
+  })
+    .populate('planner', 'name email organization')
     .sort({ createdAt: -1 });
+
+  // Add proposal count for each event
+  const eventsWithProposalCount = await Promise.all(
+    events.map(async (event) => {
+      const proposalCount = await HotelProposal.countDocuments({ event: event._id });
+      return {
+        ...event.toObject(),
+        proposalCount,
+      };
+    })
+  );
 
   res.status(200).json({
     success: true,
-    count: events.length,
-    data: events,
+    count: eventsWithProposalCount.length,
+    data: eventsWithProposalCount,
   });
 });
 
@@ -40,7 +56,7 @@ export const submitProposal = asyncHandler(async (req, res) => {
   } = req.body;
 
   // Check if event exists and is accepting proposals
-  const event = await Event.findById(eventId);
+  const event = await Event.findById(eventId).populate('planner', 'name email');
   if (!event) {
     return res.status(404).json({
       success: false,
@@ -48,7 +64,8 @@ export const submitProposal = asyncHandler(async (req, res) => {
     });
   }
 
-  if (event.status !== 'rfp-published') {
+  // Allow proposals for both rfp-published and reviewing-proposals statuses
+  if (!['rfp-published', 'reviewing-proposals'].includes(event.status)) {
     return res.status(400).json({
       success: false,
       message: 'Event is not accepting proposals',
@@ -99,6 +116,28 @@ export const submitProposal = asyncHandler(async (req, res) => {
     status: 'success',
     details: `Hotel submitted proposal for event: ${event.name}`,
   });
+
+  try {
+    if (event.planner?.email) {
+      await sendEmail({
+        to: event.planner.email,
+        subject: `New hotel proposal for ${event.name}`,
+        html: `
+          <p>Hi ${event.planner.name || 'Planner'},</p>
+          <p>A hotel has submitted a proposal for your event <strong>${event.name}</strong>.</p>
+          <ul>
+            <li><strong>Hotel:</strong> ${hotelName}</li>
+            <li><strong>Total Rooms Offered:</strong> ${totalRoomsOffered}</li>
+            <li><strong>Total Estimated Cost:</strong> ${totalEstimatedCost || 'N/A'}</li>
+          </ul>
+          <p>Please review the proposal in your dashboard.</p>
+        `,
+        text: `New hotel proposal for ${event.name} from ${hotelName}. Please review in your dashboard.`,
+      });
+    }
+  } catch (error) {
+    console.error('Error sending proposal notification email:', error);
+  }
 
   res.status(201).json({
     success: true,
@@ -184,45 +223,131 @@ export const selectProposal = asyncHandler(async (req, res) => {
     });
   }
 
-  // Update proposal status
-  proposal.status = 'selected';
-  proposal.selectedByPlanner = true;
-  proposal.selectionDate = new Date();
+  // Toggle selection
+  const wasSelected = proposal.selectedByPlanner;
+  proposal.status = wasSelected ? 'submitted' : 'selected';
+  proposal.selectedByPlanner = !wasSelected;
+  proposal.selectionDate = wasSelected ? null : new Date();
   await proposal.save();
 
-  // Add hotel to event's selectedHotels array
+  // Rebuild event's selectedHotels from all currently selected proposals
   const event = await Event.findById(proposal.event._id);
-  if (!event.selectedHotels) {
-    event.selectedHotels = [];
-  }
-  
-  event.selectedHotels.push({
-    hotel: proposal.hotel,
-    proposal: proposal._id,
-  });
-  
+  const allSelected = await HotelProposal.find({ event: event._id, selectedByPlanner: true });
+  event.selectedHotels = allSelected.map(p => ({
+    hotel: p.hotel,
+    proposal: p._id,
+  }));
   await event.save();
 
   // Log action
   await createAuditLog({
     user: req.user.id,
-    action: 'hotel_proposal_select',
+    action: wasSelected ? 'hotel_proposal_deselect' : 'hotel_proposal_select',
     resource: 'HotelProposal',
     resourceId: proposal._id,
     status: 'success',
-    details: `Planner selected hotel proposal for event: ${event.name}`,
+    details: `Planner ${wasSelected ? 'deselected' : 'selected'} hotel proposal for event: ${event.name}`,
   });
 
   res.status(200).json({
     success: true,
-    message: 'Hotel proposal selected successfully',
+    message: `Hotel proposal ${wasSelected ? 'deselected' : 'selected'} successfully`,
     data: proposal,
   });
 });
 
 /**
+ * @route   POST /api/hotel-proposals/event/:eventId/confirm-selection
+ * @desc    Confirm hotel selection - replaces all selections atomically (works for public & private)
+ * @access  Private (Planner only)
+ */
+export const confirmHotelSelection = asyncHandler(async (req, res) => {
+  const { eventId } = req.params;
+  const { selectedProposalIds } = req.body; // Array of proposal IDs
+
+  if (!selectedProposalIds || !Array.isArray(selectedProposalIds) || selectedProposalIds.length === 0) {
+    return res.status(400).json({
+      success: false,
+      message: 'Please select at least one hotel proposal',
+    });
+  }
+
+  const event = await Event.findById(eventId);
+  if (!event) {
+    return res.status(404).json({ success: false, message: 'Event not found' });
+  }
+
+  if (event.planner.toString() !== req.user.id) {
+    return res.status(403).json({ success: false, message: 'Not authorized' });
+  }
+
+  // Don't allow re-selection if already active (already paid/published)
+  if (event.status === 'active') {
+    return res.status(400).json({
+      success: false,
+      message: 'Event is already active. Hotels cannot be changed.',
+    });
+  }
+
+  // Reset ALL proposals for this event first
+  await HotelProposal.updateMany(
+    { event: eventId },
+    { $set: { selectedByPlanner: false, status: 'submitted', selectionDate: null } }
+  );
+
+  // Mark the selected ones
+  const proposals = await HotelProposal.find({ _id: { $in: selectedProposalIds }, event: eventId });
+  if (proposals.length === 0) {
+    return res.status(400).json({ success: false, message: 'No valid proposals found' });
+  }
+
+  await HotelProposal.updateMany(
+    { _id: { $in: selectedProposalIds }, event: eventId },
+    { $set: { selectedByPlanner: true, status: 'selected', selectionDate: new Date() } }
+  );
+
+  // Calculate total cost
+  let totalCost = 0;
+  const selectedHotels = [];
+  for (const proposal of proposals) {
+    totalCost += proposal.totalEstimatedCost || 0;
+    selectedHotels.push({ hotel: proposal.hotel, proposal: proposal._id });
+  }
+
+  // Replace event.selectedHotels entirely (no duplicates ever)
+  event.selectedHotels = selectedHotels;
+
+  if (event.isPrivate) {
+    event.plannerPaymentAmount = totalCost;
+    event.plannerPaymentStatus = 'pending';
+  }
+
+  await event.save();
+
+  await createAuditLog({
+    user: req.user.id,
+    action: 'hotel_selection_confirmed',
+    resource: 'Event',
+    resourceId: event._id,
+    status: 'success',
+    details: `Confirmed ${selectedHotels.length} hotel(s) for event: ${event.name}`,
+  });
+
+  res.status(200).json({
+    success: true,
+    message: `${selectedHotels.length} hotel(s) confirmed successfully`,
+    data: {
+      selectedHotels,
+      totalAmount: totalCost,
+      currency: 'INR',
+      isPrivate: event.isPrivate,
+    },
+  });
+});
+
+/**
  * @route   PUT /api/hotel-proposals/event/:eventId/publish-microsite
- * @desc    Finalize hotel selection and publish microsite
+ * @desc    Finalize hotel selection and publish microsite (for public events or after payment for private events)
  * @access  Private (Planner only)
  */
 export const publishEventMicrosite = asyncHandler(async (req, res) => {
@@ -250,6 +375,14 @@ export const publishEventMicrosite = asyncHandler(async (req, res) => {
     return res.status(400).json({
       success: false,
       message: 'Please select at least one hotel before publishing',
+    });
+  }
+
+  // For private events, require planner payment BEFORE publishing
+  if (event.isPrivate && event.plannerPaymentStatus !== 'paid') {
+    return res.status(400).json({
+      success: false,
+      message: 'Payment required for private events. Please complete payment via /api/events/:id/planner-payment before publishing microsite.',
     });
   }
 
@@ -285,8 +418,10 @@ export const publishEventMicrosite = asyncHandler(async (req, res) => {
     resource: 'Event',
     resourceId: event._id,
     status: 'success',
-    details: `Microsite published for event: ${event.name}`,
+    details: `Microsite published for event: ${event.name} (${event.isPrivate ? 'Private' : 'Public'})`,
   });
+
+  console.log(`🌐 Microsite published: ${event.name} (${event.isPrivate ? 'Private - Payment completed' : 'Public'})`);
 
   res.status(200).json({
     success: true,
@@ -353,5 +488,69 @@ export const updateProposal = asyncHandler(async (req, res) => {
     success: true,
     message: 'Proposal updated successfully',
     data: proposal,
+  });
+});
+
+/**
+ * @route   GET /api/hotel-proposals/microsite/:slug/selected
+ * @desc    Get selected hotel proposals for a microsite (Public)
+ * @access  Public
+ */
+export const getSelectedProposalsForMicrosite = asyncHandler(async (req, res) => {
+  const { slug } = req.params;
+  
+  console.log(`🔍 Fetching selected proposals for microsite: ${slug}`);
+
+  // Find event by slug
+  const event = await Event.findOne({
+    'micrositeConfig.customSlug': slug,
+    'micrositeConfig.isPublished': true,
+  });
+
+  if (!event) {
+    console.warn(`⚠️ Event not found for slug: ${slug}`);
+    return res.status(404).json({
+      success: false,
+      message: 'Event not found or not published',
+    });
+  }
+
+  // Check if event is active
+  if (event.status !== 'active') {
+    console.warn(`⚠️ Event not active: ${event.status}`);
+    return res.status(200).json({
+      success: true,
+      count: 0,
+      data: [],
+      message: 'Event is not active yet. Selected hotels will be available soon.',
+    });
+  }
+
+  // Get selected hotel proposals
+  if (!event.selectedHotels || event.selectedHotels.length === 0) {
+    console.log('ℹ️ No hotels selected yet');
+    return res.status(200).json({
+      success: true,
+      count: 0,
+      data: [],
+      message: 'No hotels selected yet',
+    });
+  }
+
+  // Fetch full proposal details for selected hotels
+  const proposalIds = event.selectedHotels.map(sh => sh.proposal);
+  const selectedProposals = await HotelProposal.find({
+    _id: { $in: proposalIds },
+    selectedByPlanner: true,
+  })
+    .populate('hotel', 'name email phone organization')
+    .sort({ hotelName: 1 });
+
+  console.log(`✅ Found ${selectedProposals.length} selected proposals`);
+
+  res.status(200).json({
+    success: true,
+    count: selectedProposals.length,
+    data: selectedProposals,
   });
 });

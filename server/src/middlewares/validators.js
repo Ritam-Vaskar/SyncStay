@@ -6,10 +6,18 @@ import { body, param, query, validationResult } from 'express-validator';
 export const validate = (req, res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
+    const errorMessages = errors.array().map(err => `${err.path}: ${err.msg}`);
+    console.error('❌ Validation Error:', {
+      path: req.path,
+      method: req.method,
+      errors: errors.array(),
+      body: req.body
+    });
     return res.status(400).json({
       success: false,
       message: 'Validation failed',
       errors: errors.array(),
+      details: errorMessages.join(', '),
     });
   }
   next();
@@ -45,9 +53,22 @@ export const validateLogin = [
  */
 export const validateEvent = [
   body('name').trim().notEmpty().withMessage('Event name is required'),
+  // Accept both 'type' and 'eventType' for backwards compatibility
   body('type')
+    .optional()
     .isIn(['conference', 'wedding', 'corporate', 'exhibition', 'other'])
     .withMessage('Invalid event type'),
+  body('eventType')
+    .optional()
+    .isIn(['conference', 'wedding', 'corporate', 'exhibition', 'other'])
+    .withMessage('Invalid event type')
+    .customSanitizer((value, { req }) => {
+      // If eventType is provided, map it to type
+      if (value && !req.body.type) {
+        req.body.type = value;
+      }
+      return value;
+    }),
   body('startDate').isISO8601().withMessage('Valid start date is required'),
   body('endDate').isISO8601().withMessage('Valid end date is required'),
   body('expectedGuests')
@@ -76,10 +97,25 @@ export const validateInventory = [
  */
 export const validateBooking = [
   body('event').isMongoId().withMessage('Valid event ID is required'),
-  body('inventory').isMongoId().withMessage('Valid inventory ID is required'),
+  // Accept either inventory OR hotelProposal
+  body('inventory')
+    .optional()
+    .isMongoId()
+    .withMessage('Valid inventory ID is required'),
+  body('hotelProposal')
+    .optional()
+    .isMongoId()
+    .withMessage('Valid hotel proposal ID is required'),
   body('roomDetails.numberOfRooms')
     .isInt({ min: 1 })
     .withMessage('Number of rooms must be at least 1'),
+  // Custom validation to ensure at least one of inventory or hotelProposal is provided
+  body().custom((value, { req }) => {
+    if (!req.body.inventory && !req.body.hotelProposal) {
+      throw new Error('Either inventory or hotelProposal is required');
+    }
+    return true;
+  }),
   validate,
 ];
 
