@@ -3,8 +3,8 @@ FROM node:20-alpine
 WORKDIR /app
 
 # Accept build-time env vars (explicit backend URLs)
-ARG VITE_API_URL=http://localhost:5001/api
-ARG VITE_SOCKET_URL=http://localhost:5001
+ARG VITE_API_URL=http://31.97.236.171:5001/api
+ARG VITE_SOCKET_URL=http://31.97.236.171:5001
 ARG VITE_RAZORPAY_KEY_ID=rzp_test_RsOdHaU8fEaxRF
 
 # Vite inlines these at build time
