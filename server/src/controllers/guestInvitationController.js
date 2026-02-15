@@ -3,6 +3,7 @@ import asyncHandler from '../utils/asyncHandler.js';
 import { createAuditLog } from '../middlewares/auditLogger.js';
 import crypto from 'crypto';
 import xlsx from 'xlsx';
+import sendEmail from '../utils/mail.js';
 
 // @desc    Add guests to private event (manually)
 // @route   POST /api/events/:eventId/guests
@@ -47,6 +48,30 @@ export const addGuests = asyncHandler(async (req, res) => {
   await createAuditLog(req.user.id, 'ADD_GUESTS', 'Event', eventId, {
     guestsAdded: newGuests.length,
   });
+
+  try {
+    const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
+    const slug = event.micrositeConfig?.customSlug;
+    const micrositeLink = slug ? `${clientUrl}/microsite/${slug}` : clientUrl;
+
+    await Promise.all(
+      newGuests.map((guest) =>
+        sendEmail({
+          to: guest.email,
+          subject: `You're invited to ${event.name}`,
+          html: `
+            <p>Hi ${guest.name || 'Guest'},</p>
+            <p>You have been invited to the private event <strong>${event.name}</strong>.</p>
+            <p><strong>Access Code:</strong> ${guest.accessCode}</p>
+            <p>Access the event here: <a href="${micrositeLink}">${micrositeLink}</a></p>
+          `,
+          text: `You're invited to ${event.name}. Access code: ${guest.accessCode}. Link: ${micrositeLink}`,
+        })
+      )
+    );
+  } catch (error) {
+    console.error('Error sending guest invitation emails:', error);
+  }
 
   res.status(200).json({
     success: true,
@@ -108,6 +133,30 @@ export const uploadGuestList = asyncHandler(async (req, res) => {
       guestsAdded: newGuests.length,
       skipped,
     });
+
+    try {
+      const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
+      const slug = event.micrositeConfig?.customSlug;
+      const micrositeLink = slug ? `${clientUrl}/microsite/${slug}` : clientUrl;
+
+      await Promise.all(
+        newGuests.map((guest) =>
+          sendEmail({
+            to: guest.email,
+            subject: `You're invited to ${event.name}`,
+            html: `
+              <p>Hi ${guest.name || 'Guest'},</p>
+              <p>You have been invited to the private event <strong>${event.name}</strong>.</p>
+              <p><strong>Access Code:</strong> ${guest.accessCode}</p>
+              <p>Access the event here: <a href="${micrositeLink}">${micrositeLink}</a></p>
+            `,
+            text: `You're invited to ${event.name}. Access code: ${guest.accessCode}. Link: ${micrositeLink}`,
+          })
+        )
+      );
+    } catch (error) {
+      console.error('Error sending guest invitation emails:', error);
+    }
 
     res.status(200).json({
       success: true,

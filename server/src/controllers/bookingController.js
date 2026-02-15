@@ -5,6 +5,7 @@ import Event from '../models/Event.js';
 import Payment from '../models/Payment.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import { createAuditLog } from '../middlewares/auditLogger.js';
+import sendEmail from '../utils/mail.js';
 
 /**
  * @route   GET /api/bookings
@@ -89,13 +90,15 @@ export const createBooking = asyncHandler(async (req, res) => {
   console.log('📝 Creating booking with data:', JSON.stringify(req.body, null, 2));
 
   // Verify event
-  const eventDoc = await Event.findById(event);
+  const eventDoc = await Event.findById(event).populate('planner', 'name email');
   if (!eventDoc) {
     return res.status(404).json({
       success: false,
       message: 'Event not found',
     });
   }
+
+  const plannerId = eventDoc.planner?._id?.toString() || eventDoc.planner?.toString();
 
   let inventoryDoc = null;
   let proposalDoc = null;
@@ -173,7 +176,7 @@ export const createBooking = asyncHandler(async (req, res) => {
     console.log('   Event:', eventDoc.name);
     console.log('   User Email:', req.user.email);
     console.log('   User Role:', req.user.role);
-    console.log('   Planner ID:', eventDoc.planner.toString());
+    console.log('   Planner ID:', plannerId);
     console.log('   User ID:', req.user.id);
     
     console.log('   Invited Guests:');
@@ -188,9 +191,9 @@ export const createBooking = asyncHandler(async (req, res) => {
     console.log('   Email comparison:');
     console.log('      Looking for:', req.user.email.toLowerCase());
     console.log('      Is invited:', isInvited);
-    console.log('      Is planner:', eventDoc.planner.toString() === req.user.id);
+    console.log('      Is planner:', plannerId === req.user.id);
     
-    if (!isInvited && eventDoc.planner.toString() !== req.user.id) {
+    if (!isInvited && plannerId !== req.user.id) {
       console.log('   ❌ Access denied: Not invited and not planner');
       return res.status(403).json({
         success: false,
@@ -305,6 +308,53 @@ export const createBooking = asyncHandler(async (req, res) => {
     resourceId: booking._id,
     status: 'success',
   });
+
+  try {
+    const guestEmail = booking.guestDetails?.email;
+    const plannerEmail = eventDoc.planner?.email;
+    const eventName = eventDoc.name;
+
+    if (guestEmail) {
+      await sendEmail({
+        to: guestEmail,
+        subject: `Booking received for ${eventName}`,
+        html: `
+          <p>Hi ${booking.guestDetails?.name || 'Guest'},</p>
+          <p>Your booking request has been received for <strong>${eventName}</strong>.</p>
+          <ul>
+            <li><strong>Hotel:</strong> ${booking.roomDetails.hotelName}</li>
+            <li><strong>Room Type:</strong> ${booking.roomDetails.roomType}</li>
+            <li><strong>Rooms:</strong> ${booking.roomDetails.numberOfRooms}</li>
+            <li><strong>Check-in:</strong> ${new Date(booking.roomDetails.checkIn).toLocaleDateString()}</li>
+            <li><strong>Check-out:</strong> ${new Date(booking.roomDetails.checkOut).toLocaleDateString()}</li>
+          </ul>
+          <p>We will notify you once the planner confirms your booking.</p>
+        `,
+        text: `Booking received for ${eventName}. Hotel: ${booking.roomDetails.hotelName}, Room: ${booking.roomDetails.roomType}.`,
+      });
+    }
+
+    if (plannerEmail) {
+      await sendEmail({
+        to: plannerEmail,
+        subject: `New booking request for ${eventName}`,
+        html: `
+          <p>Hi ${eventDoc.planner?.name || 'Planner'},</p>
+          <p>A new booking request has been created for <strong>${eventName}</strong>.</p>
+          <ul>
+            <li><strong>Guest:</strong> ${booking.guestDetails?.name || 'N/A'} (${booking.guestDetails?.email || 'N/A'})</li>
+            <li><strong>Hotel:</strong> ${booking.roomDetails.hotelName}</li>
+            <li><strong>Room Type:</strong> ${booking.roomDetails.roomType}</li>
+            <li><strong>Rooms:</strong> ${booking.roomDetails.numberOfRooms}</li>
+          </ul>
+          <p>Please review and approve in your dashboard.</p>
+        `,
+        text: `New booking request for ${eventName}. Guest: ${booking.guestDetails?.name || 'N/A'} (${booking.guestDetails?.email || 'N/A'}).`,
+      });
+    }
+  } catch (error) {
+    console.error('Error sending booking notification emails:', error);
+  }
 
   console.log(`✅ Booking created successfully: ${booking.bookingId || booking._id}`);
 
@@ -508,6 +558,31 @@ export const approveBooking = asyncHandler(async (req, res) => {
   const populatedBooking = await Booking.findById(booking._id)
     .populate('event', 'name')
     .populate('guest', 'name email');
+
+  try {
+    const guestEmail = populatedBooking.guest?.email || populatedBooking.guestDetails?.email;
+    if (guestEmail) {
+      await sendEmail({
+        to: guestEmail,
+        subject: `Booking confirmed for ${populatedBooking.event?.name || 'your event'}`,
+        html: `
+          <p>Hi ${populatedBooking.guest?.name || populatedBooking.guestDetails?.name || 'Guest'},</p>
+          <p>Your booking has been confirmed.</p>
+          <ul>
+            <li><strong>Event:</strong> ${populatedBooking.event?.name || 'N/A'}</li>
+            <li><strong>Hotel:</strong> ${populatedBooking.roomDetails.hotelName}</li>
+            <li><strong>Room Type:</strong> ${populatedBooking.roomDetails.roomType}</li>
+            <li><strong>Rooms:</strong> ${populatedBooking.roomDetails.numberOfRooms}</li>
+            <li><strong>Check-in:</strong> ${new Date(populatedBooking.roomDetails.checkIn).toLocaleDateString()}</li>
+            <li><strong>Check-out:</strong> ${new Date(populatedBooking.roomDetails.checkOut).toLocaleDateString()}</li>
+          </ul>
+        `,
+        text: `Your booking has been confirmed for ${populatedBooking.event?.name || 'your event'}.`,
+      });
+    }
+  } catch (error) {
+    console.error('Error sending booking confirmation email:', error);
+  }
 
   res.status(200).json({
     success: true,

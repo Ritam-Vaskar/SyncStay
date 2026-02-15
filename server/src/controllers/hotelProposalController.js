@@ -2,6 +2,7 @@ import HotelProposal from '../models/HotelProposal.js';
 import Event from '../models/Event.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import { createAuditLog } from '../middlewares/auditLogger.js';
+import sendEmail from '../utils/mail.js';
 
 /**
  * @route   GET /api/hotel-proposals/rfps
@@ -55,7 +56,7 @@ export const submitProposal = asyncHandler(async (req, res) => {
   } = req.body;
 
   // Check if event exists and is accepting proposals
-  const event = await Event.findById(eventId);
+  const event = await Event.findById(eventId).populate('planner', 'name email');
   if (!event) {
     return res.status(404).json({
       success: false,
@@ -115,6 +116,28 @@ export const submitProposal = asyncHandler(async (req, res) => {
     status: 'success',
     details: `Hotel submitted proposal for event: ${event.name}`,
   });
+
+  try {
+    if (event.planner?.email) {
+      await sendEmail({
+        to: event.planner.email,
+        subject: `New hotel proposal for ${event.name}`,
+        html: `
+          <p>Hi ${event.planner.name || 'Planner'},</p>
+          <p>A hotel has submitted a proposal for your event <strong>${event.name}</strong>.</p>
+          <ul>
+            <li><strong>Hotel:</strong> ${hotelName}</li>
+            <li><strong>Total Rooms Offered:</strong> ${totalRoomsOffered}</li>
+            <li><strong>Total Estimated Cost:</strong> ${totalEstimatedCost || 'N/A'}</li>
+          </ul>
+          <p>Please review the proposal in your dashboard.</p>
+        `,
+        text: `New hotel proposal for ${event.name} from ${hotelName}. Please review in your dashboard.`,
+      });
+    }
+  } catch (error) {
+    console.error('Error sending proposal notification email:', error);
+  }
 
   res.status(201).json({
     success: true,

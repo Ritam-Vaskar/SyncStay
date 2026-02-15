@@ -1,6 +1,8 @@
 import Event from '../models/Event.js';
+import User from '../models/User.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import { createAuditLog } from '../middlewares/auditLogger.js';
+import sendEmail from '../utils/mail.js';
 
 /**
  * @route   GET /api/events
@@ -104,6 +106,32 @@ export const createEvent = asyncHandler(async (req, res) => {
     resourceId: event._id,
     status: 'success',
   });
+
+  try {
+    const admins = await User.find({ role: 'admin', isActive: true }).select('email name');
+    const adminEmails = admins.map((admin) => admin.email).filter(Boolean);
+
+    if (adminEmails.length > 0) {
+      await sendEmail({
+        to: adminEmails,
+        subject: `New event pending approval: ${event.name}`,
+        html: `
+          <p>Hi Admin,</p>
+          <p>A new event has been created and is awaiting approval.</p>
+          <ul>
+            <li><strong>Event:</strong> ${event.name}</li>
+            <li><strong>Type:</strong> ${event.type}</li>
+            <li><strong>Planner:</strong> ${req.user.name} (${req.user.email})</li>
+            <li><strong>Dates:</strong> ${new Date(event.startDate).toLocaleDateString()} - ${new Date(event.endDate).toLocaleDateString()}</li>
+          </ul>
+          <p>Please review and approve the event in the admin dashboard.</p>
+        `,
+        text: `New event pending approval: ${event.name}. Planner: ${req.user.name} (${req.user.email}).`,
+      });
+    }
+  } catch (error) {
+    console.error('Error sending admin notification email:', error);
+  }
 
   res.status(201).json({
     success: true,
@@ -280,6 +308,45 @@ export const approveEvent = asyncHandler(async (req, res) => {
     status: 'success',
     details: `Event approved as RFP, now visible to hotels: ${event.name}`,
   });
+
+  try {
+    const planner = await User.findById(event.planner).select('name email');
+    if (planner?.email) {
+      await sendEmail({
+        to: planner.email,
+        subject: `Your event is approved: ${event.name}`,
+        html: `
+          <p>Hi ${planner.name || 'Planner'},</p>
+          <p>Your event <strong>${event.name}</strong> has been approved.</p>
+          <p>Hotels have been notified to submit proposals. You can review proposals as they come in.</p>
+        `,
+        text: `Your event ${event.name} has been approved. Hotels have been notified to submit proposals.`,
+      });
+    }
+
+    const hotels = await User.find({ role: 'hotel', isActive: true }).select('email name organization');
+    const hotelEmails = hotels.map((hotel) => hotel.email).filter(Boolean);
+    if (hotelEmails.length > 0) {
+      await sendEmail({
+        to: hotelEmails,
+        subject: `New RFP available: ${event.name}`,
+        html: `
+          <p>Hello,</p>
+          <p>A new event RFP is now available.</p>
+          <ul>
+            <li><strong>Event:</strong> ${event.name}</li>
+            <li><strong>Type:</strong> ${event.type}</li>
+            <li><strong>Dates:</strong> ${new Date(event.startDate).toLocaleDateString()} - ${new Date(event.endDate).toLocaleDateString()}</li>
+            <li><strong>Location:</strong> ${event.location?.city || 'TBD'}</li>
+          </ul>
+          <p>Please log in to your hotel dashboard to review and submit your proposal.</p>
+        `,
+        text: `New RFP available: ${event.name}. Please log in to submit your proposal.`,
+      });
+    }
+  } catch (error) {
+    console.error('Error sending approval notification emails:', error);
+  }
 
   res.status(200).json({
     success: true,
@@ -489,6 +556,36 @@ export const processPlannerPayment = asyncHandler(async (req, res) => {
   });
 
   console.log(`✅ Planner payment completed for event: ${event.name}`);
+
+  // Notify all invited guests that the event is live and they can book hotels
+  try {
+    if (event.invitedGuests && event.invitedGuests.length > 0) {
+      const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
+      const slug = event.micrositeConfig?.customSlug;
+      const micrositeLink = slug ? `${clientUrl}/microsite/${slug}` : clientUrl;
+
+      await Promise.all(
+        event.invitedGuests.map((guest) =>
+          sendEmail({
+            to: guest.email,
+            subject: `Event is live – Book your hotel for ${event.name}`,
+            html: `
+              <p>Hi ${guest.name || 'Guest'},</p>
+              <p>Great news! The private event <strong>${event.name}</strong> is now live and hotel bookings are open.</p>
+              <p>Visit the event page and book your hotel room:</p>
+              <p><a href="${micrositeLink}" style="display:inline-block;padding:10px 20px;background:#4F46E5;color:#fff;border-radius:6px;text-decoration:none;">Book Now</a></p>
+              <p>Or copy this link: <a href="${micrositeLink}">${micrositeLink}</a></p>
+              <p>We look forward to seeing you there!</p>
+            `,
+            text: `The private event ${event.name} is now live. Book your hotel here: ${micrositeLink}`,
+          })
+        )
+      );
+      console.log(`📧 Sent booking invitation emails to ${event.invitedGuests.length} guests`);
+    }
+  } catch (error) {
+    console.error('Error sending guest booking notification emails:', error);
+  }
 
   res.status(200).json({
     success: true,
