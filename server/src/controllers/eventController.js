@@ -560,7 +560,7 @@ export const processPlannerPayment = asyncHandler(async (req, res) => {
   // Notify all invited guests that the event is live and they can book hotels
   try {
     if (event.invitedGuests && event.invitedGuests.length > 0) {
-      const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
+      const clientUrl = (process.env.CLIENT_URL || 'http://localhost:5173').split(',')[0].trim();
       const slug = event.micrositeConfig?.customSlug;
       const micrositeLink = slug ? `${clientUrl}/microsite/${slug}` : clientUrl;
 

@@ -9,6 +9,7 @@ import config from './config/index.js';
 import connectDB from './config/database.js';
 import errorHandler from './middlewares/errorHandler.js';
 import { initSocket, getIO } from './sockets/socketService.js';
+import seedAdmin from './scripts/seedAdmin.js';
 
 // Import routes
 import authRoutes from './routes/authRoutes.js';
@@ -25,8 +26,8 @@ import guestInvitationRoutes from './routes/guestInvitationRoutes.js';
 const app = express();
 const server = createServer(app);
 
-// Connect to Database
-connectDB();
+// Connect to Database & seed admin
+connectDB().then(() => seedAdmin());
 
 // Initialize Socket.io
 const io = initSocket(server);
@@ -40,10 +41,20 @@ app.use((req, res, next) => {
 // Security Middleware
 app.use(helmet());
 
-// CORS
+// CORS — supports comma-separated origins in CLIENT_URL
 app.use(
   cors({
-    origin: config.clientUrl,
+    origin: (origin, callback) => {
+      const allowed = config.clientUrl
+        .split(',')
+        .map((u) => u.trim());
+      // allow requests with no origin (mobile apps, curl, etc.)
+      if (!origin || allowed.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error(`CORS: origin ${origin} not allowed`));
+      }
+    },
     credentials: true,
   })
 );

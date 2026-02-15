@@ -50,7 +50,7 @@ export const addGuests = asyncHandler(async (req, res) => {
   });
 
   try {
-    const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
+    const clientUrl = (process.env.CLIENT_URL || 'http://localhost:5173').split(',')[0].trim();
     const slug = event.micrositeConfig?.customSlug;
     const micrositeLink = slug ? `${clientUrl}/microsite/${slug}` : clientUrl;
 
@@ -135,7 +135,7 @@ export const uploadGuestList = asyncHandler(async (req, res) => {
     });
 
     try {
-      const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
+      const clientUrl = (process.env.CLIENT_URL || 'http://localhost:5173').split(',')[0].trim();
       const slug = event.micrositeConfig?.customSlug;
       const micrositeLink = slug ? `${clientUrl}/microsite/${slug}` : clientUrl;
 
