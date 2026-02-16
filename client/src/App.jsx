@@ -387,8 +387,8 @@ function App() {
           <Route path="/" element={<Navigate to={isAuthenticated ? "/dashboard" : "/login"} />} />
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
+        {isAuthenticated && <ChatBot />}
       </BrowserRouter>
-      {isAuthenticated && <ChatBot />}
       <Toaster position="top-right" />
     </QueryClientProvider>
   );

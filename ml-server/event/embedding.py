@@ -26,6 +26,7 @@ class EventPost(BaseModel):
     startDate: str
     endDate: str
     location: Optional[EventLocation] = None
+    customSlug: str = ""
 
 
 def extract_text_from_html(html_content: str) -> str:
@@ -85,6 +86,7 @@ async def create_event_embedding(event: EventPost):
                 "location": location_str,
                 "startDate": event.startDate,
                 "endDate": event.endDate,
+                "customSlug": event.customSlug,
             }
         )
 

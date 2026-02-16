@@ -23,6 +23,8 @@ class SimilarEvent(BaseModel):
     location: str
     startDate: str
     endDate: str
+    customSlug: str
+    micrositeUrl: str
     percentage_similarity: float
 
 
@@ -66,6 +68,7 @@ async def fetch_similar_events(request: EventSearchRequest) -> List[SimilarEvent
                     "location": meta.get("location", ""),
                     "startDate": meta.get("startDate", ""),
                     "endDate": meta.get("endDate", ""),
+                    "customSlug": meta.get("customSlug", ""),
                 }
 
         # Sort by similarity and take top_k
@@ -84,6 +87,8 @@ async def fetch_similar_events(request: EventSearchRequest) -> List[SimilarEvent
                 location=data["location"],
                 startDate=data["startDate"],
                 endDate=data["endDate"],
+                customSlug=data["customSlug"],
+                micrositeUrl=f"/microsite/{data['customSlug']}" if data["customSlug"] else "",
                 percentage_similarity=round(data["score"] * 100, 2),
             )
             for event_id, data in sorted_events
