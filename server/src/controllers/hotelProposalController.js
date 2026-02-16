@@ -443,6 +443,7 @@ export const publishEventMicrosite = asyncHandler(async (req, res) => {
             country: event.location?.country || '',
             venue: event.location?.venue || '',
           },
+          customSlug: event.micrositeConfig?.customSlug || '',
         }),
       });
 

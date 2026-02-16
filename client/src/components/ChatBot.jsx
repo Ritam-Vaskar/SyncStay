@@ -1,7 +1,9 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 
 const ChatBot = () => {
+  const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState([
     { role: 'assistant', text: 'Hi! I can help you discover events. Ask me anything!' },
@@ -10,6 +12,42 @@ const ChatBot = () => {
   const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
+
+  // Convert /microsite/... paths and http URLs into clickable links
+  const renderMessageText = (text) => {
+    const urlRegex = /(https?:\/\/[^\s]+)|(\/microsite\/[a-z0-9-]+)/gi;
+    const parts = text.split(urlRegex).filter(Boolean);
+
+    return parts.map((part, idx) => {
+      // Match internal microsite paths like /microsite/some-slug-123
+      if (/^\/microsite\/[a-z0-9-]+$/i.test(part)) {
+        return (
+          <button
+            key={idx}
+            onClick={() => navigate(part)}
+            className="text-primary-600 underline hover:text-primary-800 font-medium"
+          >
+            View Event Page
+          </button>
+        );
+      }
+      // Match full http(s) URLs
+      if (/^https?:\/\//i.test(part)) {
+        return (
+          <a
+            key={idx}
+            href={part}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-primary-600 underline hover:text-primary-800 font-medium"
+          >
+            {part}
+          </a>
+        );
+      }
+      return <span key={idx}>{part}</span>;
+    });
+  };
 
   // Auto-scroll to latest message
   useEffect(() => {
@@ -106,7 +144,7 @@ const ChatBot = () => {
                       : 'bg-white text-gray-800 border border-gray-200 rounded-bl-none shadow-sm'
                   }`}
                 >
-                  {msg.text}
+                  {msg.role === 'assistant' ? renderMessageText(msg.text) : msg.text}
                 </div>
               </div>
             ))}
