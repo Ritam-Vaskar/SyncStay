@@ -19,8 +19,15 @@ export const getBookings = asyncHandler(async (req, res) => {
   // Role-based filtering
   if (req.user.role === 'guest') {
     query.guest = req.user.id;
-  } else if (req.user.role === 'planner' && event) {
-    query.event = event;
+    // Filter by event if specified (for microsite dashboard)
+    if (event) {
+      query.event = event;
+    }
+  } else if (req.user.role === 'planner') {
+    // Filter by event if specified
+    if (event) {
+      query.event = event;
+    }
   } else if (req.user.role === 'hotel') {
     // Get inventory items belonging to this hotel
     const hotelInventory = await Inventory.find({ hotel: req.user.id }).select('_id');
