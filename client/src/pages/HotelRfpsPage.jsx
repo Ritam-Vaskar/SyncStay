@@ -70,7 +70,7 @@ export const HotelRfpsPage = () => {
   
   // Check if hotel has already submitted proposal for an event
   const hasSubmittedProposal = (eventId) => {
-    return myProposals.some(p => p.event._id === eventId || p.event === eventId);
+    return myProposals.some(p => p.event && (p.event._id === eventId || p.event === eventId));
   };
 
   const submitProposalMutation = useMutation({
