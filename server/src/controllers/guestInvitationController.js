@@ -1,7 +1,6 @@
 import Event from '../models/Event.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import { createAuditLog } from '../middlewares/auditLogger.js';
-import crypto from 'crypto';
 import xlsx from 'xlsx';
 import sendEmail from '../utils/mail.js';
 
@@ -23,10 +22,9 @@ export const addGuests = asyncHandler(async (req, res) => {
     return res.status(403).json({ message: 'Not authorized to manage this event' });
   }
 
-  // Generate access codes for new guests
+  // Prepare new guests
   const newGuests = guests.map(guest => ({
     ...guest,
-    accessCode: crypto.randomBytes(16).toString('hex'),
     addedAt: new Date(),
     hasAccessed: false,
   }));
@@ -62,10 +60,9 @@ export const addGuests = asyncHandler(async (req, res) => {
           html: `
             <p>Hi ${guest.name || 'Guest'},</p>
             <p>You have been invited to the private event <strong>${event.name}</strong>.</p>
-            <p><strong>Access Code:</strong> ${guest.accessCode}</p>
             <p>Access the event here: <a href="${micrositeLink}">${micrositeLink}</a></p>
           `,
-          text: `You're invited to ${event.name}. Access code: ${guest.accessCode}. Link: ${micrositeLink}`,
+          text: `You're invited to ${event.name}. Link: ${micrositeLink}`,
         })
       )
     );
@@ -110,7 +107,6 @@ export const uploadGuestList = asyncHandler(async (req, res) => {
       name: row.Name || row.name,
       email: row.Email || row.email,
       phone: row.Phone || row.phone || '',
-      accessCode: crypto.randomBytes(16).toString('hex'),
       addedAt: new Date(),
       hasAccessed: false,
     })).filter(guest => guest.name && guest.email);
@@ -147,10 +143,9 @@ export const uploadGuestList = asyncHandler(async (req, res) => {
             html: `
               <p>Hi ${guest.name || 'Guest'},</p>
               <p>You have been invited to the private event <strong>${event.name}</strong>.</p>
-              <p><strong>Access Code:</strong> ${guest.accessCode}</p>
               <p>Access the event here: <a href="${micrositeLink}">${micrositeLink}</a></p>
             `,
-            text: `You're invited to ${event.name}. Access code: ${guest.accessCode}. Link: ${micrositeLink}`,
+            text: `You're invited to ${event.name}. Link: ${micrositeLink}`,
           })
         )
       );
@@ -304,7 +299,6 @@ export const verifyGuestAccess = asyncHandler(async (req, res) => {
     guestInfo: {
       name: guest.name,
       email: guest.email,
-      accessCode: guest.accessCode,
     },
   });
 });

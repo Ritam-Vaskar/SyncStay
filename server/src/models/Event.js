@@ -127,11 +127,6 @@ const eventSchema = new mongoose.Schema(
         required: true,
       },
       phone: String,
-      accessCode: {
-        type: String,
-        unique: true,
-        sparse: true,
-      },
       hasAccessed: {
         type: Boolean,
         default: false,
