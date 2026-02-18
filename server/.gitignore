@@ -7,3 +7,4 @@ coverage/
 .vscode/
 dist/
 build/
+.env.example
