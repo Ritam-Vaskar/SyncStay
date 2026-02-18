@@ -7,7 +7,7 @@ import { MicrositeDashboardLayout } from '@/layouts/MicrositeDashboardLayout';
 import { LoadingPage } from '@/components/LoadingSpinner';
 import { 
   Users, Mail, Phone, Lock, Unlock, Plus, Upload, 
-  Download, Trash2, CheckCircle, XCircle, UserPlus, FileUp, Copy, Hotel
+  Download, Trash2, CheckCircle, XCircle, UserPlus, FileUp, Hotel
 } from 'lucide-react';
 import { formatDate } from '@/utils/helpers';
 import toast from 'react-hot-toast';
@@ -198,10 +198,7 @@ export const MicrositePlannerGuests = () => {
     window.URL.revokeObjectURL(url);
   };
 
-  const copyAccessCode = (code) => {
-    navigator.clipboard.writeText(code);
-    toast.success('Access code copied!');
-  };
+
 
   return (
     <MicrositeDashboardLayout event={event}>
@@ -336,7 +333,6 @@ export const MicrositePlannerGuests = () => {
                           <th>Name</th>
                           <th>Email</th>
                           <th>Phone</th>
-                          <th>Access Code</th>
                           <th>Status</th>
                           <th>Added</th>
                           <th>Actions</th>
@@ -348,19 +344,6 @@ export const MicrositePlannerGuests = () => {
                             <td>{guest.name}</td>
                             <td className="text-gray-600">{guest.email}</td>
                             <td className="text-gray-600">{guest.phone || '-'}</td>
-                            <td>
-                              <div className="flex items-center gap-2">
-                                <code className="bg-gray-100 px-2 py-1 rounded text-sm">
-                                  {guest.accessCode}
-                                </code>
-                                <button
-                                  onClick={() => copyAccessCode(guest.accessCode)}
-                                  className="text-gray-400 hover:text-gray-600"
-                                >
-                                  <Copy className="h-4 w-4" />
-                                </button>
-                              </div>
-                            </td>
                             <td>
                               {guest.hasAccessed ? (
                                 <span className="badge badge-success">

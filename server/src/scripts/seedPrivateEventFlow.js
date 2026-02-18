@@ -1,6 +1,5 @@
 import mongoose from 'mongoose';
 import dotenv from 'dotenv';
-import crypto from 'crypto';
 import User from '../models/User.js';
 import Event from '../models/Event.js';
 import Inventory from '../models/Inventory.js';
@@ -114,7 +113,6 @@ const seedPrivateEventFlow = async () => {
           name: 'Emily Johnson',
           email: 'guest1@example.com',
           phone: '+1-555-1001',
-          accessCode: crypto.randomBytes(16).toString('hex'),
           hasAccessed: true,
           addedAt: new Date(),
         },
@@ -122,7 +120,6 @@ const seedPrivateEventFlow = async () => {
           name: 'Michael Chen',
           email: 'guest2@example.com',
           phone: '+1-555-1002',
-          accessCode: crypto.randomBytes(16).toString('hex'),
           hasAccessed: true,
           addedAt: new Date(),
         },
@@ -130,7 +127,6 @@ const seedPrivateEventFlow = async () => {
           name: 'Sarah Williams',
           email: 'guest3@example.com',
           phone: '+1-555-1003',
-          accessCode: crypto.randomBytes(16).toString('hex'),
           hasAccessed: false,
           addedAt: new Date(),
         },
@@ -138,7 +134,6 @@ const seedPrivateEventFlow = async () => {
           name: 'David Brown',
           email: 'guest4@example.com',
           phone: '+1-555-1004',
-          accessCode: crypto.randomBytes(16).toString('hex'),
           hasAccessed: false,
           addedAt: new Date(),
         },
@@ -147,7 +142,6 @@ const seedPrivateEventFlow = async () => {
           name: 'Jennifer Taylor',
           email: 'wedding.guest1@example.com',
           phone: '+1-555-2001',
-          accessCode: crypto.randomBytes(16).toString('hex'),
           hasAccessed: false,
           addedAt: new Date(),
         },
@@ -155,7 +149,6 @@ const seedPrivateEventFlow = async () => {
           name: 'Robert Martinez',
           email: 'wedding.guest2@example.com',
           phone: '+1-555-2002',
-          accessCode: crypto.randomBytes(16).toString('hex'),
           hasAccessed: false,
           addedAt: new Date(),
         },
@@ -163,7 +156,6 @@ const seedPrivateEventFlow = async () => {
           name: 'Lisa Anderson',
           email: 'wedding.guest3@example.com',
           phone: '+1-555-2003',
-          accessCode: crypto.randomBytes(16).toString('hex'),
           hasAccessed: false,
           addedAt: new Date(),
         },
@@ -171,7 +163,6 @@ const seedPrivateEventFlow = async () => {
           name: 'James Wilson',
           email: 'wedding.guest4@example.com',
           phone: '+1-555-2004',
-          accessCode: crypto.randomBytes(16).toString('hex'),
           hasAccessed: false,
           addedAt: new Date(),
         },
@@ -179,7 +170,6 @@ const seedPrivateEventFlow = async () => {
           name: 'Mary Davis',
           email: 'wedding.guest5@example.com',
           phone: '+1-555-2005',
-          accessCode: crypto.randomBytes(16).toString('hex'),
           hasAccessed: false,
           addedAt: new Date(),
         },
@@ -187,7 +177,6 @@ const seedPrivateEventFlow = async () => {
           name: 'Christopher Moore',
           email: 'wedding.guest6@example.com',
           phone: '+1-555-2006',
-          accessCode: crypto.randomBytes(16).toString('hex'),
           hasAccessed: false,
           addedAt: new Date(),
         },

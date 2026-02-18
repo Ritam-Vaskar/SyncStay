@@ -292,7 +292,6 @@ export const GuestListManagementPage = () => {
                   <th>Name</th>
                   <th>Email</th>
                   <th>Phone</th>
-                  <th>Access Code</th>
                   <th>Status</th>
                   <th>Added On</th>
                   <th>Actions</th>
@@ -315,11 +314,6 @@ export const GuestListManagementPage = () => {
                           {guest.phone}
                         </div>
                       )}
-                    </td>
-                    <td>
-                      <code className="bg-gray-100 px-2 py-1 rounded text-xs">
-                        {guest.accessCode?.substring(0, 8)}...
-                      </code>
                     </td>
                     <td>
                       {guest.hasAccessed ? (
