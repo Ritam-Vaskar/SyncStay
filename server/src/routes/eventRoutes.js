@@ -12,6 +12,9 @@ import {
   replyToAdminComment,
   selectHotelsForEvent,
   processPlannerPayment,
+  getHotelRecommendations,
+  selectRecommendedHotel,
+  getMicrositeProposals,
 } from '../controllers/eventController.js';
 import { protect, authorize, optionalAuth } from '../middlewares/auth.js';
 import { validateEvent, validateMongoId } from '../middlewares/validators.js';
@@ -45,6 +48,11 @@ router.post('/:id/comment/:commentId/reply', authorize('planner'), validateMongo
 // Private event - Hotel selection and planner payment
 router.post('/:id/select-hotels', authorize('planner'), validateMongoId, selectHotelsForEvent);
 router.post('/:id/planner-payment', authorize('planner'), validateMongoId, processPlannerPayment);
+
+// Hotel recommendations and selection
+router.get('/:id/recommendations', authorize('planner', 'admin'), validateMongoId, getHotelRecommendations);
+router.post('/:id/select-recommended-hotel', authorize('planner'), validateMongoId, selectRecommendedHotel);
+router.get('/:id/microsite-proposals', authorize('planner', 'admin'), validateMongoId, getMicrositeProposals);
 
 router
   .route('/:id')

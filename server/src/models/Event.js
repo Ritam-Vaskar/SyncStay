@@ -103,6 +103,34 @@ const eventSchema = new mongoose.Schema(
         ref: 'HotelProposal',
       },
     }],
+    // Recommended hotels (AI-generated based on event criteria)
+    recommendedHotels: [{
+      hotel: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+      },
+      score: {
+        type: Number,
+        default: 0,
+      },
+      reasons: [String],
+      addedAt: {
+        type: Date,
+        default: Date.now,
+      },
+      isSelectedByPlanner: {
+        type: Boolean,
+        default: false,
+      },
+    }],
+    // Microsite access control
+    micrositeAccessGranted: {
+      type: Boolean,
+      default: false,
+    },
+    micrositeAccessGrantedAt: {
+      type: Date,
+    },
     // Accommodation requirements
     accommodationNeeds: {
       totalRooms: Number,
@@ -217,6 +245,22 @@ const eventSchema = new mongoose.Schema(
       default: 0,
     },
     totalBookings: {
+      type: Number,
+      default: 0,
+    },
+    // Vector database fields for recommendations
+    vectorId: {
+      type: String,
+      index: true,
+    },
+    embeddingHash: {
+      type: String,
+    },
+    popularityScore: {
+      type: Number,
+      default: 0,
+    },
+    viewCount: {
       type: Number,
       default: 0,
     },

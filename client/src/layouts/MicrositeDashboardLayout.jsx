@@ -39,6 +39,7 @@ export const MicrositeDashboardLayout = ({ children, event }) => {
   const plannerNavigation = [
     { name: 'Event Home', href: `/microsite/${slug}`, icon: Home },
     { name: 'Dashboard', href: `/microsite/${slug}/dashboard`, icon: LayoutDashboard },
+    { name: 'Select Hotels', href: `/microsite/${slug}/hotels`, icon: Hotel },
     { name: 'Manage Inventory', href: `/microsite/${slug}/inventory`, icon: Hotel },
     { name: 'All Bookings', href: `/microsite/${slug}/bookings`, icon: Calendar },
     { name: 'Guest List', href: `/microsite/${slug}/guests`, icon: Users },

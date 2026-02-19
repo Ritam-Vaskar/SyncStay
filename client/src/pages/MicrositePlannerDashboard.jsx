@@ -122,11 +122,24 @@ export const MicrositePlannerDashboard = () => {
           <h3 className="text-xl font-bold mb-4">Quick Actions</h3>
           <div className="grid md:grid-cols-3 gap-4">
             <Link
+              to={`/microsite/${slug}/hotels`}
+              className="flex items-center gap-3 p-4 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition-colors"
+            >
+              <div className="bg-indigo-600 p-3 rounded-lg">
+                <Hotel className="h-6 w-6 text-white" />
+              </div>
+              <div>
+                <p className="font-semibold text-gray-900">Select Hotels</p>
+                <p className="text-sm text-gray-600">View recommendations & proposals</p>
+              </div>
+            </Link>
+
+            <Link
               to={`/microsite/${slug}/inventory`}
               className="flex items-center gap-3 p-4 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
             >
               <div className="bg-blue-600 p-3 rounded-lg">
-                <Hotel className="h-6 w-6 text-white" />
+                <Package className="h-6 w-6 text-white" />
               </div>
               <div>
                 <p className="font-semibold text-gray-900">Manage Inventory</p>
@@ -144,19 +157,6 @@ export const MicrositePlannerDashboard = () => {
               <div>
                 <p className="font-semibold text-gray-900">View All Bookings</p>
                 <p className="text-sm text-gray-600">Manage guest bookings</p>
-              </div>
-            </Link>
-
-            <Link
-              to={`/microsite/${slug}/guests`}
-              className="flex items-center gap-3 p-4 bg-purple-50 hover:bg-purple-100 rounded-lg transition-colors"
-            >
-              <div className="bg-purple-600 p-3 rounded-lg">
-                <Users className="h-6 w-6 text-white" />
-              </div>
-              <div>
-                <p className="font-semibold text-gray-900">Guest List</p>
-                <p className="text-sm text-gray-600">View all attendees</p>
               </div>
             </Link>
           </div>

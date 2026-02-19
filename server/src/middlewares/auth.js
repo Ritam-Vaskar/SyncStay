@@ -108,3 +108,9 @@ export const optionalAuth = async (req, res, next) => {
     next();
   }
 };
+
+// Alias for protect (for consistency with route imports)
+export const isAuthenticated = protect;
+
+// Helper for planner or admin access
+export const isPlannerOrAdmin = [protect, authorize('planner', 'admin')];

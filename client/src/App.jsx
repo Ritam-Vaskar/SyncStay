@@ -9,6 +9,7 @@ import { LandingPage } from './pages/LandingPage';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { DashboardPage } from './pages/DashboardPage';
+import { BrowseEventsPage } from './pages/BrowseEventsPage';
 import { MicrositePage } from './pages/MicrositePage';
 import { MicrositeGuestDashboard } from './pages/MicrositeGuestDashboard';
 import { MicrositePlannerDashboard } from './pages/MicrositePlannerDashboard';
@@ -16,6 +17,7 @@ import { MicrositeMyBookings } from './pages/MicrositeMyBookings';
 import { MicrositePlannerBookings } from './pages/MicrositePlannerBookings';
 import { MicrositePlannerGuests } from './pages/MicrositePlannerGuests';
 import { MicrositeEventReports } from './pages/MicrositeEventReports';
+import { MicrositeHotelsManagement } from './pages/MicrositeHotelsManagement';
 import { AdminApprovalsPage } from './pages/AdminApprovalsPage';
 import { AdminFeedbackPage } from './pages/AdminFeedbackPage';
 import { AdminEventsPage } from './pages/AdminEventsPage';
@@ -45,7 +47,6 @@ const queryClient = new QueryClient({
 // Placeholder pages for other roles
 const ProposalsPage = () => <div className="card"><h2 className="text-2xl font-bold">Proposals</h2><p className="mt-4">Proposals management coming soon...</p></div>;
 const GuestBookingsPage = () => <div className="card"><h2 className="text-2xl font-bold">My Bookings</h2><p className="mt-4">Guest bookings page coming soon...</p></div>;
-const GuestEventsPage = () => <div className="card"><h2 className="text-2xl font-bold">Browse Events</h2><p className="mt-4">Event browsing coming soon...</p></div>;
 const AdminUsersPage = () => <div className="card"><h2 className="text-2xl font-bold">Users Management</h2><p className="mt-4">User management coming soon...</p></div>;
 const AdminAnalyticsPage = () => <div className="card"><h2 className="text-2xl font-bold">Admin Analytics</h2><p className="mt-4">Analytics dashboard coming soon...</p></div>;
 const AdminLogsPage = () => <div className="card"><h2 className="text-2xl font-bold">Audit Logs</h2><p className="mt-4">Audit logs coming soon...</p></div>;
@@ -178,6 +179,14 @@ function App() {
               </ProtectedRoute>
             }
           />
+          <Route
+            path="/microsite/:slug/hotels"
+            element={
+              <ProtectedRoute allowedRoles={['planner']}>
+                <MicrositeHotelsManagement />
+              </ProtectedRoute>
+            }
+          />
 
           {/* Protected Routes */}
           <Route
@@ -307,12 +316,10 @@ function App() {
             }
           />
           <Route
-            path="/guest/events"
+            path="/events"
             element={
-              <ProtectedRoute allowedRoles={['guest']}>
-                <DashboardLayout>
-                  <GuestEventsPage />
-                </DashboardLayout>
+              <ProtectedRoute>
+                <BrowseEventsPage />
               </ProtectedRoute>
             }
           />

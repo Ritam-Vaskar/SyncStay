@@ -3,6 +3,8 @@ import User from '../models/User.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import { createAuditLog } from '../middlewares/auditLogger.js';
 import sendEmail from '../utils/mail.js';
+import { generateEventEmbedding } from '../services/embeddingService.js';
+import { upsertVector } from '../config/qdrant.js';
 
 /**
  * @route   GET /api/events
@@ -98,6 +100,23 @@ export const createEvent = asyncHandler(async (req, res) => {
 
   const event = await Event.create(req.body);
 
+  // Generate and store embedding asynchronously
+  generateEventEmbedding(event)
+    .then(async ({ vectorId, embeddingHash, embedding }) => {
+      // Store in Qdrant
+      await upsertVector('events_vectors', vectorId, embedding, {
+        eventId: event._id.toString(),
+        name: event.name,
+        type: event.type,
+        city: event.location?.city || '',
+      });
+      
+      // Update event with vector info
+      await Event.findByIdAndUpdate(event._id, { vectorId, embeddingHash });
+      console.log(`✅ Generated embedding for event: ${event.name}`);
+    })
+    .catch(err => console.error(`❌ Failed to generate embedding for event ${event._id}:`, err.message));
+
   // Log action
   await createAuditLog({
     user: req.user.id,
@@ -176,6 +195,25 @@ export const updateEvent = asyncHandler(async (req, res) => {
     new: true,
     runValidators: true,
   });
+
+  // Regenerate embedding if event details changed
+  const oldHash = event.embeddingHash;
+  generateEventEmbedding(event)
+    .then(async ({ vectorId, embeddingHash, embedding }) => {
+      if (oldHash !== embeddingHash) {
+        // Event details changed, update embedding
+        await upsertVector('events_vectors', vectorId, embedding, {
+          eventId: event._id.toString(),
+          name: event.name,
+          type: event.type,
+          city: event.location?.city || '',
+        });
+        
+        await Event.findByIdAndUpdate(event._id, { vectorId, embeddingHash });
+        console.log(`✅ Updated embedding for event: ${event.name}`);
+      }
+    })
+    .catch(err => console.error(`❌ Failed to update embedding for event ${event._id}:`, err.message));
 
   // Log action
   await createAuditLog({
@@ -269,7 +307,7 @@ export const getEventBySlug = asyncHandler(async (req, res) => {
 
 /**
  * @route   PUT /api/events/:id/approve
- * @desc    Approve event and publish microsite
+ * @desc    Approve event and publish microsite immediately with AI recommendations
  * @access  Private (Admin only)
  */
 export const approveEvent = asyncHandler(async (req, res) => {
@@ -289,15 +327,50 @@ export const approveEvent = asyncHandler(async (req, res) => {
     });
   }
 
-  // Approve event - change status to rfp-published (not active yet)
-  // Microsite will be published after planner selects hotels
+  // Import recommendation service dynamically
+  const { generateHotelRecommendations } = await import('../services/hotelRecommendationService.js');
+
+  // Approve event - change status to rfp-published
   event.status = 'rfp-published';
   event.approvedBy = req.user.id;
   event.approvedAt = new Date();
-  // Don't publish microsite yet - wait for hotel selection
-  // event.micrositeConfig.isPublished = true;
+
+  // NEW: Publish microsite immediately and grant access
+  if (!event.micrositeConfig || !event.micrositeConfig.customSlug) {
+    const slug = event.name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '');
+    
+    const timestamp = Date.now().toString().slice(-4);
+    const uniqueSlug = `${slug}-${timestamp}`;
+
+    event.micrositeConfig = {
+      isPublished: true,
+      customSlug: uniqueSlug,
+      theme: {
+        primaryColor: '#3b82f6',
+      },
+    };
+  } else {
+    event.micrositeConfig.isPublished = true;
+  }
+
+  event.micrositeAccessGranted = true;
+  event.micrositeAccessGrantedAt = new Date();
 
   await event.save();
+
+  // Generate hotel recommendations
+  try {
+    const recommendations = await generateHotelRecommendations(event._id);
+    event.recommendedHotels = recommendations;
+    await event.save();
+    console.log(`✅ Generated ${recommendations.length} hotel recommendations for ${event.name}`);
+  } catch (error) {
+    console.error('Error generating recommendations:', error);
+    // Don't fail approval if recommendations fail
+  }
 
   // Log action
   await createAuditLog({
@@ -306,21 +379,39 @@ export const approveEvent = asyncHandler(async (req, res) => {
     resource: 'Event',
     resourceId: event._id,
     status: 'success',
-    details: `Event approved as RFP, now visible to hotels: ${event.name}`,
+    details: `Event approved, microsite published, and recommendations generated: ${event.name}`,
   });
 
   try {
     const planner = await User.findById(event.planner).select('name email');
     if (planner?.email) {
+      const micrositeUrl = `${process.env.CLIENT_URL || 'http://localhost:3000'}/microsite/${event.micrositeConfig.customSlug}`;
       await sendEmail({
         to: planner.email,
-        subject: `Your event is approved: ${event.name}`,
+        subject: `✅ Your event is approved - Microsite is live!`,
         html: `
           <p>Hi ${planner.name || 'Planner'},</p>
-          <p>Your event <strong>${event.name}</strong> has been approved.</p>
-          <p>Hotels have been notified to submit proposals. You can review proposals as they come in.</p>
+          <p>Great news! Your event <strong>${event.name}</strong> has been approved! 🎉</p>
+          
+          <h3>What's Next:</h3>
+          <ul>
+            <li>✅ Your event microsite is now live and accessible</li>
+            <li>✅ RFP has been sent to all hotels</li>
+            <li>✅ We've recommended hotels based on your requirements</li>
+          </ul>
+          
+          <p><strong>Microsite URL:</strong> <a href="${micrositeUrl}">${micrositeUrl}</a></p>
+          
+          <p>You can now:</p>
+          <ul>
+            <li>Access your microsite and manage your event</li>
+            <li>Review recommended hotels and select your preferred ones</li>
+            <li>Monitor incoming proposals from hotels responding to your RFP</li>
+          </ul>
+          
+          <p>Get started by clicking the "Manage Event" button in your dashboard!</p>
         `,
-        text: `Your event ${event.name} has been approved. Hotels have been notified to submit proposals.`,
+        text: `Your event ${event.name} has been approved! Your microsite is live at ${micrositeUrl}. Hotels have been notified and recommendations are ready.`,
       });
     }
 
@@ -350,7 +441,7 @@ export const approveEvent = asyncHandler(async (req, res) => {
 
   res.status(200).json({
     success: true,
-    message: 'Event approved and published as RFP to hotels',
+    message: 'Event approved, microsite published, and recommendations generated',
     data: event,
   });
 });
@@ -767,5 +858,152 @@ export const processPlannerPayment = asyncHandler(async (req, res) => {
     success: true,
     message: 'Payment processed successfully. Microsite is now published!',
     data: event,
+  });
+});
+/**
+ * @route   GET /api/events/:id/recommendations
+ * @desc    Get AI-generated hotel recommendations for an event
+ * @access  Private (Planner only)
+ */
+export const getHotelRecommendations = asyncHandler(async (req, res) => {
+  const event = await Event.findById(req.params.id)
+    .populate('recommendedHotels.hotel', 'name email organization location totalRooms priceRange specialization');
+
+  if (!event) {
+    return res.status(404).json({
+      success: false,
+      message: 'Event not found',
+    });
+  }
+
+  // Check if user is the planner
+  if (event.planner.toString() !== req.user.id && req.user.role !== 'admin') {
+    return res.status(403).json({
+      success: false,
+      message: 'Not authorized to view recommendations for this event',
+    });
+  }
+
+  res.status(200).json({
+    success: true,
+    count: event.recommendedHotels.length,
+    data: event.recommendedHotels,
+  });
+});
+
+/**
+ * @route   POST /api/events/:id/select-recommended-hotel
+ * @desc    Select a recommended hotel for the event
+ * @access  Private (Planner only)
+ */
+export const selectRecommendedHotel = asyncHandler(async (req, res) => {
+  const { hotelId } = req.body;
+  const event = await Event.findById(req.params.id);
+
+  if (!event) {
+    return res.status(404).json({
+      success: false,
+      message: 'Event not found',
+    });
+  }
+
+  // Check if user is the planner
+  if (event.planner.toString() !== req.user.id) {
+    return res.status(403).json({
+      success: false,
+      message: 'Not authorized to select hotels for this event',
+    });
+  }
+
+  // Find the recommended hotel
+  const recHotel = event.recommendedHotels.find(
+    (h) => h.hotel.toString() === hotelId
+  );
+
+  if (!recHotel) {
+    return res.status(404).json({
+      success: false,
+      message: 'Hotel not found in recommendations',
+    });
+  }
+
+  // Mark as selected
+  recHotel.isSelectedByPlanner = true;
+
+  // Add to selectedHotels if not already there
+  const alreadySelected = event.selectedHotels.some(
+    (sh) => sh.hotel?.toString() === hotelId
+  );
+
+  if (!alreadySelected) {
+    event.selectedHotels.push({
+      hotel: hotelId,
+      proposal: null, // No proposal for recommended hotels
+    });
+  }
+
+  await event.save();
+
+  // Log action
+  await createAuditLog({
+    user: req.user.id,
+    action: 'hotel_select_recommended',
+    resource: 'Event',
+    resourceId: event._id,
+    status: 'success',
+    details: `Selected recommended hotel for event: ${event.name}`,
+  });
+
+  res.status(200).json({
+    success: true,
+    message: 'Hotel selected successfully',
+    data: event,
+  });
+});
+
+/**
+ * @route   GET /api/events/:id/microsite-proposals
+ * @desc    Get all data for microsite hotel management (recommendations + RFP proposals)
+ * @access  Private (Planner only)
+ */
+export const getMicrositeProposals = asyncHandler(async (req, res) => {
+  const event = await Event.findById(req.params.id)
+    .populate('recommendedHotels.hotel', 'name email organization location totalRooms priceRange specialization');
+
+  if (!event) {
+    return res.status(404).json({
+      success: false,
+      message: 'Event not found',
+    });
+  }
+
+  // Check if user is the planner
+  if (event.planner.toString() !== req.user.id && req.user.role !== 'admin') {
+    return res.status(403).json({
+      success: false,
+      message: 'Not authorized to view this event data',
+    });
+  }
+
+  // Import HotelProposal model
+  const HotelProposal = (await import('../models/HotelProposal.js')).default;
+
+  // Get all RFP proposals for this event
+  const rfpProposals = await HotelProposal.find({ event: req.params.id })
+    .populate('hotel', 'name email organization');
+
+  // Get selected hotels from recommendations
+  const selectedRecommendedHotels = event.recommendedHotels
+    .filter((h) => h.isSelectedByPlanner)
+    .map((h) => h.hotel);
+
+  res.status(200).json({
+    success: true,
+    data: {
+      recommendations: event.recommendedHotels,
+      rfpProposals,
+      selectedRecommended: selectedRecommendedHotels,
+      selectedHotels: event.selectedHotels,
+    },
   });
 });

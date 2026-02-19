@@ -622,20 +622,37 @@ export const PlannerProposalsPage = () => {
                   )}
 
                   {proposal.status === 'rfp-published' && (
-                    <div className="flex items-center gap-2 text-sm text-blue-700 bg-blue-50 px-4 py-2 rounded-lg">
-                      <Send className="h-5 w-5" />
-                      <span>RFP sent to all hotels - waiting for proposals</span>
-                    </div>
+                    <>
+                      <div className="flex items-center gap-2 text-sm text-blue-700 bg-blue-50 px-4 py-2 rounded-lg">
+                        <Send className="h-5 w-5" />
+                        <span>RFP sent - Microsite is live</span>
+                      </div>
+                      
+                      {/* NEW: Direct link to microsite for hotel management */}
+                      {proposal.micrositeConfig?.customSlug && (
+                        <Link
+                          to={`/microsite/${proposal.micrositeConfig.customSlug}/dashboard`}
+                          className="btn btn-primary flex items-center gap-2"
+                        >
+                          <Calendar className="h-5 w-5" />
+                          Manage Event & Select Hotels
+                        </Link>
+                      )}
+                    </>
                   )}
 
                   {(proposal.status === 'reviewing-proposals' || (proposal.status === 'active' && proposal.selectedHotels?.length > 0)) && (
-                    <button
-                      onClick={() => viewHotelProposals(proposal)}
-                      className="btn bg-purple-600 text-white hover:bg-purple-700 flex items-center gap-2"
-                    >
-                      <Eye className="h-5 w-5" />
-                      {proposal.status === 'active' ? 'View Selected Hotels' : 'Review Hotel Proposals'}
-                    </button>
+                    <>
+                      {proposal.micrositeConfig?.customSlug && (
+                        <Link
+                          to={`/microsite/${proposal.micrositeConfig.customSlug}/dashboard`}
+                          className="btn bg-purple-600 text-white hover:bg-purple-700 flex items-center gap-2"
+                        >
+                          <Eye className="h-5 w-5" />
+                          {proposal.status === 'active' ? 'Manage Event' : 'Review Proposals in Microsite'}
+                        </Link>
+                      )}
+                    </>
                   )}
 
                   {proposal.status === 'active' && proposal.micrositeConfig?.customSlug && (

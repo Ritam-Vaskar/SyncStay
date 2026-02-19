@@ -19,6 +19,7 @@ import {
   MapPin
 } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
+import { EventRecommendations } from '../components/EventRecommendations';
 
 export const LandingPage = () => {
   const navigate = useNavigate();
@@ -116,9 +117,9 @@ export const LandingPage = () => {
             {/* Desktop Navigation */}
             <div className="hidden md:flex items-center gap-8">
               <a href="#features" className="text-gray-600 hover:text-primary-600 transition-colors">Features</a>
+              <Link to="/events" className="text-gray-600 hover:text-primary-600 transition-colors">Browse Events</Link>
               <a href="#how-it-works" className="text-gray-600 hover:text-primary-600 transition-colors">How It Works</a>
               <a href="#testimonials" className="text-gray-600 hover:text-primary-600 transition-colors">Testimonials</a>
-              <a href="#contact" className="text-gray-600 hover:text-primary-600 transition-colors">Contact</a>
               {isAuthenticated ? (
                 <Link 
                   to={user?.role === 'hotel' ? '/hotel/dashboard' : '/dashboard'} 
@@ -147,9 +148,9 @@ export const LandingPage = () => {
           {mobileMenuOpen && (
             <div className="md:hidden mt-4 pb-4 space-y-4">
               <a href="#features" className="block text-gray-600 hover:text-primary-600">Features</a>
+              <Link to="/events" className="block text-gray-600 hover:text-primary-600">Browse Events</Link>
               <a href="#how-it-works" className="block text-gray-600 hover:text-primary-600">How It Works</a>
               <a href="#testimonials" className="block text-gray-600 hover:text-primary-600">Testimonials</a>
-              <a href="#contact" className="block text-gray-600 hover:text-primary-600">Contact</a>
               {isAuthenticated ? (
                 <Link 
                   to={user?.role === 'hotel' ? '/hotel/dashboard' : '/dashboard'} 
@@ -226,6 +227,9 @@ export const LandingPage = () => {
           </div>
         </div>
       </section>
+
+      {/* Recommendations Section - Below Hero */}
+      <EventRecommendations />
 
       {/* Stats Section */}
       <section className="py-16 bg-white">
