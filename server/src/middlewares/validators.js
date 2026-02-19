@@ -56,11 +56,11 @@ export const validateEvent = [
   // Accept both 'type' and 'eventType' for backwards compatibility
   body('type')
     .optional()
-    .isIn(['conference', 'wedding', 'corporate', 'exhibition', 'other'])
+    .isIn(['conference', 'wedding', 'corporate', 'exhibition', 'seminar', 'other'])
     .withMessage('Invalid event type'),
   body('eventType')
     .optional()
-    .isIn(['conference', 'wedding', 'corporate', 'exhibition', 'other'])
+    .isIn(['conference', 'wedding', 'corporate', 'exhibition', 'seminar', 'other'])
     .withMessage('Invalid event type')
     .customSanitizer((value, { req }) => {
       // If eventType is provided, map it to type

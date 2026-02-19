@@ -58,6 +58,40 @@ const eventSchema = new mongoose.Schema(
     rejectionReason: {
       type: String,
     },
+    adminComments: [{
+      comment: {
+        type: String,
+        required: true,
+      },
+      commentedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        required: true,
+      },
+      commentedAt: {
+        type: Date,
+        default: Date.now,
+      },
+      isRead: {
+        type: Boolean,
+        default: false,
+      },
+      replies: [{
+        reply: {
+          type: String,
+          required: true,
+        },
+        repliedBy: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: 'User',
+          required: true,
+        },
+        repliedAt: {
+          type: Date,
+          default: Date.now,
+        },
+      }],
+    }],
     // Selected hotels for this event
     selectedHotels: [{
       hotel: {

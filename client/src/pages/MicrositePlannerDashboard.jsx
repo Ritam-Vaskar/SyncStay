@@ -31,16 +31,25 @@ export const MicrositePlannerDashboard = () => {
   if (eventLoading) return <LoadingPage />;
 
   const event = eventData?.data;
+  if (!event) {
+    return (
+      <MicrositeDashboardLayout event={null}>
+        <div className="card">
+          <p className="text-gray-600">Event data is unavailable right now.</p>
+        </div>
+      </MicrositeDashboardLayout>
+    );
+  }
   const bookings = bookingsData?.data || [];
   const inventory = inventoryData?.data || [];
 
   const stats = {
     totalBookings: bookings.length,
-    confirmedBookings: bookings.filter(b => b.status === 'confirmed').length,
-    totalRevenue: bookings.reduce((sum, b) => sum + (b.totalAmount || 0), 0),
+    confirmedBookings: bookings.filter((b) => b.status === 'confirmed').length,
+    totalRevenue: bookings.reduce((sum, b) => sum + (b.pricing?.totalAmount ?? b.totalAmount ?? 0), 0),
     totalInventory: inventory.reduce((sum, i) => sum + i.totalRooms, 0),
     bookedRooms: inventory.reduce((sum, i) => sum + (i.totalRooms - i.availableRooms), 0),
-    uniqueGuests: new Set(bookings.map(b => b.user?._id || b.guestDetails?.email)).size,
+    uniqueGuests: new Set(bookings.map((b) => b.guest?._id || b.guestDetails?.email)).size,
   };
 
   const occupancyRate = stats.totalInventory > 0 
@@ -261,7 +270,9 @@ export const MicrositePlannerDashboard = () => {
                         <p className="text-sm text-gray-600">{booking.roomDetails?.roomType}</p>
                       </td>
                       <td className="py-3 px-4">{booking.roomDetails?.numberOfRooms}</td>
-                      <td className="py-3 px-4 font-semibold">{formatCurrency(booking.totalAmount)}</td>
+                      <td className="py-3 px-4 font-semibold">
+                        {formatCurrency(booking.pricing?.totalAmount ?? booking.totalAmount)}
+                      </td>
                       <td className="py-3 px-4">
                         <span className={`badge ${
                           booking.status === 'confirmed' ? 'badge-success' :

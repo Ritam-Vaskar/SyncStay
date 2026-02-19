@@ -8,6 +8,8 @@ import {
   getEventBySlug,
   approveEvent,
   rejectEvent,
+  addAdminComment,
+  replyToAdminComment,
   selectHotelsForEvent,
   processPlannerPayment,
 } from '../controllers/eventController.js';
@@ -37,6 +39,8 @@ router
 // Admin approval routes
 router.put('/:id/approve', authorize('admin'), validateMongoId, auditLogger('event_approve', 'Event'), approveEvent);
 router.put('/:id/reject', authorize('admin'), validateMongoId, auditLogger('event_reject', 'Event'), rejectEvent);
+router.post('/:id/comment', authorize('admin'), validateMongoId, auditLogger('event_comment', 'Event'), addAdminComment);
+router.post('/:id/comment/:commentId/reply', authorize('planner'), validateMongoId, auditLogger('event_comment_reply', 'Event'), replyToAdminComment);
 
 // Private event - Hotel selection and planner payment
 router.post('/:id/select-hotels', authorize('planner'), validateMongoId, selectHotelsForEvent);

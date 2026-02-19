@@ -6,6 +6,7 @@ import Payment from '../models/Payment.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import { createAuditLog } from '../middlewares/auditLogger.js';
 import sendEmail from '../utils/mail.js';
+import { bookingReceivedTemplate, bookingConfirmedTemplate, plannerNewBookingTemplate } from '../utils/emailTemplates.js';
 
 /**
  * @route   GET /api/bookings
@@ -324,19 +325,17 @@ export const createBooking = asyncHandler(async (req, res) => {
     if (guestEmail) {
       await sendEmail({
         to: guestEmail,
-        subject: `Booking received for ${eventName}`,
-        html: `
-          <p>Hi ${booking.guestDetails?.name || 'Guest'},</p>
-          <p>Your booking request has been received for <strong>${eventName}</strong>.</p>
-          <ul>
-            <li><strong>Hotel:</strong> ${booking.roomDetails.hotelName}</li>
-            <li><strong>Room Type:</strong> ${booking.roomDetails.roomType}</li>
-            <li><strong>Rooms:</strong> ${booking.roomDetails.numberOfRooms}</li>
-            <li><strong>Check-in:</strong> ${new Date(booking.roomDetails.checkIn).toLocaleDateString()}</li>
-            <li><strong>Check-out:</strong> ${new Date(booking.roomDetails.checkOut).toLocaleDateString()}</li>
-          </ul>
-          <p>We will notify you once the planner confirms your booking.</p>
-        `,
+        subject: `Booking Received - ${eventName} | SyncStay`,
+        html: bookingReceivedTemplate({
+          guestName: booking.guestDetails?.name || 'Guest',
+          eventName: eventName,
+          hotelName: booking.roomDetails.hotelName,
+          roomType: booking.roomDetails.roomType,
+          numberOfRooms: booking.roomDetails.numberOfRooms,
+          checkIn: new Date(booking.roomDetails.checkIn).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }),
+          checkOut: new Date(booking.roomDetails.checkOut).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }),
+          bookingId: booking.bookingId
+        }),
         text: `Booking received for ${eventName}. Hotel: ${booking.roomDetails.hotelName}, Room: ${booking.roomDetails.roomType}.`,
       });
     }
@@ -344,18 +343,19 @@ export const createBooking = asyncHandler(async (req, res) => {
     if (plannerEmail) {
       await sendEmail({
         to: plannerEmail,
-        subject: `New booking request for ${eventName}`,
-        html: `
-          <p>Hi ${eventDoc.planner?.name || 'Planner'},</p>
-          <p>A new booking request has been created for <strong>${eventName}</strong>.</p>
-          <ul>
-            <li><strong>Guest:</strong> ${booking.guestDetails?.name || 'N/A'} (${booking.guestDetails?.email || 'N/A'})</li>
-            <li><strong>Hotel:</strong> ${booking.roomDetails.hotelName}</li>
-            <li><strong>Room Type:</strong> ${booking.roomDetails.roomType}</li>
-            <li><strong>Rooms:</strong> ${booking.roomDetails.numberOfRooms}</li>
-          </ul>
-          <p>Please review and approve in your dashboard.</p>
-        `,
+        subject: `New Booking Request - ${eventName} | SyncStay`,
+        html: plannerNewBookingTemplate({
+          plannerName: eventDoc.planner?.name || 'Planner',
+          eventName: eventName,
+          guestName: booking.guestDetails?.name || 'N/A',
+          guestEmail: booking.guestDetails?.email || 'N/A',
+          hotelName: booking.roomDetails.hotelName,
+          roomType: booking.roomDetails.roomType,
+          numberOfRooms: booking.roomDetails.numberOfRooms,
+          checkIn: new Date(booking.roomDetails.checkIn).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }),
+          checkOut: new Date(booking.roomDetails.checkOut).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }),
+          bookingId: booking.bookingId
+        }),
         text: `New booking request for ${eventName}. Guest: ${booking.guestDetails?.name || 'N/A'} (${booking.guestDetails?.email || 'N/A'}).`,
       });
     }
@@ -571,19 +571,18 @@ export const approveBooking = asyncHandler(async (req, res) => {
     if (guestEmail) {
       await sendEmail({
         to: guestEmail,
-        subject: `Booking confirmed for ${populatedBooking.event?.name || 'your event'}`,
-        html: `
-          <p>Hi ${populatedBooking.guest?.name || populatedBooking.guestDetails?.name || 'Guest'},</p>
-          <p>Your booking has been confirmed.</p>
-          <ul>
-            <li><strong>Event:</strong> ${populatedBooking.event?.name || 'N/A'}</li>
-            <li><strong>Hotel:</strong> ${populatedBooking.roomDetails.hotelName}</li>
-            <li><strong>Room Type:</strong> ${populatedBooking.roomDetails.roomType}</li>
-            <li><strong>Rooms:</strong> ${populatedBooking.roomDetails.numberOfRooms}</li>
-            <li><strong>Check-in:</strong> ${new Date(populatedBooking.roomDetails.checkIn).toLocaleDateString()}</li>
-            <li><strong>Check-out:</strong> ${new Date(populatedBooking.roomDetails.checkOut).toLocaleDateString()}</li>
-          </ul>
-        `,
+        subject: `Booking Confirmed - ${populatedBooking.event?.name || 'Your Event'} | SyncStay`,
+        html: bookingConfirmedTemplate({
+          guestName: populatedBooking.guest?.name || populatedBooking.guestDetails?.name || 'Guest',
+          eventName: populatedBooking.event?.name || 'Your Event',
+          hotelName: populatedBooking.roomDetails.hotelName,
+          roomType: populatedBooking.roomDetails.roomType,
+          numberOfRooms: populatedBooking.roomDetails.numberOfRooms,
+          checkIn: new Date(populatedBooking.roomDetails.checkIn).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }),
+          checkOut: new Date(populatedBooking.roomDetails.checkOut).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }),
+          bookingId: populatedBooking.bookingId,
+          totalAmount: populatedBooking.pricing?.totalAmount ? `${populatedBooking.pricing.currency || 'INR'} ${populatedBooking.pricing.totalAmount.toFixed(2)}` : null
+        }),
         text: `Your booking has been confirmed for ${populatedBooking.event?.name || 'your event'}.`,
       });
     }

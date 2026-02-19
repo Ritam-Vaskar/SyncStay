@@ -14,7 +14,14 @@ export const formatCurrency = (amount, currency = 'USD') => {
 };
 
 export const formatDate = (date, formatStr = 'MMM dd, yyyy') => {
-  return format(new Date(date), formatStr);
+  if (!date) return '—';
+  try {
+    const dateObj = new Date(date);
+    if (isNaN(dateObj.getTime())) return '—';
+    return format(dateObj, formatStr);
+  } catch (error) {
+    return '—';
+  }
 };
 
 export const formatRelativeDate = (date) => {
