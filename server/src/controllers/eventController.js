@@ -400,6 +400,182 @@ export const rejectEvent = asyncHandler(async (req, res) => {
 });
 
 /**
+ * @route   POST /api/events/:id/comment
+ * @desc    Add admin comment requesting changes
+ * @access  Private (Admin only)
+ */
+export const addAdminComment = asyncHandler(async (req, res) => {
+  const { comment } = req.body;
+  const event = await Event.findById(req.params.id);
+
+  if (!event) {
+    return res.status(404).json({
+      success: false,
+      message: 'Event not found',
+    });
+  }
+
+  if (!comment || !comment.trim()) {
+    return res.status(400).json({
+      success: false,
+      message: 'Comment is required',
+    });
+  }
+
+  // Add comment to event
+  event.adminComments.push({
+    comment: comment.trim(),
+    commentedBy: req.user.id,
+    commentedAt: new Date(),
+    isRead: false,
+  });
+
+  await event.save();
+
+  // Populate the comment with user details
+  const populatedEvent = await Event.findById(event._id)
+    .populate('adminComments.commentedBy', 'name email')
+    .populate('planner', 'name email');
+
+  // Send email notification to planner
+  try {
+    const planner = populatedEvent.planner;
+    if (planner?.email) {
+      await sendEmail({
+        to: planner.email,
+        subject: `Admin Feedback on Your Event: ${event.name}`,
+        html: `
+          <p>Hi ${planner.name || 'Planner'},</p>
+          <p>The admin has provided feedback on your event proposal <strong>${event.name}</strong>.</p>
+          <div style="background-color: #f8f9fa; padding: 15px; border-left: 4px solid #667eea; margin: 20px 0;">
+            <p><strong>Admin Comment:</strong></p>
+            <p>${comment}</p>
+          </div>
+          <p>Please review the feedback and make the necessary changes to your event proposal.</p>
+          <p>Thank you!</p>
+        `,
+        text: `Admin Feedback on ${event.name}: ${comment}`,
+      });
+    }
+  } catch (error) {
+    console.error('Error sending comment notification email:', error);
+  }
+
+  // Log action
+  await createAuditLog({
+    user: req.user.id,
+    action: 'event_comment',
+    resource: 'Event',
+    resourceId: event._id,
+    status: 'success',
+    details: `Admin added comment: ${comment.substring(0, 100)}`,
+  });
+
+  res.status(200).json({
+    success: true,
+    message: 'Comment added successfully',
+    data: populatedEvent,
+  });
+});
+
+/**
+ * @route   POST /api/events/:id/comment/:commentId/reply
+ * @desc    Planner replies to admin comment
+ * @access  Private (Planner only)
+ */
+export const replyToAdminComment = asyncHandler(async (req, res) => {
+  const { reply } = req.body;
+  const { id: eventId, commentId } = req.params;
+  
+  const event = await Event.findById(eventId);
+
+  if (!event) {
+    return res.status(404).json({
+      success: false,
+      message: 'Event not found',
+    });
+  }
+
+  // Verify planner owns this event
+  if (event.planner.toString() !== req.user.id) {
+    return res.status(403).json({
+      success: false,
+      message: 'Not authorized to reply to comments on this event',
+    });
+  }
+
+  if (!reply || !reply.trim()) {
+    return res.status(400).json({
+      success: false,
+      message: 'Reply is required',
+    });
+  }
+
+  // Find the comment and add reply
+  const comment = event.adminComments.id(commentId);
+  if (!comment) {
+    return res.status(404).json({
+      success: false,
+      message: 'Comment not found',
+    });
+  }
+
+  comment.replies.push({
+    reply: reply.trim(),
+    repliedBy: req.user.id,
+    repliedAt: new Date(),
+  });
+
+  await event.save();
+
+  // Populate the event with user details
+  const populatedEvent = await Event.findById(event._id)
+    .populate('adminComments.commentedBy', 'name email')
+    .populate('adminComments.replies.repliedBy', 'name email')
+    .populate('planner', 'name email');
+
+  // Send email notification to admin who commented
+  try {
+    const adminUser = await User.findById(comment.commentedBy);
+    if (adminUser?.email) {
+      await sendEmail({
+        to: adminUser.email,
+        subject: `Planner Reply on Event: ${event.name}`,
+        html: `
+          <p>Hi ${adminUser.name || 'Admin'},</p>
+          <p>The planner has replied to your feedback on event <strong>${event.name}</strong>.</p>
+          <div style="background-color: #f8f9fa; padding: 15px; border-left: 4px solid #667eea; margin: 20px 0;">
+            <p><strong>Planner's Reply:</strong></p>
+            <p>${reply}</p>
+          </div>
+          <p>Please review their response and take appropriate action.</p>
+          <p>Thank you!</p>
+        `,
+        text: `Planner Reply on ${event.name}: ${reply}`,
+      });
+    }
+  } catch (error) {
+    console.error('Error sending reply notification email:', error);
+  }
+
+  // Log action
+  await createAuditLog({
+    user: req.user.id,
+    action: 'event_comment_reply',
+    resource: 'Event',
+    resourceId: event._id,
+    status: 'success',
+    details: `Planner replied to admin comment: ${reply.substring(0, 100)}`,
+  });
+
+  res.status(200).json({
+    success: true,
+    message: 'Reply added successfully',
+    data: populatedEvent,
+  });
+});
+
+/**
  * @route   POST /api/events/:id/select-hotels
  * @desc    Planner selects hotels and calculates total cost for private event
  * @access  Private (Planner only)

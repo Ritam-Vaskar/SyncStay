@@ -7,7 +7,7 @@ import { MicrositeDashboardLayout } from '@/layouts/MicrositeDashboardLayout';
 import { LoadingPage } from '@/components/LoadingSpinner';
 import { 
   Users, Mail, Phone, Lock, Unlock, Plus, Upload, 
-  Download, Trash2, CheckCircle, XCircle, UserPlus, FileUp, Hotel
+  Download, Trash2, CheckCircle, XCircle, UserPlus, FileUp, Hotel, Clock
 } from 'lucide-react';
 import { formatDate } from '@/utils/helpers';
 import toast from 'react-hot-toast';
@@ -461,31 +461,63 @@ export const MicrositePlannerGuests = () => {
             {/* Registered Guests List */}
             {registeredGuests.length > 0 ? (
               <div className="card overflow-hidden">
+                <div className="px-6 py-4 border-b border-gray-200">
+                  <h3 className="text-lg font-semibold flex items-center gap-2">
+                    <Users className="h-5 w-5" /> Registered Guests ({registeredGuests.length})
+                  </h3>
+                </div>
                 <div className="overflow-x-auto">
-                  <table className="table">
+                  <table className="w-full">
                     <thead>
-                      <tr>
-                        <th>Name</th>
-                        <th>Email</th>
-                        <th>Phone</th>
-                        <th>Bookings</th>
-                        <th>Total Rooms</th>
-                        <th>Status</th>
+                      <tr className="bg-gradient-to-r from-gray-50 to-gray-100 border-b-2 border-gray-200">
+                        <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Name</th>
+                        <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Email</th>
+                        <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Phone</th>
+                        <th className="px-6 py-4 text-center text-sm font-semibold text-gray-700">Bookings</th>
+                        <th className="px-6 py-4 text-center text-sm font-semibold text-gray-700">Total Rooms</th>
+                        <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Status</th>
                       </tr>
                     </thead>
-                    <tbody>
+                    <tbody className="divide-y divide-gray-200">
                       {registeredGuests.map((guest, idx) => (
-                        <tr key={idx}>
-                          <td>{guest.name}</td>
-                          <td className="text-gray-600">{guest.email}</td>
-                          <td className="text-gray-600">{guest.phone || '-'}</td>
-                          <td>{guest.bookings.length}</td>
-                          <td>{guest.totalRooms}</td>
-                          <td>
+                        <tr 
+                          key={idx}
+                          className="hover:bg-blue-50 transition-colors duration-150 group"
+                        >
+                          <td className="px-6 py-4">
+                            <span className="font-semibold text-gray-900">{guest.name}</span>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="flex items-center gap-2">
+                              <Mail className="h-4 w-4 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                              <span className="text-gray-600">{guest.email}</span>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="flex items-center gap-2">
+                              <Phone className="h-4 w-4 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                              <span className="text-gray-600">{guest.phone || '—'}</span>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 text-center">
+                            <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 text-blue-600 font-semibold text-sm">
+                              {guest.bookings.length}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-center">
+                            <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-purple-100 text-purple-600 font-semibold text-sm">
+                              {guest.totalRooms}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4">
                             {guest.status === 'confirmed' ? (
-                              <span className="badge badge-success">Confirmed</span>
+                              <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-green-100 text-green-700 font-medium text-sm">
+                                <CheckCircle className="h-4 w-4" /> Confirmed
+                              </span>
                             ) : (
-                              <span className="badge badge-secondary">Pending</span>
+                              <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-100 text-amber-700 font-medium text-sm">
+                                <Clock className="h-4 w-4" /> Pending
+                              </span>
                             )}
                           </td>
                         </tr>

@@ -218,82 +218,110 @@ export const MicrositePage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div
+      className="microsite-page"
+      style={{
+        '--ms-accent': theme.primaryColor || '#b58a3a',
+        '--ms-accent-2': theme.secondaryColor || '#1f2937',
+      }}
+    >
       {/* Header with branding */}
       <div
-        className="relative h-96 bg-cover bg-center"
+        className="ms-hero bg-cover bg-center"
         style={{
-          backgroundImage: theme.bannerImage 
-            ? `url(${theme.bannerImage})` 
-            : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+          backgroundImage: theme.bannerImage
+            ? `url(${theme.bannerImage})`
+            : 'radial-gradient(1200px 600px at 10% 0%, rgba(181, 138, 58, 0.45), rgba(15, 23, 42, 0.92))',
         }}
       >
-        <div className="absolute inset-0 bg-black bg-opacity-40" />
-        
-        {/* Auth Header Bar */}
-        <div className="absolute top-0 right-0 p-4 z-10">
-          {isAuthenticated ? (
-            <div className="flex items-center gap-3">
-              <div className="bg-white/90 backdrop-blur px-4 py-2 rounded-lg shadow-lg flex items-center gap-3">
-                <div className="text-right">
-                  <p className="text-sm font-semibold text-gray-900">{user?.name}</p>
-                  <p className="text-xs text-gray-600 capitalize">{user?.role}</p>
+        <div className="ms-hero-overlay" />
+        <div className="ms-hero-orb ms-hero-orb--one" />
+        <div className="ms-hero-orb ms-hero-orb--two" />
+
+        <div className="ms-hero-inner ms-container">
+          {/* Auth Header Bar */}
+          <div className="flex justify-end">
+            {isAuthenticated ? (
+              <div className="flex items-center gap-3">
+                <div className="ms-auth-bar px-4 py-2 rounded-lg flex items-center gap-3">
+                  <div className="text-right">
+                    <p className="text-sm font-semibold text-gray-900">{user?.name}</p>
+                    <p className="text-xs text-gray-600 capitalize">{user?.role}</p>
+                  </div>
+                  <Link
+                    to={`/microsite/${slug}/dashboard`}
+                    className="btn btn-sm bg-primary-600 text-white hover:bg-primary-700 flex items-center gap-2"
+                  >
+                    <LayoutDashboard className="h-4 w-4" />
+                    Event Dashboard
+                  </Link>
+                  <button
+                    onClick={handleLogout}
+                    className="btn btn-sm bg-white text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+                  >
+                    <LogOut className="h-4 w-4" />
+                    Logout
+                  </button>
                 </div>
-                <Link
-                  to={`/microsite/${slug}/dashboard`}
-                  className="btn btn-sm bg-primary-600 text-white hover:bg-primary-700 flex items-center gap-2"
-                >
-                  <LayoutDashboard className="h-4 w-4" />
-                  Event Dashboard
-                </Link>
+              </div>
+            ) : (
+              <div className="flex gap-2">
                 <button
-                  onClick={handleLogout}
-                  className="btn btn-sm bg-white text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+                  onClick={() => {
+                    setAuthMode('login');
+                    setShowAuthModal(true);
+                  }}
+                  className="btn btn-sm bg-white text-gray-700 hover:bg-gray-100 flex items-center gap-2 shadow-lg"
                 >
-                  <LogOut className="h-4 w-4" />
-                  Logout
+                  <LogIn className="h-4 w-4" />
+                  Login
+                </button>
+                <button
+                  onClick={() => {
+                    setAuthMode('register');
+                    setShowAuthModal(true);
+                  }}
+                  className="btn btn-sm bg-primary-600 text-white hover:bg-primary-700 flex items-center gap-2 shadow-lg"
+                >
+                  <UserPlus className="h-4 w-4" />
+                  Register
                 </button>
               </div>
+            )}
+          </div>
+
+          <div className="ms-reveal">
+            {theme.logo && (
+              <img src={theme.logo} alt="Logo" className="h-14 mb-5 drop-shadow" />
+            )}
+            <div className="flex flex-wrap gap-2 mb-4">
+              <span className="ms-pill">
+                <Calendar className="h-4 w-4" />
+                {formatDate(event.startDate)} to {formatDate(event.endDate)}
+              </span>
+              <span className="ms-pill">
+                <MapPin className="h-4 w-4" />
+                {event.location?.city || event.location?.venue || 'Location TBD'}
+              </span>
+              <span className="ms-pill">
+                <Users className="h-4 w-4" />
+                {event.expectedGuests} guests
+              </span>
             </div>
-          ) : (
-            <div className="flex gap-2">
-              <button
-                onClick={() => {
-                  setAuthMode('login');
-                  setShowAuthModal(true);
-                }}
-                className="btn btn-sm bg-white text-gray-700 hover:bg-gray-100 flex items-center gap-2 shadow-lg"
-              >
-                <LogIn className="h-4 w-4" />
-                Login
-              </button>
-              <button
-                onClick={() => {
-                  setAuthMode('register');
-                  setShowAuthModal(true);
-                }}
-                className="btn btn-sm bg-primary-600 text-white hover:bg-primary-700 flex items-center gap-2 shadow-lg"
-              >
-                <UserPlus className="h-4 w-4" />
-                Register
-              </button>
+            <h1 className="ms-hero-title text-white mb-3">{event.name}</h1>
+            <p className="ms-hero-subtitle max-w-2xl">{event.description}</p>
+            <div className="ms-hero-meta">
+              <span className="ms-pill">Event type: {event.type}</span>
+              <span className="ms-pill">Booking deadline: {formatDate(event.bookingDeadline)}</span>
             </div>
-          )}
-        </div>
-        
-        <div className="relative container mx-auto px-6 h-full flex flex-col justify-center">
-          {theme.logo && (
-            <img src={theme.logo} alt="Logo" className="h-16 mb-4" />
-          )}
-          <h1 className="text-5xl font-bold text-white mb-4">{event.name}</h1>
-          <p className="text-xl text-white/90 max-w-2xl">{event.description}</p>
+          </div>
         </div>
       </div>
 
-      <div className="container mx-auto px-6 py-12">
+      <div className="ms-container py-12">
         {/* Private Event Notice - Show for private events */}
         {event.isPrivate && (
-          <div className="card mb-8 bg-purple-50 border-2 border-purple-200">
+          <div className="card ms-alert mb-8 bg-purple-50 border-2 border-purple-200">
             <div className="flex items-start gap-4">
               <div className="flex-shrink-0">
                 <div className="bg-purple-100 p-3 rounded-lg">
@@ -317,7 +345,7 @@ export const MicrositePage = () => {
 
         {/* Event Details */}
         <div className="grid md:grid-cols-3 gap-6 mb-12">
-          <div className="card flex items-start gap-4">
+          <div className="card flex items-start gap-4 ms-reveal">
             <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary-100">
               <Calendar className="h-6 w-6 text-primary-600" />
             </div>
@@ -327,7 +355,7 @@ export const MicrositePage = () => {
             </div>
           </div>
 
-          <div className="card flex items-start gap-4">
+          <div className="card flex items-start gap-4 ms-reveal ms-reveal--delay">
             <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary-100">
               <MapPin className="h-6 w-6 text-primary-600" />
             </div>
@@ -338,7 +366,7 @@ export const MicrositePage = () => {
             </div>
           </div>
 
-          <div className="card flex items-start gap-4">
+          <div className="card flex items-start gap-4 ms-reveal ms-reveal--delay">
             <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary-100">
               <Users className="h-6 w-6 text-primary-600" />
             </div>
@@ -350,7 +378,7 @@ export const MicrositePage = () => {
         </div>
 
         {/* Important Dates */}
-        <div className="card mb-12 bg-amber-50 border-amber-200">
+        <div className="card ms-alert mb-12 bg-amber-50 border-amber-200">
           <div className="flex items-center gap-3">
             <Calendar className="h-6 w-6 text-amber-600" />
             <div>
@@ -362,11 +390,11 @@ export const MicrositePage = () => {
 
         {/* Available Hotels/Inventory */}
         <div>
-          <h2 className="text-3xl font-bold mb-6">Available Hotels & Rooms</h2>
+          <h2 className="ms-section-title mb-6">Available Hotels and Rooms</h2>
           
           {/* Private event notice for non-invited users */}
           {event.isPrivate && isAuthenticated && !isInvitedGuest && user?.role !== 'admin' && event.planner?._id !== user?.id && (
-            <div className="card bg-amber-50 border-2 border-amber-200 mb-6">
+            <div className="card ms-alert bg-amber-50 border-2 border-amber-200 mb-6">
               <div className="flex items-center gap-3">
                 <Lock className="h-5 w-5 text-amber-600 flex-shrink-0" />
                 <div>
@@ -378,7 +406,7 @@ export const MicrositePage = () => {
           )}
 
           {event.isPrivate && !isAuthenticated && (
-            <div className="card bg-blue-50 border-2 border-blue-200 mb-6">
+            <div className="card ms-alert bg-blue-50 border-2 border-blue-200 mb-6">
               <div className="flex items-center gap-3">
                 <LogIn className="h-5 w-5 text-blue-600 flex-shrink-0" />
                 <div>
@@ -405,7 +433,7 @@ export const MicrositePage = () => {
                 const nights = Math.ceil((checkOutDate - checkInDate) / (1000 * 60 * 60 * 24));
 
                 return (
-                  <div key={proposal._id} className="card bg-white shadow-lg">
+                  <div key={proposal._id} className="card bg-white shadow-lg ms-reveal">
                     {/* Hotel Header */}
                     <div className="border-b border-gray-200 pb-4 mb-6">
                       <div className="flex items-start justify-between">

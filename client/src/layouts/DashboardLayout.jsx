@@ -13,6 +13,7 @@ import {
   X,
   Users,
   Home,
+  MessageSquare,
 } from 'lucide-react';
 
 export const DashboardLayout = ({ children }) => {
@@ -64,6 +65,7 @@ export const DashboardLayout = ({ children }) => {
       return [
         ...baseItems,
         { name: 'Event Approvals', href: '/admin/approvals', icon: FileText },
+        { name: 'Feedback Conversations', href: '/admin/feedback', icon: MessageSquare },
         { name: 'Users', href: '/admin/users', icon: Users },
         { name: 'All Events', href: '/admin/events', icon: Calendar },
         { name: 'Analytics', href: '/admin/analytics', icon: BarChart3 },

@@ -1,13 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Calendar, MapPin, Users, Clock, DollarSign, Hotel, FileText, Lock, Unlock, Mail, Plus, X } from 'lucide-react';
 import { eventService } from '@/services/apiServices';
 import toast from 'react-hot-toast';
 
 export const CreateProposalPage = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const queryClient = useQueryClient();
+  const editProposal = location.state?.editProposal;
 
   const [formData, setFormData] = useState({
     name: '',
@@ -42,6 +44,47 @@ export const CreateProposalPage = () => {
 
   const [guestInput, setGuestInput] = useState({ name: '', email: '', phone: '' });
 
+  // Populate form with existing proposal data when editing
+  useEffect(() => {
+    if (editProposal) {
+      console.log('📝 Editing proposal:', editProposal);
+      setFormData({
+        name: editProposal.name || '',
+        description: editProposal.description || '',
+        eventType: editProposal.eventType || 'conference',
+        startDate: editProposal.startDate ? new Date(editProposal.startDate).toISOString().split('T')[0] : '',
+        endDate: editProposal.endDate ? new Date(editProposal.endDate).toISOString().split('T')[0] : '',
+        location: editProposal.location || '',
+        expectedGuests: editProposal.expectedGuests || '',
+        bookingDeadline: editProposal.bookingDeadline ? new Date(editProposal.bookingDeadline).toISOString().split('T')[0] : '',
+        budget: editProposal.budget || '',
+        specialRequirements: editProposal.specialRequirements || '',
+        isPrivate: editProposal.isPrivate || false,
+        invitedGuests: editProposal.invitedGuests || [],
+        accommodationNeeds: {
+          totalRooms: editProposal.accommodationNeeds?.totalRooms || '',
+          roomTypes: {
+            single: editProposal.accommodationNeeds?.roomTypes?.single || '',
+            double: editProposal.accommodationNeeds?.roomTypes?.double || '',
+            suite: editProposal.accommodationNeeds?.roomTypes?.suite || ''
+          },
+          preferredHotels: editProposal.accommodationNeeds?.preferredHotels || '',
+          amenitiesRequired: editProposal.accommodationNeeds?.amenitiesRequired || []
+        },
+        additionalServices: {
+          transportation: editProposal.additionalServices?.transportation || false,
+          catering: editProposal.additionalServices?.catering || false,
+          avEquipment: editProposal.additionalServices?.avEquipment || false,
+          other: editProposal.additionalServices?.other || ''
+        }
+      });
+      toast('Editing existing proposal. Make your changes and resubmit.', { 
+        duration: 3000,
+        icon: '✏️'
+      });
+    }
+  }, [editProposal]);
+
   const amenitiesOptions = [
     'Free WiFi',
     'Breakfast Included',
@@ -54,11 +97,23 @@ export const CreateProposalPage = () => {
   ];
 
   const createProposalMutation = useMutation({
-    mutationFn: (data) => eventService.create(data),
+    mutationFn: (data) => {
+      if (editProposal?._id) {
+        // Update existing proposal
+        return eventService.update(editProposal._id, data);
+      }
+      // Create new proposal
+      return eventService.create(data);
+    },
     onSuccess: () => {
-      toast.success('Event proposal submitted successfully! Waiting for admin approval.');
+      const message = editProposal?._id 
+        ? 'Event proposal updated successfully! Waiting for admin approval.' 
+        : 'Event proposal submitted successfully! Waiting for admin approval.';
+      toast.success(message);
       queryClient.invalidateQueries(['planner-events']);
-      navigate('/planner/events');
+      queryClient.invalidateQueries(['planner-proposals']);
+      queryClient.invalidateQueries(['events']);
+      navigate('/planner/proposals');
     },
     onError: (error) => {
       toast.error(error.response?.data?.message || 'Failed to submit proposal');
@@ -188,8 +243,15 @@ export const CreateProposalPage = () => {
     <div className="max-w-5xl mx-auto space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold text-gray-900">Create Event Proposal</h1>
-        <p className="text-gray-600 mt-1">Submit your event details for admin approval</p>
+        <h1 className="text-3xl font-bold text-gray-900">
+          {editProposal ? 'Edit Event Proposal' : 'Create Event Proposal'}
+        </h1>
+        <p className="text-gray-600 mt-1">
+          {editProposal 
+            ? 'Update your event details and resubmit for approval' 
+            : 'Submit your event details for admin approval'
+          }
+        </p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
@@ -666,7 +728,10 @@ export const CreateProposalPage = () => {
             disabled={createProposalMutation.isPending}
             className="btn btn-primary"
           >
-            {createProposalMutation.isPending ? 'Submitting...' : 'Submit Proposal for Approval'}
+            {createProposalMutation.isPending 
+              ? (editProposal ? 'Updating...' : 'Submitting...') 
+              : (editProposal ? 'Update & Resubmit for Approval' : 'Submit Proposal for Approval')
+            }
           </button>
         </div>
       </form>
