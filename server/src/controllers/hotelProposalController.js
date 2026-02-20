@@ -238,6 +238,28 @@ export const selectProposal = asyncHandler(async (req, res) => {
     hotel: p.hotel,
     proposal: p._id,
   }));
+  
+  // For public events, auto-activate when at least one hotel is selected
+  if (!event.isPrivate && !wasSelected && allSelected.length > 0) {
+    if (event.status === 'reviewing-proposals' || event.status === 'pending-approval') {
+      event.status = 'active';
+      // Also auto-publish microsite
+      if (!event.micrositeConfig || !event.micrositeConfig.isPublished) {
+        const slug = event.micrositeConfig?.customSlug || event.name
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/(^-|-$)/g, '');
+        
+        event.micrositeConfig = {
+          ...event.micrositeConfig,
+          isPublished: true,
+          customSlug: event.micrositeConfig?.customSlug || `${slug}-${Date.now().toString().slice(-4)}`,
+          theme: event.micrositeConfig?.theme || { primaryColor: '#3b82f6' },
+        };
+      }
+    }
+  }
+  
   await event.save();
 
   // Log action
@@ -321,6 +343,25 @@ export const confirmHotelSelection = asyncHandler(async (req, res) => {
   if (event.isPrivate) {
     event.plannerPaymentAmount = totalCost;
     event.plannerPaymentStatus = 'pending';
+  } else {
+    // For public events, automatically activate when hotels are selected
+    if (event.status === 'reviewing-proposals' || event.status === 'pending-approval') {
+      event.status = 'active';
+      // Also publish the microsite automatically for public events
+      if (!event.micrositeConfig || !event.micrositeConfig.isPublished) {
+        const slug = event.micrositeConfig?.customSlug || event.name
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/(^-|-$)/g, '');
+        
+        event.micrositeConfig = {
+          ...event.micrositeConfig,
+          isPublished: true,
+          customSlug: event.micrositeConfig?.customSlug || `${slug}-${Date.now().toString().slice(-4)}`,
+          theme: event.micrositeConfig?.theme || { primaryColor: '#3b82f6' },
+        };
+      }
+    }
   }
 
   await event.save();
@@ -547,17 +588,6 @@ export const getSelectedProposalsForMicrosite = asyncHandler(async (req, res) =>
     });
   }
 
-  // Check if event is active
-  if (event.status !== 'active') {
-    console.warn(`⚠️ Event not active: ${event.status}`);
-    return res.status(200).json({
-      success: true,
-      count: 0,
-      data: [],
-      message: 'Event is not active yet. Selected hotels will be available soon.',
-    });
-  }
-
   // Get selected hotel proposals
   if (!event.selectedHotels || event.selectedHotels.length === 0) {
     console.log('ℹ️ No hotels selected yet');
@@ -573,7 +603,7 @@ export const getSelectedProposalsForMicrosite = asyncHandler(async (req, res) =>
   const proposalIds = event.selectedHotels.map(sh => sh.proposal);
   const selectedProposals = await HotelProposal.find({
     _id: { $in: proposalIds },
-    selectedByPlanner: true,
+    // Don't filter by selectedByPlanner - the fact that it's in event.selectedHotels means it's selected
   })
     .populate('hotel', 'name email phone organization')
     .sort({ hotelName: 1 });

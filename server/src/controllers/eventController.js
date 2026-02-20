@@ -1007,3 +1007,95 @@ export const getMicrositeProposals = asyncHandler(async (req, res) => {
     },
   });
 });
+
+/**
+ * @route   PUT /api/events/:id/activate
+ * @desc    Activate event if it has selected hotels (utility for fixing stuck events)
+ * @access  Private (Planner/Admin)
+ */
+export const activateEvent = asyncHandler(async (req, res) => {
+  const event = await Event.findById(req.params.id);
+
+  if (!event) {
+    return res.status(404).json({
+      success: false,
+      message: 'Event not found',
+    });
+  }
+
+  // Check authorization
+  if (event.planner.toString() !== req.user.id && req.user.role !== 'admin') {
+    return res.status(403).json({
+      success: false,
+      message: 'Not authorized to activate this event',
+    });
+  }
+
+  // Check if event has selected hotels
+  if (!event.selectedHotels || event.selectedHotels.length === 0) {
+    return res.status(400).json({
+      success: false,
+      message: 'Cannot activate event without selected hotels',
+    });
+  }
+
+  // For private events, require payment
+  if (event.isPrivate && event.plannerPaymentStatus !== 'paid') {
+    return res.status(400).json({
+      success: false,
+      message: 'Private events require payment before activation',
+    });
+  }
+
+  // Update status to active
+  event.status = 'active';
+
+  // Ensure microsite is published
+  if (!event.micrositeConfig || !event.micrositeConfig.isPublished) {
+    const slug = event.micrositeConfig?.customSlug || event.name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '');
+    
+    event.micrositeConfig = {
+      ...event.micrositeConfig,
+      isPublished: true,
+      customSlug: event.micrositeConfig?.customSlug || `${slug}-${Date.now().toString().slice(-4)}`,
+      theme: event.micrositeConfig?.theme || { primaryColor: '#3b82f6' },
+    };
+  }
+
+  await event.save();
+
+  // Generate embedding for public events
+  if (!event.isPrivate) {
+    try {
+      const embeddingData = await generateEventEmbedding(event);
+      if (embeddingData && embeddingData.vector) {
+        await upsertVector('events_vectors', event._id.toString(), embeddingData.vector, {
+          name: event.name,
+          type: event.type,
+          status: event.status,
+        });
+        console.log(`✅ Event embedding generated for: ${event.name}`);
+      }
+    } catch (error) {
+      console.error('⚠️ Failed to generate embedding:', error.message);
+    }
+  }
+
+  await createAuditLog({
+    user: req.user.id,
+    action: 'event_update',
+    resource: 'Event',
+    resourceId: event._id,
+    status: 'success',
+    details: `Event activated: ${event.name}`,
+  });
+
+  res.status(200).json({
+    success: true,
+    message: 'Event activated successfully',
+    data: event,
+  });
+});

@@ -15,6 +15,7 @@ import {
   getHotelRecommendations,
   selectRecommendedHotel,
   getMicrositeProposals,
+  activateEvent,
 } from '../controllers/eventController.js';
 import { protect, authorize, optionalAuth } from '../middlewares/auth.js';
 import { validateEvent, validateMongoId } from '../middlewares/validators.js';
@@ -44,6 +45,9 @@ router.put('/:id/approve', authorize('admin'), validateMongoId, auditLogger('eve
 router.put('/:id/reject', authorize('admin'), validateMongoId, auditLogger('event_reject', 'Event'), rejectEvent);
 router.post('/:id/comment', authorize('admin'), validateMongoId, auditLogger('event_comment', 'Event'), addAdminComment);
 router.post('/:id/comment/:commentId/reply', authorize('planner'), validateMongoId, auditLogger('event_comment_reply', 'Event'), replyToAdminComment);
+
+// Activate event (utility for fixing stuck events)
+router.put('/:id/activate', authorize('planner', 'admin'), validateMongoId, auditLogger('event_update', 'Event'), activateEvent);
 
 // Private event - Hotel selection and planner payment
 router.post('/:id/select-hotels', authorize('planner'), validateMongoId, selectHotelsForEvent);
