@@ -100,22 +100,8 @@ export const createEvent = asyncHandler(async (req, res) => {
 
   const event = await Event.create(req.body);
 
-  // Generate and store embedding asynchronously
-  generateEventEmbedding(event)
-    .then(async ({ vectorId, embeddingHash, embedding }) => {
-      // Store in Qdrant
-      await upsertVector('events_vectors', vectorId, embedding, {
-        eventId: event._id.toString(),
-        name: event.name,
-        type: event.type,
-        city: event.location?.city || '',
-      });
-      
-      // Update event with vector info
-      await Event.findByIdAndUpdate(event._id, { vectorId, embeddingHash });
-      console.log(`✅ Generated embedding for event: ${event.name}`);
-    })
-    .catch(err => console.error(`❌ Failed to generate embedding for event ${event._id}:`, err.message));
+  // Note: Embeddings are NOT generated on creation to save costs
+  // They will be generated automatically when the event becomes active
 
   // Log action
   await createAuditLog({

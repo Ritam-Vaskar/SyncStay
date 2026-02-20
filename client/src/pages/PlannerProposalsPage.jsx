@@ -655,16 +655,6 @@ export const PlannerProposalsPage = () => {
                     </>
                   )}
 
-                  {proposal.status === 'active' && proposal.micrositeConfig?.customSlug && (
-                    <Link
-                      to={`/microsite/${proposal.micrositeConfig.customSlug}/dashboard`}
-                      className="btn btn-primary flex items-center gap-2"
-                    >
-                      <Calendar className="h-5 w-5" />
-                      Manage Event
-                    </Link>
-                  )}
-
                   {proposal.status === 'rejected' && (
                     <button
                       onClick={() => navigate('/planner/proposals/create', { state: { editProposal: proposal } })}
