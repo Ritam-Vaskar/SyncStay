@@ -879,7 +879,7 @@ export const getHotelRecommendations = asyncHandler(async (req, res) => {
 
 /**
  * @route   POST /api/events/:id/select-recommended-hotel
- * @desc    Select a recommended hotel for the event
+ * @desc    Select a recommended hotel (creates a HotelProposal from AI recommendation)
  * @access  Private (Planner only)
  */
 export const selectRecommendedHotel = asyncHandler(async (req, res) => {
@@ -901,22 +901,151 @@ export const selectRecommendedHotel = asyncHandler(async (req, res) => {
     });
   }
 
-  // Find the recommended hotel
+  // Validate that the hotel exists and is active
+  const hotel = await User.findOne({
+    _id: hotelId,
+    role: 'hotel',
+    isActive: true,
+  });
+
+  if (!hotel) {
+    return res.status(404).json({
+      success: false,
+      message: 'Hotel not found or not active',
+    });
+  }
+
+  console.log('✅ Hotel validated:', hotel.name || hotel.organization);
+
+  // Import HotelProposal model
+  const HotelProposal = (await import('../models/HotelProposal.js')).default;
+
+  // Check if a proposal already exists for this hotel and event
+  let proposal = await HotelProposal.findOne({
+    event: event._id,
+    hotel: hotelId,
+  });
+
+  if (proposal) {
+    console.log('✅ Existing proposal found, marking as selected');
+    proposal.selectedByPlanner = true;
+    proposal.status = 'selected';
+    proposal.selectionDate = new Date();
+    await proposal.save();
+  } else {
+    // Create a new HotelProposal from hotel's profile data
+    console.log('🆕 Creating new proposal from AI recommendation');
+
+    // Calculate total rooms from hotel's availability
+    const totalRooms = hotel.totalRooms || 50; // Default to 50 if not set
+    const roomDistribution = {
+      single: Math.floor(totalRooms * 0.4), // 40% single
+      double: Math.floor(totalRooms * 0.5), // 50% double
+      suite: Math.floor(totalRooms * 0.1),  // 10% suite
+    };
+
+    // Use hotel's price range or default pricing
+    const avgPrice = hotel.priceRange?.min && hotel.priceRange?.max 
+      ? (hotel.priceRange.min + hotel.priceRange.max) / 2 
+      : 100; // Default $100/night
+
+    const pricing = {
+      singleRoom: {
+        pricePerNight: Math.round(avgPrice * 0.8), // 80% of avg
+        availableRooms: roomDistribution.single,
+      },
+      doubleRoom: {
+        pricePerNight: Math.round(avgPrice), // Full avg price
+        availableRooms: roomDistribution.double,
+      },
+      suite: {
+        pricePerNight: Math.round(avgPrice * 1.5), // 150% of avg
+        availableRooms: roomDistribution.suite,
+      },
+    };
+
+    // Extract facilities from hotel profile (if available)
+    const facilities = {
+      wifi: true, // Assume basic amenities
+      parking: true,
+      breakfast: hotel.facilities?.breakfast || false,
+      gym: hotel.facilities?.gym || false,
+      pool: hotel.facilities?.pool || false,
+      spa: hotel.facilities?.spa || false,
+      restaurant: hotel.facilities?.restaurant || true,
+      conferenceRoom: hotel.facilities?.conferenceRoom || (event.type === 'conference'),
+      airportShuttle: hotel.facilities?.airportShuttle || false,
+      laundry: hotel.facilities?.laundry || true,
+    };
+
+    // Calculate estimated cost
+    const nights = event.startDate && event.endDate 
+      ? Math.ceil((new Date(event.endDate) - new Date(event.startDate)) / (1000 * 60 * 60 * 24))
+      : 3; // Default 3 nights
+
+    const estimatedRoomsNeeded = event.expectedGuests 
+      ? Math.ceil(event.expectedGuests / 2) // Assume 2 guests per room
+      : 30;
+
+    const totalEstimatedCost = Math.round(avgPrice * nights * estimatedRoomsNeeded);
+
+    proposal = await HotelProposal.create({
+      event: event._id,
+      hotel: hotelId,
+      hotelName: hotel.name || hotel.organization,
+      pricing,
+      totalRoomsOffered: totalRooms,
+      amenities: hotel.amenities || [],
+      facilities,
+      additionalServices: {
+        transportation: {
+          available: false,
+          cost: 0,
+          description: '',
+        },
+        catering: {
+          available: event.type === 'conference' || event.type === 'corporate',
+          costPerPerson: 50,
+          description: 'Full catering service available',
+        },
+        avEquipment: {
+          available: event.type === 'conference',
+          cost: 500,
+          description: 'Audio-visual equipment for conferences',
+        },
+        other: '',
+      },
+      specialOffer: 'Selected from AI recommendations - Best match for your event!',
+      notes: `Auto-generated proposal from AI recommendation. Hotel: ${hotel.location?.city || 'N/A'}, ${hotel.location?.country || 'N/A'}`,
+      totalEstimatedCost,
+      status: 'selected',
+      selectedByPlanner: true,
+      selectionDate: new Date(),
+    });
+
+    console.log('✅ Created new proposal:', proposal._id);
+  }
+
+  // Check if hotel is in rule-based recommendations and mark it as selected
   const recHotel = event.recommendedHotels.find(
     (h) => h.hotel.toString() === hotelId
   );
 
-  if (!recHotel) {
-    return res.status(404).json({
-      success: false,
-      message: 'Hotel not found in recommendations',
+  if (recHotel) {
+    recHotel.isSelectedByPlanner = true;
+    console.log('📌 Marked hotel as selected in recommendedHotels');
+  } else {
+    // Hotel is from AI recommendations, add it to recommendedHotels
+    event.recommendedHotels.push({
+      hotel: hotelId,
+      score: 0,
+      reasons: ['Selected from AI recommendations'],
+      isSelectedByPlanner: true,
     });
+    console.log('🤖 Added AI-recommended hotel to recommendedHotels');
   }
 
-  // Mark as selected
-  recHotel.isSelectedByPlanner = true;
-
-  // Add to selectedHotels if not already there
+  // Add to selectedHotels with proposal reference
   const alreadySelected = event.selectedHotels.some(
     (sh) => sh.hotel?.toString() === hotelId
   );
@@ -924,8 +1053,42 @@ export const selectRecommendedHotel = asyncHandler(async (req, res) => {
   if (!alreadySelected) {
     event.selectedHotels.push({
       hotel: hotelId,
-      proposal: null, // No proposal for recommended hotels
+      proposal: proposal._id, // Link to the HotelProposal
     });
+    console.log('✅ Added hotel to selectedHotels with proposal reference');
+  } else {
+    // Update existing entry with proposal reference
+    const existingSelection = event.selectedHotels.find(
+      (sh) => sh.hotel?.toString() === hotelId
+    );
+    if (existingSelection) {
+      existingSelection.proposal = proposal._id;
+      console.log('✅ Updated existing selectedHotel with proposal reference');
+    }
+  }
+
+  // For public events, auto-activate when at least one hotel is selected
+  if (!event.isPrivate && event.selectedHotels.length > 0) {
+    if (event.status === 'reviewing-proposals' || event.status === 'pending-approval' || event.status === 'rfp-published') {
+      event.status = 'active';
+      console.log('🎉 Auto-activated public event');
+      
+      // Also auto-publish microsite
+      if (!event.micrositeConfig || !event.micrositeConfig.isPublished) {
+        const slug = event.micrositeConfig?.customSlug || event.name
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/(^-|-$)/g, '');
+        
+        event.micrositeConfig = {
+          ...event.micrositeConfig,
+          isPublished: true,
+          customSlug: event.micrositeConfig?.customSlug || `${slug}-${Date.now().toString().slice(-4)}`,
+          theme: event.micrositeConfig?.theme || { primaryColor: '#3b82f6' },
+        };
+        console.log('🌐 Auto-published microsite:', event.micrositeConfig.customSlug);
+      }
+    }
   }
 
   await event.save();
@@ -937,19 +1100,22 @@ export const selectRecommendedHotel = asyncHandler(async (req, res) => {
     resource: 'Event',
     resourceId: event._id,
     status: 'success',
-    details: `Selected recommended hotel for event: ${event.name}`,
+    details: `Selected recommended hotel (${hotel.name || hotel.organization}) for event: ${event.name}. Created proposal: ${proposal._id}`,
   });
 
   res.status(200).json({
     success: true,
-    message: 'Hotel selected successfully',
-    data: event,
+    message: 'Hotel selected successfully and proposal created',
+    data: {
+      event,
+      proposal,
+    },
   });
 });
 
 /**
  * @route   GET /api/events/:id/microsite-proposals
- * @desc    Get all data for microsite hotel management (recommendations + RFP proposals)
+ * @desc    Get all data for microsite hotel management (AI recommendations + RFP proposals)
  * @access  Private (Planner only)
  */
 export const getMicrositeProposals = asyncHandler(async (req, res) => {
@@ -978,6 +1144,35 @@ export const getMicrositeProposals = asyncHandler(async (req, res) => {
   const rfpProposals = await HotelProposal.find({ event: req.params.id })
     .populate('hotel', 'name email organization');
 
+  // Get AI-powered hotel recommendations
+  let aiRecommendations = [];
+  try {
+    console.log('🤖 Fetching AI recommendations for event:', req.params.id);
+    const { getHotelRecommendationsLogic } = await import('../controllers/recommendationController.js');
+    aiRecommendations = await getHotelRecommendationsLogic(req.params.id, req.user._id, 10);
+    console.log('✅ AI recommendations fetched:', aiRecommendations.length);
+    
+    // Mark recommendations as selected if they're in selectedHotels
+    const selectedHotelIds = event.selectedHotels.map(sh => sh.hotel?.toString()).filter(Boolean);
+    aiRecommendations = aiRecommendations.map(rec => ({
+      ...rec,
+      isSelectedByPlanner: selectedHotelIds.includes(rec.hotel._id.toString())
+    }));
+    console.log('✅ Marked selected hotels in AI recommendations');
+  } catch (error) {
+    console.error('❌ Error fetching AI recommendations:', error.message);
+    // Fallback to rule-based recommendations if AI fails
+    console.log('🔄 Falling back to rule-based recommendations');
+    aiRecommendations = event.recommendedHotels.map(rec => ({
+      hotel: rec.hotel,
+      score: rec.score,
+      breakdown: { total: rec.score },
+      reasons: rec.reasons || [],
+      isSelectedByPlanner: rec.isSelectedByPlanner
+    }));
+    console.log('📊 Rule-based recommendations:', aiRecommendations.length);
+  }
+
   // Get selected hotels from recommendations
   const selectedRecommendedHotels = event.recommendedHotels
     .filter((h) => h.isSelectedByPlanner)
@@ -986,7 +1181,7 @@ export const getMicrositeProposals = asyncHandler(async (req, res) => {
   res.status(200).json({
     success: true,
     data: {
-      recommendations: event.recommendedHotels,
+      recommendations: aiRecommendations, // Use AI recommendations
       rfpProposals,
       selectedRecommended: selectedRecommendedHotels,
       selectedHotels: event.selectedHotels,

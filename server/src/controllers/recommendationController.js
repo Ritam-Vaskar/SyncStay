@@ -104,110 +104,161 @@ export const getUserRecommendations = async (req, res) => {
 /**
  * Get hotel recommendations for an event (planner perspective)
  */
+/**
+ * Core logic for getting hotel recommendations (can be reused)
+ * @param {String} eventId - The event ID
+ * @param {String} plannerId - The planner ID
+ * @param {Number} limit - Number of recommendations
+ * @returns {Array} - Scored hotel recommendations
+ */
+export const getHotelRecommendationsLogic = async (eventId, plannerId, limit = 10) => {
+  // Fetch event
+  const event = await Event.findById(eventId);
+  if (!event) {
+    throw new Error('Event not found');
+  }
+
+  // Fetch event vector
+  const eventVectorData = await retrieveVector(COLLECTIONS.EVENTS, eventId);
+  if (!eventVectorData || !eventVectorData.vector) {
+    // If no embeddings, fallback to rule-based recommendations
+    console.warn('⚠️ No embeddings found for event, using rule-based fallback');
+    const { generateHotelRecommendations } = await import('../services/hotelRecommendationService.js');
+    const ruleBasedRecs = await generateHotelRecommendations(eventId);
+    
+    console.log('📊 Rule-based generated:', ruleBasedRecs.length, 'recommendations');
+    
+    // Fetch hotel details for rule-based recommendations
+    const hotelIds = ruleBasedRecs.map(r => r.hotel);
+    const hotels = await User.find({ _id: { $in: hotelIds } }).lean();
+    
+    const formattedRecs = ruleBasedRecs.map(rec => {
+      const hotel = hotels.find(h => h._id.toString() === rec.hotel.toString());
+      return {
+        hotel,
+        score: rec.score,
+        breakdown: { total: rec.score },
+        reasons: rec.reasons || []
+      };
+    }).filter(rec => rec.hotel).slice(0, limit);
+    
+    console.log('✅ Returning', formattedRecs.length, 'rule-based recommendations');
+    return formattedRecs;
+  }
+
+  console.log('🎯 Event has embeddings, using AI-powered matching');
+
+  // Fetch planner vector (if exists)
+  const plannerVectorData = await retrieveVector(COLLECTIONS.PLANNERS, plannerId.toString());
+
+  // Create search vector (combine event + planner preferences)
+  let searchVector;
+  if (plannerVectorData && plannerVectorData.vector) {
+    // 70% event requirements, 30% planner preferences
+    searchVector = combineVectors(eventVectorData.vector, plannerVectorData.vector, 0.7, 0.3);
+    console.log('🔄 Combined event + planner vectors');
+  } else {
+    searchVector = eventVectorData.vector;
+    console.log('📍 Using event vector only (no planner vector)');
+  }
+
+  // Search hotels (no payload filter - filter in app instead)
+  const vectorResults = await searchVectors(
+    COLLECTIONS.HOTELS,
+    searchVector,
+    50 // Get more for filtering
+  );
+
+  console.log('🔍 Vector search returned:', vectorResults.length, 'hotels');
+
+  // Convert UUIDs back to ObjectIds and fetch hotel details
+  const hotelIds = vectorResults.map((r) => uuidToObjectId(r.id));
+  
+  // First try with country filter
+  let hotels = await User.find({
+    _id: { $in: hotelIds },
+    role: 'hotel',
+    isActive: true,
+    'location.country': event.location?.country, // Filter by country in MongoDB
+  }).lean();
+
+  console.log('🏨 Hotels after country filter:', hotels.length);
+
+  // If no hotels found, try without country filter (for demo/testing)
+  if (hotels.length === 0) {
+    console.log('⚠️ No hotels in target country, expanding search to all countries');
+    hotels = await User.find({
+      _id: { $in: hotelIds },
+      role: 'hotel',
+      isActive: true,
+    }).lean();
+    console.log('🌍 Hotels after removing country filter:', hotels.length);
+  }
+
+  // Create hotel map (using original UUID for matching)
+  const hotelMap = {};
+  vectorResults.forEach((result) => {
+    const objectId = uuidToObjectId(result.id);
+    const hotel = hotels.find(h => h._id.toString() === objectId);
+    if (hotel) {
+      hotelMap[result.id] = hotel;
+    }
+  });
+
+  // Hybrid scoring
+  const scoredHotels = vectorResults
+    .filter((r) => hotelMap[r.id])
+    .map((result) => {
+      const hotel = hotelMap[result.id];
+      const vectorScore = result.score * 100;
+
+      // Location score
+      const locationScore = calculateLocationScore(hotel, event);
+
+      // Budget score
+      const budgetScore = calculateBudgetScore(hotel, event);
+
+      // Capacity score
+      const capacityScore = calculateCapacityScore(hotel, event);
+
+      // Event type score
+      const eventTypeScore = calculateEventTypeScore(hotel, event);
+
+      // Final hybrid score
+      const finalScore =
+        0.4 * vectorScore +
+        0.25 * locationScore +
+        0.2 * budgetScore +
+        0.1 * capacityScore +
+        0.05 * eventTypeScore;
+
+      return {
+        hotel,
+        score: finalScore,
+        breakdown: {
+          vector: vectorScore,
+          location: locationScore,
+          budget: budgetScore,
+          capacity: capacityScore,
+          eventType: eventTypeScore,
+        },
+        reasons: generateReasons(hotel, event, finalScore),
+      };
+    })
+    .sort((a, b) => b.score - a.score)
+    .slice(0, parseInt(limit));
+
+  console.log('✅ Returning', scoredHotels.length, 'AI-powered recommendations');
+  return scoredHotels;
+};
+
 export const getHotelRecommendationsForEvent = async (req, res) => {
   try {
     const { eventId } = req.params;
     const plannerId = req.user._id;
     const { limit = 10 } = req.query;
 
-    // Fetch event
-    const event = await Event.findById(eventId);
-    if (!event) {
-      return res.status(404).json({
-        success: false,
-        message: 'Event not found',
-      });
-    }
-
-    // Fetch event vector
-    const eventVectorData = await retrieveVector(COLLECTIONS.EVENTS, eventId);
-    if (!eventVectorData || !eventVectorData.vector) {
-      return res.status(400).json({
-        success: false,
-        message: 'Event embedding not found. Please regenerate embeddings.',
-      });
-    }
-
-    // Fetch planner vector (if exists)
-    const plannerVectorData = await retrieveVector(COLLECTIONS.PLANNERS, plannerId.toString());
-
-    // Create search vector (combine event + planner preferences)
-    let searchVector;
-    if (plannerVectorData && plannerVectorData.vector) {
-      // 70% event requirements, 30% planner preferences
-      searchVector = combineVectors(eventVectorData.vector, plannerVectorData.vector, 0.7, 0.3);
-    } else {
-      searchVector = eventVectorData.vector;
-    }
-
-    // Search hotels (no payload filter - filter in app instead)
-    const vectorResults = await searchVectors(
-      COLLECTIONS.HOTELS,
-      searchVector,
-      50 // Get more for filtering
-    );
-
-    // Convert UUIDs back to ObjectIds and fetch hotel details
-    const hotelIds = vectorResults.map((r) => uuidToObjectId(r.id));
-    const hotels = await User.find({
-      _id: { $in: hotelIds },
-      role: 'hotel',
-      isActive: true,
-      'address.country': event.location.country, // Filter by country in MongoDB
-    }).lean();
-
-    // Create hotel map (using original UUID for matching)
-    const hotelMap = {};
-    vectorResults.forEach((result) => {
-      const objectId = uuidToObjectId(result.id);
-      const hotel = hotels.find(h => h._id.toString() === objectId);
-      if (hotel) {
-        hotelMap[result.id] = hotel;
-      }
-    });
-
-    // Hybrid scoring
-    const scoredHotels = vectorResults
-      .filter((r) => hotelMap[r.id])
-      .map((result) => {
-        const hotel = hotelMap[result.id];
-        const vectorScore = result.score * 100;
-
-        // Location score
-        const locationScore = calculateLocationScore(hotel, event);
-
-        // Budget score
-        const budgetScore = calculateBudgetScore(hotel, event);
-
-        // Capacity score
-        const capacityScore = calculateCapacityScore(hotel, event);
-
-        // Event type score
-        const eventTypeScore = calculateEventTypeScore(hotel, event);
-
-        // Final hybrid score
-        const finalScore =
-          0.4 * vectorScore +
-          0.25 * locationScore +
-          0.2 * budgetScore +
-          0.1 * capacityScore +
-          0.05 * eventTypeScore;
-
-        return {
-          hotel,
-          score: finalScore,
-          breakdown: {
-            vector: vectorScore,
-            location: locationScore,
-            budget: budgetScore,
-            capacity: capacityScore,
-            eventType: eventTypeScore,
-          },
-          reasons: generateReasons(hotel, event, finalScore),
-        };
-      })
-      .sort((a, b) => b.score - a.score)
-      .slice(0, parseInt(limit));
+    const scoredHotels = await getHotelRecommendationsLogic(eventId, plannerId, limit);
 
     res.status(200).json({
       success: true,
