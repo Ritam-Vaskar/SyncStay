@@ -8,7 +8,11 @@
     "start": "node src/app.js",
     "dev": "nodemon src/app.js",
     "seed": "node src/utils/seeder.js",
-    "seed:private": "node src/scripts/seedPrivateEventFlow.js"
+    "seed:private": "node src/scripts/seedPrivateEventFlow.js",
+    "tbo:remove-seeded": "node src/scripts/removeSeededHotels.js",
+    "tbo:sync": "node src/scripts/syncTBOHotels.js",
+    "tbo:setup": "node src/scripts/removeSeededHotels.js && node src/scripts/syncTBOHotels.js && node src/scripts/generateEmbeddings.js",
+    "generate-embeddings": "node src/scripts/generateEmbeddings.js"
   },
   "keywords": [
     "MERN",
