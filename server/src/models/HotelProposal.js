@@ -95,6 +95,26 @@ const hotelProposalSchema = new mongoose.Schema(
     selectionDate: {
       type: Date,
     },
+    // TBO-specific metadata
+    tboMetadata: {
+      searchDate: Date,
+      currency: String,
+      rawCurrency: String,
+      rawRooms: [{
+        Name: [String],
+        BookingCode: String,
+        TotalFare: Number,
+        DayRates: mongoose.Schema.Types.Mixed,
+        MealType: String,
+        IsRefundable: Boolean,
+        CancelPolicies: mongoose.Schema.Types.Mixed,
+      }],
+      bookingCodes: {
+        singleRoom: String,
+        doubleRoom: String,
+        suite: String,
+      },
+    },
   },
   {
     timestamps: true,

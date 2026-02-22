@@ -89,6 +89,37 @@ const userSchema = new mongoose.Schema(
     },
     facilities: [String],
     description: String,
+    // TBO-specific fields
+    hotelSource: {
+      type: String,
+      enum: ['tbo', 'manual', 'seeded'],
+      default: 'manual',
+    },
+    tboData: {
+      hotelCode: String,
+      cityCode: String,
+      countryCode: String,
+      starRating: Number,
+      latitude: Number,
+      longitude: Number,
+      map: String,
+    },
+    hasAccessed: {
+      type: Boolean,
+      default: false,
+    },
+    address: {
+      street: String,
+      city: String,
+      state: String,
+      country: String,
+      postalCode: String,
+    },
+    availableRooms: {
+      type: Number,
+      default: 0,
+    },
+    images: [String],
   },
   {
     timestamps: true,

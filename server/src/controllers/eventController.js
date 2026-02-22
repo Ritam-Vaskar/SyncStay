@@ -5,6 +5,8 @@ import { createAuditLog } from '../middlewares/auditLogger.js';
 import sendEmail from '../utils/mail.js';
 import { generateEventEmbedding } from '../services/embeddingService.js';
 import { upsertVector } from '../config/qdrant.js';
+import tboService from '../services/tboService.js';
+import tboSearchService from '../services/tboSearchService.js';
 
 /**
  * @route   GET /api/events
@@ -878,6 +880,59 @@ export const getHotelRecommendations = asyncHandler(async (req, res) => {
 });
 
 /**
+ * Helper: Generate estimated pricing for non-TBO hotels
+ */
+function generateEstimatedPricing(hotel, event) {
+  const totalRooms = hotel.totalRooms || 50;
+  const roomDistribution = {
+    single: Math.floor(totalRooms * 0.4), // 40% single
+    double: Math.floor(totalRooms * 0.5), // 50% double
+    suite: Math.floor(totalRooms * 0.1),  // 10% suite
+  };
+
+  const avgPrice = hotel.priceRange?.min && hotel.priceRange?.max 
+    ? (hotel.priceRange.min + hotel.priceRange.max) / 2 
+    : 5000; // Default ₹5000/night
+
+  return {
+    singleRoom: {
+      pricePerNight: Math.round(avgPrice * 0.8), // 80% of avg
+      availableRooms: roomDistribution.single,
+    },
+    doubleRoom: {
+      pricePerNight: Math.round(avgPrice), // Full avg price
+      availableRooms: roomDistribution.double,
+    },
+    suite: {
+      pricePerNight: Math.round(avgPrice * 1.5), // 150% of avg
+      availableRooms: roomDistribution.suite,
+    },
+  };
+}
+
+/**
+ * Helper: Extract facilities from hotel profile
+ */
+function extractFacilities(hotel, event) {
+  // Check if facilities is an array (new format) or object (old format)
+  const hotelFacilities = hotel.facilities || [];
+  const facilitiesArray = Array.isArray(hotelFacilities) ? hotelFacilities : [];
+  
+  return {
+    wifi: facilitiesArray.includes('wifi') || true, // Assume wifi always available
+    parking: facilitiesArray.includes('parking') || true,
+    breakfast: facilitiesArray.includes('breakfast') || false,
+    gym: facilitiesArray.includes('gym') || false,
+    pool: facilitiesArray.includes('pool') || false,
+    spa: facilitiesArray.includes('spa') || false,
+    restaurant: facilitiesArray.includes('restaurant') || true,
+    conferenceRoom: facilitiesArray.includes('conferenceRoom') || (event.type === 'conference'),
+    airportShuttle: facilitiesArray.includes('airportShuttle') || false,
+    laundry: facilitiesArray.includes('laundry') || true,
+  };
+}
+
+/**
  * @route   POST /api/events/:id/select-recommended-hotel
  * @desc    Select a recommended hotel (creates a HotelProposal from AI recommendation)
  * @access  Private (Planner only)
@@ -936,47 +991,64 @@ export const selectRecommendedHotel = asyncHandler(async (req, res) => {
     // Create a new HotelProposal from hotel's profile data
     console.log('🆕 Creating new proposal from AI recommendation');
 
-    // Calculate total rooms from hotel's availability
-    const totalRooms = hotel.totalRooms || 50; // Default to 50 if not set
-    const roomDistribution = {
-      single: Math.floor(totalRooms * 0.4), // 40% single
-      double: Math.floor(totalRooms * 0.5), // 50% double
-      suite: Math.floor(totalRooms * 0.1),  // 10% suite
-    };
+    // Check if this is a TBO hotel
+    const isTBOHotel = hotel.hotelSource === 'tbo' && hotel.tboData?.hotelCode;
+    let pricing, tboMetadata;
 
-    // Use hotel's price range or default pricing
-    const avgPrice = hotel.priceRange?.min && hotel.priceRange?.max 
-      ? (hotel.priceRange.min + hotel.priceRange.max) / 2 
-      : 100; // Default $100/night
+    if (isTBOHotel) {
+      console.log('🔍 TBO Hotel detected, fetching real-time pricing...');
+      
+      try {
+        // Calculate check-in and check-out dates
+        const checkInDate = event.startDate 
+          ? new Date(event.startDate).toISOString().split('T')[0]
+          : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]; // 7 days from now
+        
+        const checkOutDate = event.endDate
+          ? new Date(event.endDate).toISOString().split('T')[0]
+          : new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]; // 10 days from now
 
-    const pricing = {
-      singleRoom: {
-        pricePerNight: Math.round(avgPrice * 0.8), // 80% of avg
-        availableRooms: roomDistribution.single,
-      },
-      doubleRoom: {
-        pricePerNight: Math.round(avgPrice), // Full avg price
-        availableRooms: roomDistribution.double,
-      },
-      suite: {
-        pricePerNight: Math.round(avgPrice * 1.5), // 150% of avg
-        availableRooms: roomDistribution.suite,
-      },
-    };
+        // Default room configuration (can be customized based on event)
+        const rooms = [{ adults: 2, children: 0 }];
 
-    // Extract facilities from hotel profile (if available)
-    const facilities = {
-      wifi: true, // Assume basic amenities
-      parking: true,
-      breakfast: hotel.facilities?.breakfast || false,
-      gym: hotel.facilities?.gym || false,
-      pool: hotel.facilities?.pool || false,
-      spa: hotel.facilities?.spa || false,
-      restaurant: hotel.facilities?.restaurant || true,
-      conferenceRoom: hotel.facilities?.conferenceRoom || (event.type === 'conference'),
-      airportShuttle: hotel.facilities?.airportShuttle || false,
-      laundry: hotel.facilities?.laundry || true,
-    };
+        // Call TBO Search API
+        const searchResponse = await tboService.searchHotels({
+          hotelCodes: [hotel.tboData.hotelCode],
+          checkInDate,
+          checkOutDate,
+          rooms,
+        });
+
+        if (searchResponse && searchResponse.HotelResult && searchResponse.HotelResult.length > 0) {
+          // Parse the search results
+          const parsedResults = tboSearchService.parseSearchResponse(searchResponse);
+          
+          if (parsedResults.length > 0) {
+            const pricingData = tboSearchService.transformToPricingData(parsedResults[0]);
+            pricing = pricingData.pricing;
+            tboMetadata = pricingData.metadata;
+            
+            console.log('✅ Real-time TBO pricing fetched successfully');
+          } else {
+            console.warn('⚠️ No pricing data in TBO response, using estimated pricing');
+            pricing = generateEstimatedPricing(hotel, event);
+          }
+        } else {
+          console.warn('⚠️ TBO Search returned no results, using estimated pricing');
+          pricing = generateEstimatedPricing(hotel, event);
+        }
+      } catch (tboError) {
+        console.error('❌ TBO Search API error:', tboError.message);
+        console.log('⚠️ Falling back to estimated pricing');
+        pricing = generateEstimatedPricing(hotel, event);
+      }
+    } else {
+      // Non-TBO hotel: use estimated pricing
+      pricing = generateEstimatedPricing(hotel, event);
+    }
+
+    // Extract facilities from hotel profile
+    const facilities = extractFacilities(hotel, event);
 
     // Calculate estimated cost
     const nights = event.startDate && event.endDate 
@@ -987,14 +1059,31 @@ export const selectRecommendedHotel = asyncHandler(async (req, res) => {
       ? Math.ceil(event.expectedGuests / 2) // Assume 2 guests per room
       : 30;
 
-    const totalEstimatedCost = Math.round(avgPrice * nights * estimatedRoomsNeeded);
+    // Calculate total cost based on available room types
+    let avgRoomPrice = 0;
+    let roomCount = 0;
+    if (pricing.singleRoom?.pricePerNight) {
+      avgRoomPrice += pricing.singleRoom.pricePerNight;
+      roomCount++;
+    }
+    if (pricing.doubleRoom?.pricePerNight) {
+      avgRoomPrice += pricing.doubleRoom.pricePerNight;
+      roomCount++;
+    }
+    if (pricing.suite?.pricePerNight) {
+      avgRoomPrice += pricing.suite.pricePerNight;
+      roomCount++;
+    }
+    avgRoomPrice = roomCount > 0 ? avgRoomPrice / roomCount : 5000; // Default ₹5000
 
-    proposal = await HotelProposal.create({
+    const totalEstimatedCost = Math.round(avgRoomPrice * nights * estimatedRoomsNeeded);
+
+    const proposalData = {
       event: event._id,
       hotel: hotelId,
       hotelName: hotel.name || hotel.organization,
       pricing,
-      totalRoomsOffered: totalRooms,
+      totalRoomsOffered: hotel.totalRooms || 50,
       amenities: hotel.amenities || [],
       facilities,
       additionalServices: {
@@ -1015,13 +1104,22 @@ export const selectRecommendedHotel = asyncHandler(async (req, res) => {
         },
         other: '',
       },
-      specialOffer: 'Selected from AI recommendations - Best match for your event!',
+      specialOffer: isTBOHotel 
+        ? 'Real-time pricing from TBO - Best match for your event!'
+        : 'Selected from AI recommendations - Best match for your event!',
       notes: `Auto-generated proposal from AI recommendation. Hotel: ${hotel.location?.city || 'N/A'}, ${hotel.location?.country || 'N/A'}`,
       totalEstimatedCost,
       status: 'selected',
       selectedByPlanner: true,
       selectionDate: new Date(),
-    });
+    };
+
+    // Add TBO metadata if available
+    if (tboMetadata) {
+      proposalData.tboMetadata = tboMetadata;
+    }
+
+    proposal = await HotelProposal.create(proposalData);
 
     console.log('✅ Created new proposal:', proposal._id);
   }
