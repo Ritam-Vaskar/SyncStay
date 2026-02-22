@@ -82,9 +82,34 @@ export const createEvent = asyncHandler(async (req, res) => {
   if (req.body.location && typeof req.body.location === 'string') {
     req.body.location = {
       city: req.body.location,
-      country: '',
+      country: 'India', // Default country
       venue: ''
     };
+  }
+
+  // Normalize location data
+  if (req.body.location) {
+    // Default country to India if not provided
+    if (!req.body.location.country || req.body.location.country.trim() === '') {
+      req.body.location.country = 'India';
+    }
+
+    // Normalize city names for consistency
+    const cityNormalizations = {
+      'dumdum': 'Kolkata',
+      'dum dum': 'Kolkata',
+      'new delhi': 'Delhi',
+      'newdelhi': 'Delhi',
+      'bangaluru': 'Bangalore',
+      'bengaluru': 'Bangalore',
+      'mumbai city': 'Mumbai',
+      'hyd': 'Hyderabad',
+    };
+
+    const cityLower = req.body.location.city?.toLowerCase().trim();
+    if (cityLower && cityNormalizations[cityLower]) {
+      req.body.location.city = cityNormalizations[cityLower];
+    }
   }
 
   // Generate custom slug if not provided
@@ -194,7 +219,12 @@ export const updateEvent = asyncHandler(async (req, res) => {
           eventId: event._id.toString(),
           name: event.name,
           type: event.type,
-          city: event.location?.city || '',
+          location: event.location?.city || '',
+          country: event.location?.country || '',
+          budgetMin: event.budgetRange?.min || event.budget || 0,
+          budgetMax: event.budgetRange?.max || event.budget || 0,
+          attendees: event.expectedGuests || 0,
+          status: event.status,
         });
         
         await Event.findByIdAndUpdate(event._id, { vectorId, embeddingHash });
@@ -358,6 +388,30 @@ export const approveEvent = asyncHandler(async (req, res) => {
   } catch (error) {
     console.error('Error generating recommendations:', error);
     // Don't fail approval if recommendations fail
+  }
+
+  // 🔥 NEW: Auto-generate embeddings for public events
+  if (!event.isPrivate) {
+    try {
+      console.log(`🤖 Generating embeddings for approved event: ${event.name}`);
+      const embeddingData = await generateEventEmbedding(event);
+      
+      await upsertVector('events_vectors', event._id.toString(), embeddingData.vector, {
+        name: event.name,
+        type: event.type,
+        location: event.location?.city || '',
+        country: event.location?.country || 'India',
+        budgetMin: event.budgetRange?.min || event.budget || 0,
+        budgetMax: event.budgetRange?.max || event.budget || 0,
+        attendees: event.expectedGuests || 0,
+        status: event.status,
+      });
+      
+      console.log(`✅ Embeddings generated and stored for ${event.name}`);
+    } catch (error) {
+      console.error('❌ Error generating embeddings:', error);
+      // Don't fail approval if embeddings fail
+    }
   }
 
   // Log action
@@ -1354,6 +1408,11 @@ export const activateEvent = asyncHandler(async (req, res) => {
         await upsertVector('events_vectors', event._id.toString(), embeddingData.vector, {
           name: event.name,
           type: event.type,
+          location: event.location?.city || '',
+          country: event.location?.country || '',
+          budgetMin: event.budgetRange?.min || event.budget || 0,
+          budgetMax: event.budgetRange?.max || event.budget || 0,
+          attendees: event.expectedGuests || 0,
           status: event.status,
         });
         console.log(`✅ Event embedding generated for: ${event.name}`);
