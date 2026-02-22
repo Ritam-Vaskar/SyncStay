@@ -18,6 +18,7 @@ import { MicrositePlannerBookings } from './pages/MicrositePlannerBookings';
 import { MicrositePlannerGuests } from './pages/MicrositePlannerGuests';
 import { MicrositeEventReports } from './pages/MicrositeEventReports';
 import { MicrositeHotelsManagement } from './pages/MicrositeHotelsManagement';
+import { MicrositeInventoryManagement } from './pages/MicrositeInventoryManagement';
 import { AdminApprovalsPage } from './pages/AdminApprovalsPage';
 import { AdminFeedbackPage } from './pages/AdminFeedbackPage';
 import { AdminEventsPage } from './pages/AdminEventsPage';
@@ -79,26 +80,6 @@ const MicrositePaymentsPlaceholder = () => {
   );
 };
 
-const MicrositeInventoryPlaceholder = () => {
-  const { slug } = useParams();
-  const { data: eventData } = useQuery({
-    queryKey: ['microsite-event', slug],
-    queryFn: () => eventService.getBySlug(slug),
-  });
-  return (
-    <MicrositeDashboardLayout event={eventData?.data}>
-      <div className="card">
-        <h2 className="text-2xl font-bold">Manage Inventory</h2>
-        <p className="mt-4 text-gray-600">Inventory management for this event coming soon...</p>
-      </div>
-    </MicrositeDashboardLayout>
-  );
-};
-
-
-
-
-
 function App() {
   const { isAuthenticated } = useAuthStore();
 
@@ -151,7 +132,7 @@ function App() {
             path="/microsite/:slug/inventory"
             element={
               <ProtectedRoute allowedRoles={['planner']}>
-                <MicrositeInventoryPlaceholder />
+                <MicrositeInventoryManagement />
               </ProtectedRoute>
             }
           />

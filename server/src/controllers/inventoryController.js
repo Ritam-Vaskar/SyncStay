@@ -1,7 +1,10 @@
 import Inventory from '../models/Inventory.js';
 import Event from '../models/Event.js';
+import InventoryGroup from '../models/InventoryGroup.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import { createAuditLog } from '../middlewares/auditLogger.js';
+import * as groupingService from '../services/groupingService.js';
+import * as recommendationService from '../services/groupHotelRecommendationService.js';
 
 /**
  * @route   GET /api/inventory
@@ -262,5 +265,197 @@ export const deleteInventory = asyncHandler(async (req, res) => {
   res.status(200).json({
     success: true,
     message: 'Inventory deleted successfully',
+  });
+});
+
+/**
+ * @route   POST /api/inventory/:eventId/groups/auto-generate
+ * @desc    Auto-generate groups for public event
+ * @access  Private (Planner)
+ */
+export const autoGenerateGroups = asyncHandler(async (req, res) => {
+  const { eventId } = req.params;
+
+  const groups = await groupingService.autoGroupGuestsByRelationship(eventId);
+
+  res.status(201).json({
+    success: true,
+    data: groups,
+    message: 'Groups auto-generated successfully',
+  });
+});
+
+/**
+ * @route   POST /api/inventory/:eventId/groups
+ * @desc    Create manual group (for private events)
+ * @access  Private (Planner)
+ */
+export const createGroup = asyncHandler(async (req, res) => {
+  const { eventId } = req.params;
+  const { name, number, description, members, priority } = req.body;
+
+  // Validate required fields
+  if (!name || name.trim() === '') {
+    return res.status(400).json({
+      success: false,
+      message: 'Group name is required',
+    });
+  }
+
+  if (number === undefined || number === null || number === '' || isNaN(number)) {
+    return res.status(400).json({
+      success: false,
+      message: 'Number of people is required and must be a valid number',
+    });
+  }
+
+  if (parseInt(number) < 1) {
+    return res.status(400).json({
+      success: false,
+      message: 'Number of people must be at least 1',
+    });
+  }
+
+  const group = await groupingService.createManualGroup(eventId, {
+    name: name.trim(),
+    number: parseInt(number),
+    description: description && description.trim() ? description.trim() : undefined,
+    members: members || [],
+    priority: priority || 0,
+  });
+
+  res.status(201).json({
+    success: true,
+    data: group,
+    message: 'Group created successfully',
+  });
+});
+
+/**
+ * @route   GET /api/inventory/:eventId/groups
+ * @desc    Get all groups for an event
+ * @access  Private (Planner)
+ */
+export const getEventGroups = asyncHandler(async (req, res) => {
+  const { eventId } = req.params;
+
+  const groups = await groupingService.getGroupsByEvent(eventId);
+
+  res.status(200).json({
+    success: true,
+    data: groups,
+    message: 'Groups fetched successfully',
+  });
+});
+
+/**
+ * @route   PUT /api/inventory/:groupId/guests/assign
+ * @desc    Assign guests to a group
+ * @access  Private (Planner)
+ */
+export const assignGuestsToGroup = asyncHandler(async (req, res) => {
+  const { groupId } = req.params;
+  const { guestEmails } = req.body;
+
+  if (!guestEmails || !Array.isArray(guestEmails)) {
+    return res.status(400).json({
+      success: false,
+      message: 'Guest emails array is required',
+    });
+  }
+
+  const group = await groupingService.assignGuestsToGroup(groupId, guestEmails);
+
+  res.status(200).json({
+    success: true,
+    data: group,
+    message: `${guestEmails.length} guests assigned to group`,
+  });
+});
+
+/**
+ * @route   DELETE /api/inventory/:groupId/guests/remove
+ * @desc    Remove guest from group
+ * @access  Private (Planner)
+ */
+export const removeGuestFromGroup = asyncHandler(async (req, res) => {
+  const { groupId } = req.params;
+  const { guestEmail } = req.body;
+
+  const group = await groupingService.removeGuestFromGroup(groupId, guestEmail);
+
+  res.status(200).json({
+    success: true,
+    data: group,
+    message: 'Guest removed from group',
+  });
+});
+
+/**
+ * @route   DELETE /api/inventory/:groupId
+ * @desc    Delete a group
+ * @access  Private (Planner)
+ */
+export const deleteGroup = asyncHandler(async (req, res) => {
+  const { groupId } = req.params;
+
+  const group = await groupingService.deleteGroup(groupId);
+
+  res.status(200).json({
+    success: true,
+    data: group,
+    message: 'Group deleted successfully',
+  });
+});
+
+/**
+ * @route   GET /api/inventory/:eventId/recommendations
+ * @desc    Get hotel recommendations for event (both group and individual)
+ * @access  Private (Planner)
+ */
+export const getEventRecommendations = asyncHandler(async (req, res) => {
+  const { eventId } = req.params;
+
+  const recommendations = await recommendationService.rankHotelsForEvent(eventId);
+
+  res.status(200).json({
+    success: true,
+    data: recommendations,
+    message: 'Recommendations computed successfully',
+  });
+});
+
+/**
+ * @route   GET /api/inventory/guest/:guestEmail/history
+ * @desc    Get guest booking history
+ * @access  Private (Planner)
+ */
+export const getGuestHistory = asyncHandler(async (req, res) => {
+  const { guestEmail } = req.params;
+
+  const history = await recommendationService.getGuestBookingHistory(guestEmail);
+
+  res.status(200).json({
+    success: true,
+    data: history,
+    message: 'Guest booking history fetched',
+  });
+});
+
+/**
+ * @route   PUT /api/inventory/:groupId/metadata
+ * @desc    Update group metadata
+ * @access  Private (Planner)
+ */
+export const updateGroupMetadata = asyncHandler(async (req, res) => {
+  const { groupId } = req.params;
+  const { metadata } = req.body;
+
+  const group = await groupingService.updateGroupMetadata(groupId, metadata);
+
+  res.status(200).json({
+    success: true,
+    data: group,
+    message: 'Group metadata updated',
   });
 });

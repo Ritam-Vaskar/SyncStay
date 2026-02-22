@@ -8,6 +8,15 @@ import {
   lockInventory,
   releaseInventory,
   deleteInventory,
+  autoGenerateGroups,
+  createGroup,
+  getEventGroups,
+  assignGuestsToGroup,
+  removeGuestFromGroup,
+  deleteGroup,
+  getEventRecommendations,
+  getGuestHistory,
+  updateGroupMetadata,
 } from '../controllers/inventoryController.js';
 import { protect, authorize } from '../middlewares/auth.js';
 import { validateInventory, validateMongoId } from '../middlewares/validators.js';
@@ -21,6 +30,62 @@ router.get('/event/:eventId/available', getAvailableInventory);
 // All other routes require authentication
 router.use(protect);
 
+// Group management routes (must come before generic /:id routes to avoid conflicts)
+router.post(
+  '/:eventId/groups/auto-generate',
+  authorize('planner'),
+  autoGenerateGroups
+);
+
+router
+  .route('/:eventId/groups')
+  .post(
+    authorize('planner'),
+    createGroup
+  )
+  .get(
+    authorize('planner'),
+    getEventGroups
+  );
+
+router.put(
+  '/:groupId/guests/assign',
+  authorize('planner'),
+  assignGuestsToGroup
+);
+
+router.delete(
+  '/:groupId/guests/remove',
+  authorize('planner'),
+  removeGuestFromGroup
+);
+
+router.delete(
+  '/:groupId',
+  authorize('planner'),
+  deleteGroup
+);
+
+router.put(
+  '/:groupId/metadata',
+  authorize('planner'),
+  updateGroupMetadata
+);
+
+// Recommendations routes
+router.get(
+  '/:eventId/recommendations',
+  authorize('planner'),
+  getEventRecommendations
+);
+
+router.get(
+  '/guest/:guestEmail/history',
+  authorize('planner'),
+  getGuestHistory
+);
+
+// Generic inventory routes (defined after group routes)
 router
   .route('/')
   .get(getInventory)
