@@ -18,6 +18,7 @@ const qdrantClient = new QdrantClient({
 export const COLLECTIONS = {
   EVENTS: 'events_vectors',
   HOTELS: 'hotels_vectors',
+  HOTEL_ACTIVITY: 'hotels_activity_vectors',
   USERS: 'users_vectors',
   PLANNERS: 'planners_vectors',
 };
@@ -52,6 +53,16 @@ export async function initializeCollections() {
     }
 
     console.log('✅ All Qdrant collections initialized');
+
+    // Ensure payload indexes exist for filtered searches
+    try {
+      await qdrantClient.createPayloadIndex(COLLECTIONS.HOTELS, {
+        field_name: 'country',
+        field_schema: 'keyword',
+      });
+      console.log('✅ Payload index on hotels_vectors.country ready');
+    } catch { /* already exists — ignore */ }
+
     return true;
   } catch (error) {
     console.error('❌ Error initializing Qdrant collections:', error);

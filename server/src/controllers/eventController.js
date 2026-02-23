@@ -1,9 +1,11 @@
 import Event from '../models/Event.js';
 import User from '../models/User.js';
+import HotelActivity from '../models/HotelActivity.js';
+import Booking from '../models/Booking.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import { createAuditLog } from '../middlewares/auditLogger.js';
 import sendEmail from '../utils/mail.js';
-import { generateEventEmbedding } from '../services/embeddingService.js';
+import { generateEventEmbedding, updateHotelActivityEmbedding } from '../services/embeddingService.js';
 import { upsertVector } from '../config/qdrant.js';
 import tboService from '../services/tboService.js';
 import tboSearchService from '../services/tboSearchService.js';
@@ -208,6 +210,32 @@ export const updateEvent = asyncHandler(async (req, res) => {
     new: true,
     runValidators: true,
   });
+
+  // ── Event completion hook ────────────────────────────────────────────────────
+  // When status changes to 'completed', mark all selected-hotel activities as
+  // completed and refresh their activity-history embeddings (fire-and-forget).
+  if (req.body.status === 'completed') {
+    (async () => {
+      try {
+        const activities = await HotelActivity.find({ event: event._id, outcome: 'selected' });
+        for (const act of activities) {
+          const bookingCount = await Booking.countDocuments({
+            event: event._id,
+            'inventory.hotel': act.hotel,
+            status: { $in: ['confirmed', 'checked-in', 'checked-out'] },
+          });
+          act.outcome = 'completed';
+          act.bookingsCount = bookingCount;
+          await act.save();
+          await updateHotelActivityEmbedding(act.hotel);
+        }
+        console.log(`[HotelActivity] marked ${activities.length} activities completed for event ${event.name}`);
+      } catch (err) {
+        console.error('[HotelActivity] completion update failed:', err.message);
+      }
+    })();
+  }
+  // ────────────────────────────────────────────────────────────────────────────
 
   // Regenerate embedding if event details changed
   const oldHash = event.embeddingHash;

@@ -1,9 +1,11 @@
 import HotelProposal from '../models/HotelProposal.js';
 import Event from '../models/Event.js';
+import HotelActivity from '../models/HotelActivity.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import { createAuditLog } from '../middlewares/auditLogger.js';
 import sendEmail from '../utils/mail.js';
 import config from '../config/index.js';
+import { updateHotelActivityEmbedding } from '../services/embeddingService.js';
 
 /**
  * @route   GET /api/hotel-proposals/rfps
@@ -261,6 +263,32 @@ export const selectProposal = asyncHandler(async (req, res) => {
   }
   
   await event.save();
+
+  // ── Hotel Activity hook ──────────────────────────────────────────────────────
+  // Record the selection so the hotel's activity-history embedding stays current.
+  // Fire-and-forget (never block the HTTP response).
+  if (!wasSelected) {
+    HotelActivity.findOneAndUpdate(
+      { hotel: proposal.hotel, event: event._id },
+      {
+        $setOnInsert: {
+          hotel: proposal.hotel,
+          event: event._id,
+          eventType: event.type || 'other',
+          eventName: event.name,
+          eventScale: event.expectedGuests > 500 ? 'large' : event.expectedGuests > 100 ? 'medium' : 'small',
+          eventLocation: event.location?.city || '',
+          eventDate: event.startDate,
+          source: 'proposal_selected',
+        },
+        $set: { outcome: 'selected' },
+      },
+      { upsert: true, new: true }
+    )
+      .then(() => updateHotelActivityEmbedding(proposal.hotel))
+      .catch(err => console.error('[HotelActivity] update failed:', err.message));
+  }
+  // ────────────────────────────────────────────────────────────────────────────
 
   // Log action
   await createAuditLog({

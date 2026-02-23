@@ -66,14 +66,15 @@ export async function generateEmbedding(text, useCache = true) {
  * @returns {Promise<Object>} - { vector, hash }
  */
 export async function generateEventEmbedding(event) {
+  const budget = event.budget || event.budgetRange?.min || 0;
   const eventText = `
 Title: ${event.name}
-Type: ${event.type}
+Type: ${event.type || 'general'}
 Description: ${event.description || 'No description'}
 Location: ${event.location?.city || ''}, ${event.location?.country || ''}
-Budget: ${event.budgetRange?.min || 0} - ${event.budgetRange?.max || 0} INR
+Budget: ${budget} INR
 Attendees: ${event.expectedGuests || 0}
-Tags: ${event.tags?.join(', ') || 'None'}
+Event Category: ${event.category || event.type || 'general'}
 Duration: ${event.startDate ? new Date(event.startDate).toDateString() : ''} to ${event.endDate ? new Date(event.endDate).toDateString() : ''}
 `.trim();
 
@@ -89,28 +90,116 @@ Duration: ${event.startDate ? new Date(event.startDate).toDateString() : ''} to 
  * @returns {Promise<Object>} - { vector, hash }
  */
 export async function generateHotelEmbedding(hotel) {
-  // Build rich context for AI understanding
+  // Prefer TBO-enriched data (set by tboHotelEnrichmentService) over local schema fields
+  const facilities = hotel._tboEnriched
+    ? [...new Set([...(hotel.tboFacilities || []), ...(hotel.facilities || []).map(f => f.toLowerCase())])]
+    : (hotel.facilities || []);
+
+  const description = hotel._tboEnriched
+    ? (hotel.tboDescription || hotel.description || 'Professional hotel services for events')
+    : (hotel.description || 'Professional hotel services for events and gatherings');
+
+  const rating = hotel._tboEnriched ? (hotel.tboRating || hotel.averageRating || 0) : (hotel.averageRating || 0);
+
   const hotelText = `
 Hotel Name: ${hotel.name || hotel.organization}
 Location: ${hotel.location?.city || ''}, ${hotel.location?.country || ''}
-Full Address: ${hotel.location?.address || ''}
-Capacity: ${hotel.totalRooms || 0} rooms available, can accommodate ${(hotel.totalRooms || 0) * 2} guests
+Star Rating: ${rating} out of 5
+Capacity: ${hotel.totalRooms || 0} rooms, can host ${(hotel.totalRooms || 0) * 2} guests
 Event Specialization: ${hotel.specialization?.join(', ') || 'All types of events'}
 Price Range: ${hotel.priceRange?.min || 0} to ${hotel.priceRange?.max || 0} INR per room per night
-Facilities & Amenities: ${hotel.facilities?.join(', ') || 'Standard hotel amenities'}
-Description: ${hotel.description || 'Professional hotel services for events and gatherings'}
-Guest Rating: ${hotel.averageRating || 0} out of 5 stars
-Past Events Hosted: ${hotel.eventsHostedCount || 0} events
-Event Types Previously Hosted: ${hotel.eventTypesHosted?.join(', ') || 'Various event types'}
-Awards & Recognition: ${hotel.awards?.join(', ') || 'None'}
-Venue Type: ${hotel.venueType || 'Hotel with event spaces'}
-Best For: ${hotel.bestFor || 'Corporate events, conferences, weddings, and social gatherings'}
+Facilities & Amenities: ${facilities.length ? facilities.join(', ') : 'Standard hotel amenities'}
+Description: ${description}
 `.trim();
 
   const vector = await generateEmbedding(hotelText);
   const hash = crypto.createHash('md5').update(hotelText).digest('hex');
 
   return { vector, hash, text: hotelText };
+}
+
+/**
+ * Generate a cumulative activity embedding for a hotel.
+ * Aggregates ALL past HotelActivity documents into a single descriptive text
+ * so Qdrant can semantically match: event type → which hotels hosted similar events.
+ *
+ * @param {string|ObjectId} hotelId
+ * @returns {Promise<{ vector: number[], hash: string, text: string, activityCount: number }>}
+ */
+export async function generateHotelActivityEmbedding(hotelId) {
+  // Dynamic import to avoid circular deps (HotelActivity → embeddingService)
+  const { default: HotelActivity } = await import('../models/HotelActivity.js');
+  const { default: User } = await import('../models/User.js');
+
+  const hotel = await User.findById(hotelId).select('name location specialization').lean();
+  const activities = await HotelActivity.find({ hotel: hotelId })
+    .sort({ eventDate: -1 })
+    .limit(30) // use most recent 30 events for embedding
+    .lean();
+
+  if (activities.length === 0) {
+    // No activity yet — embed just the hotel profile so the collection stays populated
+    const profileText = `Hotel: ${hotel?.name || 'Unknown Hotel'} | No event history yet`;
+    const vector = await generateEmbedding(profileText);
+    const hash = crypto.createHash('md5').update(profileText).digest('hex');
+    return { vector, hash, text: profileText, activityCount: 0 };
+  }
+
+  // Count by event type for dominant specialization
+  const typeCounts = {};
+  for (const a of activities) {
+    typeCounts[a.eventType] = (typeCounts[a.eventType] || 0) + 1;
+  }
+  const dominantTypes = Object.entries(typeCounts)
+    .sort((a, b) => b[1] - a[1])
+    .map(([type, count]) => `${type} (${count}x)`)
+    .join(', ');
+
+  const totalGuests = activities.reduce((s, a) => s + (a.eventScale || 0), 0);
+  const avgScale = activities.length > 0 ? Math.round(totalGuests / activities.length) : 0;
+
+  const historyLines = activities
+    .slice(0, 15)
+    .map((a, i) => `${i + 1}. ${a.eventName || 'Event'} — Type: ${a.eventType || 'general'} — ${a.eventScale || 0} guests — ${a.eventLocation?.city || ''} — ${a.outcome}`)
+    .join('\n');
+
+  const activityText = `
+Hotel: ${hotel?.name || 'Unknown'} in ${hotel?.location?.city || ''}
+Event History (most recent first):
+${historyLines}
+Event Type Expertise: ${dominantTypes}
+Total Events Hosted: ${activities.length}
+Average Event Scale: ${avgScale} guests
+`.trim();
+
+  const vector = await generateEmbedding(activityText);
+  const hash = crypto.createHash('md5').update(activityText).digest('hex');
+
+  return { vector, hash, text: activityText, activityCount: activities.length };
+}
+
+/**
+ * Upsert a hotel's activity embedding into Qdrant hotels_activity_vectors.
+ * Call this whenever a new HotelActivity document is created or updated.
+ *
+ * @param {string|ObjectId} hotelId
+ */
+export async function updateHotelActivityEmbedding(hotelId) {
+  try {
+    const { upsertVector, COLLECTIONS } = await import('../config/qdrant.js');
+    const { vector, hash, activityCount } = await generateHotelActivityEmbedding(hotelId);
+
+    await upsertVector(COLLECTIONS.HOTEL_ACTIVITY, hotelId.toString(), vector, {
+      hotelId: hotelId.toString(),
+      activityCount,
+      updatedAt: new Date().toISOString(),
+    });
+
+    console.log(`✅ Hotel activity embedding updated for ${hotelId} (${activityCount} events)`);
+  } catch (err) {
+    // Non-critical: log but do not throw so the main request succeeds
+    console.error('⚠️  Failed to update hotel activity embedding:', err.message);
+  }
 }
 
 /**

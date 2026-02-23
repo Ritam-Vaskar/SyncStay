@@ -2,6 +2,9 @@ import Event from '../models/Event.js';
 import User from '../models/User.js';
 import { retrieveVector, searchVectors, COLLECTIONS, uuidToObjectId } from '../config/qdrant.js';
 import { combineVectors } from '../services/embeddingService.js';
+import { enrichHotelsWithTBO } from '../services/tboHotelEnrichmentService.js';
+import { scoreFacilitiesWithGemini, buildFallbackScores } from '../services/geminiRecommendationService.js';
+import { scoreHotelsForPlanner } from '../services/hybridScoringService.js';
 
 /**
  * Get personalized event recommendations for a user
@@ -112,131 +115,97 @@ export const getUserRecommendations = async (req, res) => {
  * @returns {Array} - Scored hotel recommendations
  */
 export const getHotelRecommendationsLogic = async (eventId, plannerId, limit = 10) => {
-  // Fetch event
   const event = await Event.findById(eventId);
-  if (!event) {
-    throw new Error('Event not found');
-  }
+  if (!event) throw new Error('Event not found');
 
-  // Fetch event vector
-  const eventVectorData = await retrieveVector(COLLECTIONS.EVENTS, eventId);
-  if (!eventVectorData || !eventVectorData.vector) {
-    // If no embeddings, fallback to rule-based recommendations
-    console.warn('⚠️ No embeddings found for event, using rule-based fallback');
+  // ── Step 1: Build Qdrant search vector ──────────────────────────────────
+  const [eventVectorData, plannerVectorData] = await Promise.all([
+    retrieveVector(COLLECTIONS.EVENTS, eventId),
+    retrieveVector(COLLECTIONS.PLANNERS, plannerId.toString()),
+  ]);
+
+  let searchVector = null;
+  if (eventVectorData?.vector) {
+    searchVector = plannerVectorData?.vector
+      ? combineVectors(eventVectorData.vector, plannerVectorData.vector, 0.7, 0.3)
+      : eventVectorData.vector;
+    console.log('[Reco] Using ' + (plannerVectorData?.vector ? 'combined event+planner' : 'event-only') + ' vector');
+  } else {
+    console.warn('⚠️  [Reco] No event vector — falling back to rule-based');
     const { generateHotelRecommendations } = await import('../services/hotelRecommendationService.js');
     const ruleBasedRecs = await generateHotelRecommendations(eventId);
-    
-    console.log('📊 Rule-based generated:', ruleBasedRecs.length, 'recommendations');
-    
-    // Fetch hotel details for rule-based recommendations
     const hotelIds = ruleBasedRecs.map(r => r.hotel);
     const hotels = await User.find({ _id: { $in: hotelIds } }).lean();
-    
-    const formattedRecs = ruleBasedRecs.map(rec => {
-      const hotel = hotels.find(h => h._id.toString() === rec.hotel.toString());
-      return {
-        hotel,
-        score: rec.score,
-        breakdown: { total: rec.score },
-        reasons: rec.reasons || []
-      };
-    }).filter(rec => rec.hotel).slice(0, limit);
-    
-    console.log('✅ Returning', formattedRecs.length, 'rule-based recommendations');
-    return formattedRecs;
+    return ruleBasedRecs
+      .map(rec => ({ hotel: hotels.find(h => h._id.toString() === rec.hotel.toString()), score: rec.score, breakdown: { total: rec.score }, reasons: rec.reasons || [] }))
+      .filter(r => r.hotel).slice(0, limit);
   }
 
-  console.log('🎯 Event has embeddings, using AI-powered matching');
+  // ── Step 2: Vector search – pull candidates from BOTH collections ───────────
+  // Note: no Qdrant payload filter (payload indexes not provisioned on cloud).
+  // Country filtering happens in the MongoDB query below.
 
-  // Fetch planner vector (if exists)
-  const plannerVectorData = await retrieveVector(COLLECTIONS.PLANNERS, plannerId.toString());
+  // Search hotel profiles AND activity history in parallel
+  const [profileResults, activityResults] = await Promise.all([
+    searchVectors(COLLECTIONS.HOTELS, searchVector, 50),
+    searchVectors(COLLECTIONS.HOTEL_ACTIVITY, eventVectorData.vector, 50).catch(() => []),
+  ]);
 
-  // Create search vector (combine event + planner preferences)
-  let searchVector;
-  if (plannerVectorData && plannerVectorData.vector) {
-    // 70% event requirements, 30% planner preferences
-    searchVector = combineVectors(eventVectorData.vector, plannerVectorData.vector, 0.7, 0.3);
-    console.log('🔄 Combined event + planner vectors');
-  } else {
-    searchVector = eventVectorData.vector;
-    console.log('📍 Using event vector only (no planner vector)');
+  console.log(`🔍 [Reco] Profile: ${profileResults.length}  ActivityHistory: ${activityResults.length}`);
+
+  // Merge both result sets (de-duplicate, keep best score from each)
+  const candidateMap = {};
+  for (const r of profileResults) {
+    const id = uuidToObjectId(r.id);
+    if (!candidateMap[id] || r.score > (candidateMap[id].profileScore || 0)) {
+      candidateMap[id] = { ...(candidateMap[id] || {}), id, profileScore: r.score };
+    }
+  }
+  for (const r of activityResults) {
+    const id = uuidToObjectId(r.id);
+    if (!candidateMap[id]) candidateMap[id] = { id };
+    if (r.score > (candidateMap[id].activityScore || 0)) {
+      candidateMap[id].activityScore = r.score;
+    }
   }
 
-  // Build Qdrant filter for hard constraints
-  const qdrantFilter = {
-    must: [
-      // Country filter (case-insensitive via normalization at data entry)
-      { key: 'country', match: { value: event.location?.country || 'India' } },
-    ]
-  };
+  const candidateIds = Object.keys(candidateMap);
+  const eventCountry = event.location?.country;
+  const countryQuery = eventCountry ? { 'location.country': { $regex: new RegExp(eventCountry, 'i') } } : {};
+  const hotels = await User.find({ _id: { $in: candidateIds }, role: 'hotel', isActive: true, ...countryQuery }).lean();
+  console.log(`🏨 [Reco] ${hotels.length} hotels fetched from DB`);
 
-  console.log('🔍 Searching with filters:', JSON.stringify(qdrantFilter));
+  // ── Step 3: TBO enrichment ────────────────────────────────────────────────
+  const enrichedHotels = await enrichHotelsWithTBO(hotels);
 
-  // Search hotels with Qdrant payload filters
-  const vectorResults = await searchVectors(
-    COLLECTIONS.HOTELS,
-    searchVector,
-    50, // Get more candidates
-    qdrantFilter
+  // ── Step 4: Gemini facility scoring ─────────────────────────────────────────
+  let geminiScores;
+  try {
+    geminiScores = await scoreFacilitiesWithGemini(enrichedHotels, event, []);
+  } catch {
+    geminiScores = buildFallbackScores(enrichedHotels, event, []);
+  }
+
+  // Inject pre-computed activity similarity into candidateMap for hybridScoringService
+  // (scoreHotelsForPlanner will re-fetch from Qdrant but we already have the scores —
+  //  override the Qdrant retrieve call by patching the hotel objects)
+  for (const hotel of enrichedHotels) {
+    const id = hotel._id.toString();
+    hotel._precomputedActivityScore = candidateMap[id]?.activityScore != null
+      ? candidateMap[id].activityScore * 100
+      : null;
+  }
+
+  // ── Step 5: Hybrid blend + sort ───────────────────────────────────────────────
+  const scored = await scoreHotelsForPlanner(
+    enrichedHotels,
+    event,
+    geminiScores,
+    eventVectorData.vector,
   );
 
-  console.log('🔍 Vector search returned:', vectorResults.length, 'hotels from', event.location?.country);
-
-  // Convert UUIDs back to ObjectIds and fetch hotel details
-  const hotelIds = vectorResults.map((r) => uuidToObjectId(r.id));
-  
-  // Fetch hotels with minimal filtering (Qdrant already filtered by country)
-  let hotels = await User.find({
-    _id: { $in: hotelIds },
-    role: 'hotel',
-    isActive: true,
-  }).lean();
-
-  console.log('🏨 Hotels fetched from database:', hotels.length);
-
-  // Create hotel map (using original UUID for matching)
-  const hotelMap = {};
-  vectorResults.forEach((result) => {
-    const objectId = uuidToObjectId(result.id);
-    const hotel = hotels.find(h => h._id.toString() === objectId);
-    if (hotel) {
-      hotelMap[result.id] = hotel;
-    }
-  });
-
-  // AI-First Hybrid scoring: Trust the embeddings!
-  const scoredHotels = vectorResults
-    .filter((r) => hotelMap[r.id])
-    .map((result) => {
-      const hotel = hotelMap[result.id];
-      
-      // Primary signal: AI vector similarity (0-100)
-      const aiScore = result.score * 100;
-
-      // Minimal logical checks for critical constraints only
-      const capacityBonus = calculateCapacityBonus(hotel, event);
-      const cityMatchBonus = calculateCityBonus(hotel, event);
-
-      // AI-first scoring: 75% AI, 15% capacity match, 10% city exact match
-      const finalScore = (0.75 * aiScore) + (0.15 * capacityBonus) + (0.10 * cityMatchBonus);
-
-      return {
-        hotel,
-        score: finalScore,
-        breakdown: {
-          aiSimilarity: aiScore,
-          capacityMatch: capacityBonus,
-          cityMatch: cityMatchBonus,
-          total: finalScore,
-        },
-        reasons: generateAIReasons(hotel, event, aiScore, capacityBonus, cityMatchBonus),
-      };
-    })
-    .sort((a, b) => b.score - a.score)
-    .slice(0, parseInt(limit));
-
-  console.log('✅ Returning', scoredHotels.length, 'AI-powered recommendations');
-  return scoredHotels;
+  console.log(`✅ [Reco] Returning top ${Math.min(limit, scored.length)} recommendations`);
+  return scored.slice(0, limit);
 };
 
 export const getHotelRecommendationsForEvent = async (req, res) => {

@@ -36,6 +36,11 @@ export const MicrositeInventoryManagement = () => {
   const [isLoadingRecommendations, setIsLoadingRecommendations] = useState(false);
   const [populatedHotels, setPopulatedHotels] = useState([]);
   const [expandedGroupRecs, setExpandedGroupRecs] = useState({});
+  // Hotel assignment state
+  const [groupAssignments, setGroupAssignments] = useState({}); // { [groupId]: { hotelId, hotelName, fullHotel } }
+  const [nearbyHotels, setNearbyHotels] = useState({});         // { [groupId]: [{ ...hotel, distanceKm }] }
+  const [isAssigning, setIsAssigning] = useState({});           // { [groupId]: boolean }
+  const [expandedNearby, setExpandedNearby] = useState({});     // { [groupId]: boolean }
 
   // Fetch event
   const { data: eventData, isLoading: eventLoading } = useQuery({
@@ -190,6 +195,38 @@ export const MicrositeInventoryManagement = () => {
       toast.error(error.response?.data?.message || 'Failed to delete group');
     },
   });
+
+  // Assign a hotel to a group and fetch nearby hotels
+  const assignHotel = async (groupId, hotelId, hotelName, fullHotel) => {
+    setIsAssigning((prev) => ({ ...prev, [groupId]: true }));
+    try {
+      await api.put(`/inventory/${groupId}/assign-hotel`, { hotelId });
+      setGroupAssignments((prev) => ({ ...prev, [groupId]: { hotelId: String(hotelId), hotelName, fullHotel } }));
+      toast.success(`${hotelName} assigned!`);
+      // Fetch nearby hotels using lat/lng from the assigned hotel
+      const lat = fullHotel?.tboData?.latitude;
+      const lng = fullHotel?.tboData?.longitude;
+      if (lat && lng) {
+        fetchNearbyHotels(groupId, lat, lng, String(hotelId));
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to assign hotel');
+    } finally {
+      setIsAssigning((prev) => ({ ...prev, [groupId]: false }));
+    }
+  };
+
+  // Fetch hotels near a given lat/lng point
+  const fetchNearbyHotels = async (groupId, lat, lng, excludeId) => {
+    try {
+      const res = await api.get(`/inventory/${event._id}/nearby-hotels`, {
+        params: { lat, lng, radiusKm: 15, excludeId },
+      });
+      setNearbyHotels((prev) => ({ ...prev, [groupId]: res.data || [] }));
+    } catch (err) {
+      console.error('Nearby hotels fetch failed:', err);
+    }
+  };
 
   // Fetch recommendations
   const fetchRecommendations = async () => {
@@ -651,8 +688,19 @@ export const MicrositeInventoryManagement = () => {
                     <div className="space-y-8">
                       {recommendations.groupRecommendations.map((groupRec) => (
                         <div key={groupRec.groupId} className="border-l-4 border-green-600 pl-6 pb-6">
-                          <div className="flex justify-between items-center mb-4">
-                            <h4 className="font-bold text-green-600 text-lg">{groupRec.groupName} Group</h4>
+                          <div className="flex flex-wrap justify-between items-center mb-4 gap-2">
+                            <div className="flex items-center gap-3">
+                              <h4 className="font-bold text-green-600 text-lg">{groupRec.groupName} Group</h4>
+                              {groupAssignments[groupRec.groupId] ? (
+                                <span className="text-xs bg-teal-100 text-teal-700 px-2 py-1 rounded-full font-semibold">
+                                  ✓ {groupAssignments[groupRec.groupId].hotelName}
+                                </span>
+                              ) : (
+                                <span className="text-xs bg-amber-100 text-amber-700 px-2 py-1 rounded-full font-semibold">
+                                  ⚪ Unassigned
+                                </span>
+                              )}
+                            </div>
                             {groupRec.hotels && groupRec.hotels.length > 1 && (
                               <button
                                 onClick={() => setExpandedGroupRecs({ ...expandedGroupRecs, [groupRec.groupId]: !expandedGroupRecs[groupRec.groupId] })}
@@ -757,6 +805,23 @@ export const MicrositeInventoryManagement = () => {
                                           </ul>
                                         </div>
                                       )}
+
+                                      {/* Assign Button */}
+                                      <button
+                                        onClick={() => assignHotel(groupRec.groupId, topHotel.hotelId, topHotel.hotelName, fullHotel)}
+                                        disabled={isAssigning[groupRec.groupId]}
+                                        className={`mt-4 w-full py-2 px-4 rounded-lg font-semibold text-sm transition-all ${
+                                          groupAssignments[groupRec.groupId]?.hotelId === String(topHotel.hotelId)
+                                            ? 'bg-teal-600 text-white cursor-default'
+                                            : 'bg-green-600 hover:bg-green-700 text-white'
+                                        }`}
+                                      >
+                                        {isAssigning[groupRec.groupId]
+                                          ? 'Assigning...'
+                                          : groupAssignments[groupRec.groupId]?.hotelId === String(topHotel.hotelId)
+                                          ? `✓ Assigned to ${groupRec.groupName}`
+                                          : `Assign to ${groupRec.groupName} Group`}
+                                      </button>
                                     </div>
                                   );
                                 })()}
@@ -818,10 +883,109 @@ export const MicrositeInventoryManagement = () => {
                                       <p className="text-blue-600">{hotel.reasons[0]}</p>
                                     </div>
                                   )}
+
+                                  {/* Assign alternative hotel button */}
+                                  <button
+                                    onClick={() => assignHotel(groupRec.groupId, hotel.hotelId, hotel.hotelName, fullHotel)}
+                                    disabled={isAssigning[groupRec.groupId]}
+                                    className={`mt-3 w-full py-1.5 px-3 rounded-lg text-sm font-semibold transition-all ${
+                                      groupAssignments[groupRec.groupId]?.hotelId === String(hotel.hotelId)
+                                        ? 'bg-teal-100 text-teal-700 cursor-default'
+                                        : 'bg-blue-50 border border-blue-300 text-blue-700 hover:bg-blue-100'
+                                    }`}
+                                  >
+                                    {groupAssignments[groupRec.groupId]?.hotelId === String(hotel.hotelId)
+                                      ? `✓ Assigned to ${groupRec.groupName}`
+                                      : `Assign to ${groupRec.groupName}`}
+                                  </button>
                                 </div>
                               );
                             })}
                           </div>
+
+                          {/* Nearby Hotels Panel — appears after a hotel is assigned */}
+                          {nearbyHotels[groupRec.groupId]?.length > 0 && (
+                            <div className="mt-4">
+                              <button
+                                onClick={() =>
+                                  setExpandedNearby((prev) => ({
+                                    ...prev,
+                                    [groupRec.groupId]: !prev[groupRec.groupId],
+                                  }))
+                                }
+                                className="w-full flex items-center justify-between p-3 bg-blue-50 rounded-lg border border-blue-200 text-sm font-semibold text-blue-700 hover:bg-blue-100 transition-colors"
+                              >
+                                <span>
+                                  📍 {nearbyHotels[groupRec.groupId].length} nearby hotel(s) within 15km — co-locate groups or spread them out
+                                </span>
+                                <span>{expandedNearby[groupRec.groupId] ? '↑' : '↓'}</span>
+                              </button>
+
+                              {expandedNearby[groupRec.groupId] && (
+                                <div className="mt-2 space-y-2">
+                                  {nearbyHotels[groupRec.groupId].map((nh) => {
+                                    const nhId = String(nh._id);
+                                    const alreadyAssignedToGroups = Object.entries(groupAssignments)
+                                      .filter(([gId, a]) => a.hotelId === nhId && gId !== String(groupRec.groupId))
+                                      .map(([gId]) =>
+                                        recommendations.groupRecommendations.find(
+                                          (gr) => String(gr.groupId) === gId
+                                        )?.groupName
+                                      )
+                                      .filter(Boolean);
+
+                                    return (
+                                      <div
+                                        key={nh._id}
+                                        className="flex items-center justify-between p-3 bg-white border border-blue-100 rounded-lg hover:border-blue-300 transition-colors"
+                                      >
+                                        <div className="flex-1 min-w-0">
+                                          <p className="font-semibold text-gray-900 text-sm truncate">
+                                            {nh.name || nh.organization}
+                                          </p>
+                                          <div className="flex flex-wrap items-center gap-3 mt-1 text-xs text-gray-500">
+                                            <span>📍 {nh.distanceKm.toFixed(1)} km away</span>
+                                            {nh.location?.city && <span>{nh.location.city}</span>}
+                                            {nh.priceRange?.min && (
+                                              <span>💰 ${nh.priceRange.min}+</span>
+                                            )}
+                                            {nh.totalRooms && (
+                                              <span>🛏 {nh.totalRooms} rooms</span>
+                                            )}
+                                          </div>
+                                          {alreadyAssignedToGroups.length > 0 && (
+                                            <p className="text-xs text-amber-600 mt-1 font-medium">
+                                              Also used by: {alreadyAssignedToGroups.join(', ')}
+                                            </p>
+                                          )}
+                                        </div>
+                                        <button
+                                          onClick={() =>
+                                            assignHotel(
+                                              groupRec.groupId,
+                                              nh._id,
+                                              nh.name || nh.organization,
+                                              nh
+                                            )
+                                          }
+                                          disabled={isAssigning[groupRec.groupId]}
+                                          className={`ml-3 flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                                            groupAssignments[groupRec.groupId]?.hotelId === nhId
+                                              ? 'bg-teal-100 text-teal-700 cursor-default'
+                                              : 'bg-blue-600 hover:bg-blue-700 text-white'
+                                          }`}
+                                        >
+                                          {groupAssignments[groupRec.groupId]?.hotelId === nhId
+                                            ? '✓ Assigned'
+                                            : 'Assign'}
+                                        </button>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -997,27 +1161,65 @@ export const MicrositeInventoryManagement = () => {
                   </div>
                 </div>
 
-                {/* Groups Summary */}
+                {/* Group → Hotel Assignment Summary */}
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-3">Guest Groups ({groups.length})</h3>
-                  <div className="space-y-2">
-                    {groups.map((g) => (
-                      <div key={g._id} className="flex items-center justify-between p-2 bg-blue-50 rounded-lg">
-                        <div>
-                          <p className="font-medium text-gray-900">{g.name}</p>
-                          <p className="text-sm text-gray-600">{g.members.length} members</p>
-                        </div>
-                        <CheckCircle2 className="h-5 w-5 text-blue-600" />
-                      </div>
-                    ))}
+                  <h3 className="text-lg font-semibold text-gray-900 mb-3">Group Hotel Assignments</h3>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm border border-gray-200 rounded-lg overflow-hidden">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="text-left px-4 py-3 font-semibold text-gray-700">Group</th>
+                          <th className="text-left px-4 py-3 font-semibold text-gray-700">Guests</th>
+                          <th className="text-left px-4 py-3 font-semibold text-gray-700">Assigned Hotel</th>
+                          <th className="text-left px-4 py-3 font-semibold text-gray-700">City</th>
+                          <th className="text-left px-4 py-3 font-semibold text-gray-700">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {groups.map((g) => {
+                          const assignment = groupAssignments[g._id];
+                          return (
+                            <tr key={g._id} className={assignment ? 'bg-white' : 'bg-amber-50'}>
+                              <td className="px-4 py-3 font-medium text-gray-900">{g.name}</td>
+                              <td className="px-4 py-3 text-gray-600">{g.number || g.members?.length || 0}</td>
+                              <td className="px-4 py-3">
+                                {assignment ? (
+                                  <span className="font-semibold text-gray-900">{assignment.hotelName}</span>
+                                ) : (
+                                  <span className="text-amber-600 text-xs">Not assigned — go back to Step 3</span>
+                                )}
+                              </td>
+                              <td className="px-4 py-3 text-gray-600 text-xs">
+                                {assignment?.fullHotel?.location?.city || assignment?.fullHotel?.tboData?.cityCode || '—'}
+                              </td>
+                              <td className="px-4 py-3">
+                                {assignment ? (
+                                  <span className="inline-flex items-center gap-1 bg-teal-100 text-teal-700 text-xs px-2 py-1 rounded-full font-semibold">
+                                    <CheckCircle2 className="h-3 w-3" /> Assigned
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 bg-amber-100 text-amber-700 text-xs px-2 py-1 rounded-full font-semibold">
+                                    ⚠ Unassigned
+                                  </span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
                   </div>
+                  {Object.keys(groupAssignments).length < groups.length && (
+                    <p className="text-xs text-amber-600 mt-2">
+                      ⚠ Some groups are unassigned. Go back to Step 3 and click "Assign" on a hotel card.
+                    </p>
+                  )}
                 </div>
 
                 {/* Final action */}
                 <div className="bg-primary-50 border border-primary-200 rounded-lg p-4">
                   <p className="text-sm text-primary-900">
-                    ✓ All groups have been created and recommendations generated. Click below to finalize your inventory
-                    configuration.
+                    ✓ Assignments are saved immediately when you click Assign in Step 3. Click below to finalize.
                   </p>
                 </div>
               </div>

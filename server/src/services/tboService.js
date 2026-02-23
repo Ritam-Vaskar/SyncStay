@@ -7,8 +7,12 @@ import axios from 'axios';
 class TBOService {
   constructor() {
     this.baseURL = 'http://api.tbotechnology.in/TBOHolidays_HotelAPI';
-    this.username = process.env.TBO_USERNAME || 'ApiIntegrationNew';
-    this.password = process.env.TBO_PASSWORD || 'Hotel@123';
+    this.username = process.env.TBO_USERNAME || 'hakathontest';
+    this.password = process.env.TBO_PASSWORD || 'Hac@98147521';
+
+    // In-memory TTL cache for hotel details: hotelCode -> { data, expiry }
+    this._detailsCache = new Map();
+    this._CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
     
     // Create axios instance with default config
     this.client = axios.create({
@@ -78,19 +82,67 @@ class TBOService {
   }
 
   /**
-   * Get detailed information for specific hotels
-   * @param {Array<string>} hotelCodes - Array of hotel codes
+   * Get detailed information for specific hotels.
+   * Uses correct endpoint casing: /HotelDetails (capital D)
+   * @param {Array<string>} hotelCodes
+   * @param {string} language
    */
-  async getHotelDetails(hotelCodes) {
+  async getHotelDetails(hotelCodes, language = 'EN') {
     try {
-      const response = await this.client.post('/Hoteldetails', {
-        HotelCodes: hotelCodes.join(','),
+      const response = await this.client.post('/HotelDetails', {
+        Hotelcodes: hotelCodes.join(','),
+        Language: language,
+        IsRoomDetailRequired: false,
       });
       return response.data;
     } catch (error) {
       console.error('❌ TBO HotelDetails Error:', error.response?.data || error.message);
       throw new Error(`Failed to fetch hotel details: ${error.message}`);
     }
+  }
+
+  /**
+   * Cached getHotelDetails — only fetches codes missing from 24-hour cache.
+   * Individual hotel detail objects cached per code.
+   * @param {Array<string>} hotelCodes
+   * @returns {Promise<Array<Object>>} TBO hotel detail objects (nulls stripped)
+   */
+  async getHotelDetailsCached(hotelCodes) {
+    const now = Date.now();
+    const results = [];
+    const missing = [];
+
+    for (const code of hotelCodes) {
+      const entry = this._detailsCache.get(String(code));
+      if (entry && entry.expiry > now) {
+        if (entry.data) results.push(entry.data);
+      } else {
+        missing.push(String(code));
+      }
+    }
+
+    if (missing.length > 0) {
+      try {
+        console.log(`📡 TBO HotelDetails fetch for ${missing.length} code(s):`, missing);
+        const response = await this.getHotelDetails(missing);
+        const fetched = response?.Hotels || [];
+        for (const hotel of fetched) {
+          const code = String(hotel.HotelCode);
+          this._detailsCache.set(code, { data: hotel, expiry: now + this._CACHE_TTL_MS });
+          results.push(hotel);
+        }
+        // Cache null sentinel for any codes TBO returned nothing for (avoids repeated retries)
+        for (const code of missing) {
+          if (!this._detailsCache.has(code)) {
+            this._detailsCache.set(code, { data: null, expiry: now + this._CACHE_TTL_MS });
+          }
+        }
+      } catch (err) {
+        console.warn('⚠️  TBO HotelDetails fetch failed, skipping enrichment:', err.message);
+      }
+    }
+
+    return results; // nulls already excluded above
   }
 
   /**

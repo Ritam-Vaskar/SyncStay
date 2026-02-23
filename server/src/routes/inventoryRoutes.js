@@ -17,6 +17,8 @@ import {
   getEventRecommendations,
   getGuestHistory,
   updateGroupMetadata,
+  assignHotelToGroup,
+  getNearbyHotels,
 } from '../controllers/inventoryController.js';
 import { protect, authorize } from '../middlewares/auth.js';
 import { validateInventory, validateMongoId } from '../middlewares/validators.js';
@@ -70,6 +72,19 @@ router.put(
   '/:groupId/metadata',
   authorize('planner'),
   updateGroupMetadata
+);
+
+// Hotel assignment & nearby hotels routes (before generic /:id)
+router.put(
+  '/:groupId/assign-hotel',
+  authorize('planner'),
+  assignHotelToGroup
+);
+
+router.get(
+  '/:eventId/nearby-hotels',
+  authorize('planner'),
+  getNearbyHotels
 );
 
 // Recommendations routes

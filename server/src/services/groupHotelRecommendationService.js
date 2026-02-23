@@ -4,6 +4,9 @@ import User from '../models/User.js';
 import InventoryGroup from '../models/InventoryGroup.js';
 import mongoose from 'mongoose';
 import { retrieveVector, searchVectors, COLLECTIONS, uuidToObjectId } from '../config/qdrant.js';
+import { enrichHotelsWithTBO, getMergedFacilities } from './tboHotelEnrichmentService.js';
+import { scoreFacilitiesWithGemini, buildFallbackScores } from './geminiRecommendationService.js';
+import { scoreHotelsForGroups } from './hybridScoringService.js';
 
 /**
  * Get guest's past booking history
@@ -250,225 +253,133 @@ export const scoreHotelForGuest = async (eventId, guestEmail, hotelId) => {
 };
 
 /**
- * Get semantic similarity scores between event and hotels using Qdrant embeddings
- * This compares event requirements with hotel capabilities at semantic level
+ * Retrieve event vector from Qdrant (used for activity cosine similarity).
+ * Returns null when the event has never been embedded.
  */
-const getEmbeddingSimilarityScores = async (eventId, hotelIds) => {
+const getEventVector = async (eventId) => {
   try {
-    // Try to retrieve the event vector from Qdrant
-    const eventVector = await retrieveVector(COLLECTIONS.EVENTS, eventId);
-    
-    if (!eventVector || !eventVector.vector) {
-      console.log('⚠️  Event embedding not found in Qdrant, skipping semantic matching');
-      return {};
-    }
-
-    console.log(`📡 Event embedding found. Searching similar hotels...`);
-    const hotelIdStrings = hotelIds.map(id => id.toString());
-    console.log(`   Selected hotel IDs (${hotelIds.length}):`, hotelIdStrings);
-
-    const similarityScores = {};
-
-    // Search for hotels similar to the event in Qdrant
-    const searchResults = await searchVectors(
-      COLLECTIONS.HOTELS,
-      eventVector.vector,
-      Math.max(hotelIds.length * 5, 20) // Search for 5x hotels to get better coverage
-    );
-
-    console.log(`📊 Qdrant search returned ${searchResults.length} results`);
-
-    // Build a similarity score map by converting UUID back to ObjectId
-    // Keep track of best match for each selected hotel
-    const bestScorePerHotel = {};
-    
-    for (const result of searchResults) {
-      // Convert UUID ID back to MongoDB ObjectId
-      const convertedId = uuidToObjectId(result.id);
-      
-      // Find exact match in selected hotels
-      for (const hidStr of hotelIdStrings) {
-        if (hidStr === convertedId) {
-          // Direct match found
-          if (!bestScorePerHotel[hidStr] || result.score > bestScorePerHotel[hidStr].score) {
-            bestScorePerHotel[hidStr] = { id: convertedId, score: result.score };
-            console.log(`   ✅ EXACT MATCH: ${hidStr} -> score=${result.score.toFixed(4)}`);
-          }
-          break;
-        }
-      }
-    }
-
-    // Convert best scores to point values
-    for (const [hidStr, scoreData] of Object.entries(bestScorePerHotel)) {
-      const similarities = (scoreData.score || 0) * 30;
-      similarityScores[hidStr] = similarities;
-    }
-
-    console.log(`🔍 Embedding bonus scores applied to ${Object.keys(similarityScores).length}/${hotelIdStrings.length} hotels`);
-    console.log('   Scores:', similarityScores);
-    return similarityScores;
-  } catch (error) {
-    console.error('⚠️  Error getting embedding similarity scores:', error.message);
-    // Return empty scores, fallback to rule-based scoring only
-    return {};
+    const result = await retrieveVector(COLLECTIONS.EVENTS, eventId.toString());
+    return result?.vector || null;
+  } catch {
+    return null;
   }
 };
 
 /**
- * Rank all selected hotels for an event with group + individual recommendations
+ * Rank all selected hotels for an event — HYBRID PIPELINE
+ *
+ * Step 1  : Enrich hotels with real TBO facility/description data.
+ * Step 2  : Single Gemini call → per-group + event-level facility scores.
+ * Step 3  : Pull event embedding + each hotel's activity-history vector from Qdrant.
+ * Step 4  : Hybrid blend per group  (50% Gemini + 35% activity + 10% capacity + 5% city).
+ * Step 5  : Individual scoring     (40% Gemini + 30% activity + personal history bonuses).
  */
 export const rankHotelsForEvent = async (eventId) => {
   try {
-    // Fetch event with POPULATED hotel details
-    const event = await Event.findById(eventId).populate('selectedHotels.hotel');
-    const groups = await InventoryGroup.find({ event: eventId });
-    const selectedHotels = event?.selectedHotels || [];
+    const [event, groups] = await Promise.all([
+      Event.findById(eventId).populate('selectedHotels.hotel'),
+      InventoryGroup.find({ event: eventId }),
+    ]);
 
-    console.log('Event:', event?.name, 'isPrivate:', event?.isPrivate);
-    console.log('Selected Hotels:', selectedHotels.length);
-    console.log('Groups:', groups.length);
+    const raw = event?.selectedHotels || [];
+    console.log(`\n🏨 rankHotelsForEvent  event=${event?.name}  hotels=${raw.length}  groups=${groups.length}`);
 
-    if (selectedHotels.length === 0 || groups.length === 0) {
+    if (raw.length === 0 || groups.length === 0) {
       return { groupRecommendations: [], individualRecommendations: {} };
     }
 
-    // Get embedding similarity scores from Qdrant for all selected hotels
-    const hotelIds = selectedHotels
-      .map(sh => {
-        const id = sh.hotel?._id || sh.hotel;
-        console.log(`   Hotel ID extracted: ${id} (type: ${typeof id})`);
-        return id;
-      });
-    
-    console.log(`📋 Hotel IDs for embedding search:`, hotelIds.map(id => id.toString()));
-    const embeddingSimilarityScores = await getEmbeddingSimilarityScores(eventId, hotelIds);
+    // Extract hotel objects (already populated)
+    const hotels = raw.map(sh => sh.hotel).filter(Boolean);
 
-    // Score hotels for each group with EVENT-TYPE awareness + EMBEDDING SIMILARITY
-    const groupRecommendations = [];
-    for (const group of groups) {
-      const groupScores = [];
+    // ── Step 1: TBO enrichment ──────────────────────────────────────────────
+    console.log('📡 [1/4] Enriching hotels with TBO data...');
+    const enrichedHotels = await enrichHotelsWithTBO(hotels);
+    console.log(`   TBO-enriched: ${enrichedHotels.filter(h => h._tboEnriched).length}/${enrichedHotels.length}`);
 
-      for (const selectedHotel of selectedHotels) {
-        const hotelId = selectedHotel.hotel?._id || selectedHotel.hotel;
-        
-        // Get member booking histories
-        const groupMemberHistories = await Promise.all(
-          group.members.map(async (member) => {
-            const history = await getGuestBookingHistory(member.guestEmail);
-            const count = history.filter(
-              (b) => b.inventory?.hotelName?.toLowerCase() === selectedHotel.hotel?.name?.toLowerCase()
-            ).length;
-            return { email: member.guestEmail, count };
-          })
-        );
-
-        // Get the hotel details
-        const hotel = selectedHotel.hotel || await User.findById(hotelId);
-
-        // Get embedding score for this hotel
-        const hotelIdString = hotel._id.toString();
-        const embeddingScore = embeddingSimilarityScores[hotelIdString] || 0;
-
-        // Apply scoring based on event type - EMBEDDING SIMILARITY ONLY
-        let scoreResult;
-        if (event.isPrivate) {
-          scoreResult = scoreHotelForPrivateEvent(hotel, event, group, groupMemberHistories, embeddingScore);
-        } else {
-          scoreResult = scoreHotelForPublicEvent(hotel, event, group, groupMemberHistories, embeddingScore);
-        }
-
-        const groupScore = scoreResult.score; // Pure embedding + minimal capacity check
-
-        groupScores.push({
-          hotelId: hotel._id,
-          hotelName: hotel.name,
-          groupScore: groupScore, // Embedding-based score
-          ruleBasedScore: scoreResult.score,
-          embeddingScore: embeddingScore,
-          reasons: scoreResult.reasons,
-          reasonCategory: event.isPrivate ? 'private-event' : 'public-event',
-          hotel: hotel, // Include full hotel object
-        });
-
-        console.log(`  ${hotel.name}: embedding=${embeddingScore.toFixed(2)} + capacity=${scoreResult.score - embeddingScore > 0 ? '+' + (scoreResult.score - embeddingScore).toFixed(2) : '0'} = ${groupScore.toFixed(2)}`);
-      }
-
-      // Sort by combined score descending
-      groupScores.sort((a, b) => b.groupScore - a.groupScore);
-      groupRecommendations.push({
-        groupId: group._id,
-        groupName: group.name,
-        eventType: event.isPrivate ? 'private' : 'public',
-        hotels: groupScores.slice(0, 3), // Top 3 recommendations
-      });
-
-      console.log(`${group.name} recommendations:`, groupScores.slice(0, 1).map(s => ({ hotel: s.hotelName, score: s.groupScore })));
+    // ── Step 2: Gemini facility + group scoring ─────────────────────────────
+    console.log('🤖 [2/4] Calling Gemini for facility fit scoring...');
+    let geminiScores;
+    try {
+      geminiScores = await scoreFacilitiesWithGemini(enrichedHotels, event, groups);
+    } catch (err) {
+      console.warn('⚠️  Gemini call failed, using rule-based fallback:', err.message);
+      geminiScores = buildFallbackScores(enrichedHotels, event, groups);
     }
 
-    // Score hotels for each individual guest (personalized) - EMBEDDING SIMILARITY ONLY
+    // ── Step 3: Retrieve event vector + hotel activity vectors ──────────────
+    console.log('🔍 [3/4] Retrieving activity vectors from Qdrant...');
+    const eventVector = await getEventVector(eventId);
+    if (eventVector) {
+      console.log('   ✅ Event vector found');
+    } else {
+      console.log('   ⚠️  Event vector not in Qdrant — activity scoring will use neutral 50');
+    }
+
+    // ── Step 4: Group recommendations via hybridScoringService ─────────────
+    console.log('🧮 [4/4] Computing hybrid group scores...');
+    const groupRecommendations = await scoreHotelsForGroups(
+      enrichedHotels,
+      event,
+      groups,
+      geminiScores,
+      eventVector,
+    );
+
+    // ── Step 5: Individual guest recommendations ────────────────────────────
     const individualRecommendations = {};
     for (const group of groups) {
       for (const member of group.members) {
-        const guestRecommendations = [];
+        const bookingHistory = await getGuestBookingHistory(member.guestEmail);
 
-        for (const selectedHotel of selectedHotels) {
-          const hotelId = selectedHotel.hotel?._id || selectedHotel.hotel;
-          const hotel = selectedHotel.hotel || await User.findById(hotelId);
-          
-          // Get embedding score for this hotel
-          const hotelIdForLookup = hotel._id.toString();
-          const embeddingScore = embeddingSimilarityScores[hotelIdForLookup] || 0;
+        // Build per-hotel individual scores
+        const guestScores = enrichedHotels.map(hotel => {
+          const hotelId = hotel._id.toString();
 
-          let score = embeddingScore;
-          const reasons = [];
+          // Gemini event-level score as anchor (40%)
+          const geminiEventScore = geminiScores?.eventScores?.[hotelId]?.score || 50;
 
-          if (embeddingScore > 15) {
-            reasons.push('Strong semantic match with your preferences');
-          } else if (embeddingScore > 8) {
-            reasons.push('Good semantic match');
-          } else if (embeddingScore > 0) {
-            reasons.push('Semantic preference match');
-          }
+          // Personal history bonus (max 20)
+          const stays = bookingHistory.filter(
+            b => b.inventory?.hotelName?.toLowerCase() === hotel.name?.toLowerCase()
+          ).length;
+          const historyBonus = Math.min(stays * 10, 20);
 
-          // Minimal fallback: basic amenity check (max 3 points)
-          if (hotel.facilities && Array.isArray(hotel.facilities) && hotel.facilities.length > 0) {
-            const basicAmenities = ['wifi', 'restaurant', 'gym'];
-            const matches = hotel.facilities.filter(f =>
-              basicAmenities.some(ba => f?.toLowerCase().includes(ba))
-            ).length;
+          // Amenity bonus (max 10)
+          const facilities = getMergedFacilities(hotel);
+          const preferred = ['wifi', 'pool', 'gym', 'spa', 'restaurant', 'bar'];
+          const amenityMatches = facilities.filter(f => preferred.some(p => f.includes(p))).length;
+          const amenityBonus = Math.min(amenityMatches * 2, 10);
 
-            if (matches > 0) {
-              score += Math.min(matches, 3);
-              reasons.push(`Has ${matches} essential amenities`);
-            }
-          }
+          const personalScore = Math.min(
+            Math.round((0.70 * geminiEventScore) + historyBonus + amenityBonus),
+            100,
+          );
 
-          guestRecommendations.push({
+          const reasons = [...(geminiScores?.eventScores?.[hotelId]?.reasons?.slice(0, 2) || [])];
+          if (stays > 0) reasons.push(`You've stayed here ${stays} time(s) before`);
+          if (amenityMatches > 2) reasons.push(`${amenityMatches} preferred amenities`);
+
+          return {
             hotelId: hotel._id,
             hotelName: hotel.name,
-            personalScore: Math.min(score, 100),
-            embeddingScore,
+            personalScore,
             reasons,
-            reasonCategory: 'embedding-match',
-            hotel: hotel,
-          });
-        }
+            reasonCategory: 'personal-preference',
+            hotel,
+          };
+        });
 
-        guestRecommendations.sort((a, b) => b.personalScore - a.personalScore);
+        guestScores.sort((a, b) => b.personalScore - a.personalScore);
         individualRecommendations[member.guestEmail] = {
           guestName: member.guestName,
           groupId: group._id,
           groupName: group.name,
-          hotels: guestRecommendations.slice(0, 3), // Top 3 recommendations
+          hotels: guestScores.slice(0, 3),
         };
       }
     }
 
-    return {
-      groupRecommendations,
-      individualRecommendations,
-    };
+    return { groupRecommendations, individualRecommendations };
   } catch (error) {
     console.error('Error ranking hotels:', error);
     throw error;
