@@ -162,38 +162,37 @@ export const getHotelRecommendationsLogic = async (eventId, plannerId, limit = 1
     console.log('📍 Using event vector only (no planner vector)');
   }
 
-  // Search hotels (no payload filter - filter in app instead)
+  // Build Qdrant filter for hard constraints
+  const qdrantFilter = {
+    must: [
+      // Country filter (case-insensitive via normalization at data entry)
+      { key: 'country', match: { value: event.location?.country || 'India' } },
+    ]
+  };
+
+  console.log('🔍 Searching with filters:', JSON.stringify(qdrantFilter));
+
+  // Search hotels with Qdrant payload filters
   const vectorResults = await searchVectors(
     COLLECTIONS.HOTELS,
     searchVector,
-    50 // Get more for filtering
+    50, // Get more candidates
+    qdrantFilter
   );
 
-  console.log('🔍 Vector search returned:', vectorResults.length, 'hotels');
+  console.log('🔍 Vector search returned:', vectorResults.length, 'hotels from', event.location?.country);
 
   // Convert UUIDs back to ObjectIds and fetch hotel details
   const hotelIds = vectorResults.map((r) => uuidToObjectId(r.id));
   
-  // First try with country filter
+  // Fetch hotels with minimal filtering (Qdrant already filtered by country)
   let hotels = await User.find({
     _id: { $in: hotelIds },
     role: 'hotel',
     isActive: true,
-    'location.country': event.location?.country, // Filter by country in MongoDB
   }).lean();
 
-  console.log('🏨 Hotels after country filter:', hotels.length);
-
-  // If no hotels found, try without country filter (for demo/testing)
-  if (hotels.length === 0) {
-    console.log('⚠️ No hotels in target country, expanding search to all countries');
-    hotels = await User.find({
-      _id: { $in: hotelIds },
-      role: 'hotel',
-      isActive: true,
-    }).lean();
-    console.log('🌍 Hotels after removing country filter:', hotels.length);
-  }
+  console.log('🏨 Hotels fetched from database:', hotels.length);
 
   // Create hotel map (using original UUID for matching)
   const hotelMap = {};
@@ -205,44 +204,32 @@ export const getHotelRecommendationsLogic = async (eventId, plannerId, limit = 1
     }
   });
 
-  // Hybrid scoring
+  // AI-First Hybrid scoring: Trust the embeddings!
   const scoredHotels = vectorResults
     .filter((r) => hotelMap[r.id])
     .map((result) => {
       const hotel = hotelMap[result.id];
-      const vectorScore = result.score * 100;
+      
+      // Primary signal: AI vector similarity (0-100)
+      const aiScore = result.score * 100;
 
-      // Location score
-      const locationScore = calculateLocationScore(hotel, event);
+      // Minimal logical checks for critical constraints only
+      const capacityBonus = calculateCapacityBonus(hotel, event);
+      const cityMatchBonus = calculateCityBonus(hotel, event);
 
-      // Budget score
-      const budgetScore = calculateBudgetScore(hotel, event);
-
-      // Capacity score
-      const capacityScore = calculateCapacityScore(hotel, event);
-
-      // Event type score
-      const eventTypeScore = calculateEventTypeScore(hotel, event);
-
-      // Final hybrid score
-      const finalScore =
-        0.4 * vectorScore +
-        0.25 * locationScore +
-        0.2 * budgetScore +
-        0.1 * capacityScore +
-        0.05 * eventTypeScore;
+      // AI-first scoring: 75% AI, 15% capacity match, 10% city exact match
+      const finalScore = (0.75 * aiScore) + (0.15 * capacityBonus) + (0.10 * cityMatchBonus);
 
       return {
         hotel,
         score: finalScore,
         breakdown: {
-          vector: vectorScore,
-          location: locationScore,
-          budget: budgetScore,
-          capacity: capacityScore,
-          eventType: eventTypeScore,
+          aiSimilarity: aiScore,
+          capacityMatch: capacityBonus,
+          cityMatch: cityMatchBonus,
+          total: finalScore,
         },
-        reasons: generateReasons(hotel, event, finalScore),
+        reasons: generateAIReasons(hotel, event, aiScore, capacityBonus, cityMatchBonus),
       };
     })
     .sort((a, b) => b.score - a.score)
@@ -294,119 +281,91 @@ async function getTrendingEvents(limit = 10) {
 }
 
 /**
- * Calculate location score
+ * Calculate capacity bonus (0-100)
+ * Critical constraint: Can the hotel physically accommodate guests?
  */
-function calculateLocationScore(hotel, event) {
-  if (hotel.location.city === event.location.city) {
-    return 100;
-  }
-  if (hotel.location.country === event.location.country) {
-    return 50;
-  }
-  return 0;
-}
-
-/**
- * Calculate budget score
- */
-function calculateBudgetScore(hotel, event) {
-  if (!hotel.priceRange || !event.budgetRange) return 50;
-
-  const hotelMin = hotel.priceRange.min || 0;
-  const hotelMax = hotel.priceRange.max || Infinity;
-  const eventMin = event.budgetRange.min || 0;
-  const eventMax = event.budgetRange.max || Infinity;
-
-  const eventAvg = (eventMin + eventMax) / 2;
-
-  // Perfect match
-  if (hotelMin <= eventAvg && hotelMax >= eventAvg) {
-    return 100;
-  }
-
-  // Partial overlap
-  if (hotelMax >= eventMin && hotelMin <= eventMax) {
-    return 60;
-  }
-
-  // Close range
-  const distance = Math.min(
-    Math.abs(hotelMin - eventMax),
-    Math.abs(hotelMax - eventMin)
-  );
-  if (distance < 5000) {
-    return 30;
-  }
-
-  return 0;
-}
-
-/**
- * Calculate capacity score
- */
-function calculateCapacityScore(hotel, event) {
-  if (!hotel.totalRooms || !event.expectedGuests) return 50;
+function calculateCapacityBonus(hotel, event) {
+  if (!hotel.totalRooms || !event.expectedGuests) return 50; // Neutral if unknown
 
   const roomsNeeded = Math.ceil(event.expectedGuests / 2); // Assume 2 guests per room
 
   if (hotel.totalRooms >= roomsNeeded) {
-    return 100;
+    return 100; // Perfect capacity
   }
 
   if (hotel.totalRooms >= roomsNeeded * 0.7) {
-    return 70;
+    return 70; // Can accommodate most guests
   }
 
-  return 30;
+  return 30; // Insufficient capacity
 }
 
 /**
- * Calculate event type score
+ * Calculate city match bonus (0-100)
+ * Small bonus for exact city match (AI already handles location semantically)
  */
-function calculateEventTypeScore(hotel, event) {
-  if (!hotel.specialization || hotel.specialization.length === 0) return 50;
+function calculateCityBonus(hotel, event) {
+  if (!hotel.location?.city || !event.location?.city) return 50;
 
-  if (hotel.specialization.includes(event.type)) {
-    return 100;
+  // Case-insensitive comparison
+  const hotelCity = hotel.location.city.toLowerCase().trim();
+  const eventCity = event.location.city.toLowerCase().trim();
+
+  if (hotelCity === eventCity) {
+    return 100; // Exact city match
   }
 
-  return 30;
+  // Check if cities contain each other (e.g., "New Delhi" contains "Delhi")
+  if (hotelCity.includes(eventCity) || eventCity.includes(hotelCity)) {
+    return 80; // Close match
+  }
+
+  return 50; // Different city (country filter already applied)
 }
 
 /**
- * Generate recommendation reasons
+ * Generate AI-driven recommendation reasons
  */
-function generateReasons(hotel, event, score) {
+function generateAIReasons(hotel, event, aiScore, capacityBonus, cityBonus) {
   const reasons = [];
 
-  if (hotel.location.city === event.location.city) {
-    reasons.push(`Located in ${event.location.city}`);
-  } else if (hotel.location.country === event.location.country) {
-    reasons.push(`Located in ${event.location.country}`);
+  // Primary reason: AI match quality
+  if (aiScore >= 80) {
+    reasons.push('🎯 Excellent AI match for your event requirements');
+  } else if (aiScore >= 60) {
+    reasons.push('✅ Good AI match for your event type and needs');
+  } else if (aiScore >= 40) {
+    reasons.push('👌 Suitable match based on event criteria');
   }
 
-  if (hotel.priceRange && event.budgetRange) {
-    const eventAvg = (event.budgetRange.min + event.budgetRange.max) / 2;
-    if (hotel.priceRange.min <= eventAvg && hotel.priceRange.max >= eventAvg) {
-      reasons.push('Pricing matches your budget');
-    }
+  // Location  
+  if (cityBonus === 100) {
+    reasons.push(`📍 Located in ${event.location?.city}`);
+  } else if (cityBonus >= 80) {
+    reasons.push(`📍 Near ${event.location?.city}`);
+  } else {
+    reasons.push(`🌍 Available in ${hotel.location?.country || 'your country'}`);
   }
 
-  if (hotel.specialization && hotel.specialization.includes(event.type)) {
-    reasons.push(`Specializes in ${event.type} events`);
+  // Capacity
+  if (capacityBonus === 100 && event.expectedGuests) {
+    reasons.push(`👥 Can accommodate all ${event.expectedGuests} guests`);
+  } else if (capacityBonus >= 70 && event.expectedGuests) {
+    reasons.push(`👥 Can accommodate most of your ${event.expectedGuests} guests`);
   }
 
-  if (hotel.totalRooms && event.expectedGuests) {
-    const roomsNeeded = Math.ceil(event.expectedGuests / 2);
-    if (hotel.totalRooms >= roomsNeeded) {
-      reasons.push(`Can accommodate ${event.expectedGuests} guests`);
-    }
+  // Hotel quality indicators
+  if (hotel.averageRating >= 4) {
+    reasons.push(`⭐ Highly rated (${hotel.averageRating}/5)`);
   }
 
-  if (score >= 80) {
-    reasons.push('Excellent match for your event');
-  } else if (score >= 60) {
-    reasons.push('Good match for your event');
+  if (hotel.eventsHostedCount > 10) {
+    reasons.push(`🏆 Experienced (hosted ${hotel.eventsHostedCount}+ events)`);
+  }
+
+  // Event type specialization (from AI + metadata)
+  if (hotel.specialization?.includes(event.type)) {
+    reasons.push(`🎪 Specializes in ${event.type} events`);
   }
 
   return reasons;

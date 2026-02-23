@@ -89,16 +89,22 @@ Duration: ${event.startDate ? new Date(event.startDate).toDateString() : ''} to 
  * @returns {Promise<Object>} - { vector, hash }
  */
 export async function generateHotelEmbedding(hotel) {
+  // Build rich context for AI understanding
   const hotelText = `
-Name: ${hotel.name || hotel.organization}
+Hotel Name: ${hotel.name || hotel.organization}
 Location: ${hotel.location?.city || ''}, ${hotel.location?.country || ''}
-Address: ${hotel.location?.address || ''}
-Capacity: ${hotel.totalRooms || 0} rooms
-Specialization: ${hotel.specialization?.join(', ') || 'General'}
-Price Range: ${hotel.priceRange?.min || 0} - ${hotel.priceRange?.max || 0} INR per night
-Facilities: ${hotel.facilities?.join(', ') || 'Standard facilities'}
-Description: ${hotel.description || 'No description'}
-Rating: ${hotel.averageRating || 0}/5
+Full Address: ${hotel.location?.address || ''}
+Capacity: ${hotel.totalRooms || 0} rooms available, can accommodate ${(hotel.totalRooms || 0) * 2} guests
+Event Specialization: ${hotel.specialization?.join(', ') || 'All types of events'}
+Price Range: ${hotel.priceRange?.min || 0} to ${hotel.priceRange?.max || 0} INR per room per night
+Facilities & Amenities: ${hotel.facilities?.join(', ') || 'Standard hotel amenities'}
+Description: ${hotel.description || 'Professional hotel services for events and gatherings'}
+Guest Rating: ${hotel.averageRating || 0} out of 5 stars
+Past Events Hosted: ${hotel.eventsHostedCount || 0} events
+Event Types Previously Hosted: ${hotel.eventTypesHosted?.join(', ') || 'Various event types'}
+Awards & Recognition: ${hotel.awards?.join(', ') || 'None'}
+Venue Type: ${hotel.venueType || 'Hotel with event spaces'}
+Best For: ${hotel.bestFor || 'Corporate events, conferences, weddings, and social gatherings'}
 `.trim();
 
   const vector = await generateEmbedding(hotelText);

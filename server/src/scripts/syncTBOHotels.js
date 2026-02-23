@@ -10,12 +10,11 @@ import tboTransformService from '../services/tboTransformService.js';
 
 // City configurations
 const CITIES = [
+  { name: 'Delhi', code: '130443', limit: 12 },
   { name: 'Kolkata', code: '113128', limit: 12 },
   { name: 'Hyderabad', code: '113457', limit: 12 },
   { name: 'Bangalore', code: '130995', limit: 12 },
   { name: 'Mumbai', code: '113196', limit: 12 },
-  // Skip Delhi for now if API is slow/timing out
-  // { name: 'Delhi', code: '130443', limit: 12 },
 ];
 
 async function syncTBOHotels() {
