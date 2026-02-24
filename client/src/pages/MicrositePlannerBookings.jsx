@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { eventService, bookingService } from '@/services/apiServices';
 import { MicrositeDashboardLayout } from '@/layouts/MicrositeDashboardLayout';
 import { LoadingPage } from '@/components/LoadingSpinner';
-import { Calendar, CheckCircle, Clock, XCircle, Search, Filter, DollarSign } from 'lucide-react';
+import { Calendar, CheckCircle, Clock, XCircle, Search, Filter, DollarSign, CreditCard } from 'lucide-react';
 import { formatCurrency, formatDate } from '@/utils/helpers';
 import toast from 'react-hot-toast';
 
@@ -16,6 +16,7 @@ export const MicrositePlannerBookings = () => {
   const [selectedBooking, setSelectedBooking] = useState(null);
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [rejectionReason, setRejectionReason] = useState('');
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
 
   const { data: eventData, isLoading: eventLoading } = useQuery({
     queryKey: ['microsite-event', slug],
@@ -53,6 +54,20 @@ export const MicrositePlannerBookings = () => {
     },
   });
 
+  // Load Razorpay script
+  useEffect(() => {
+    const script = document.createElement('script');
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    script.async = true;
+    document.body.appendChild(script);
+
+    return () => {
+      if (document.body.contains(script)) {
+        document.body.removeChild(script);
+      }
+    };
+  }, []);
+
   if (eventLoading || bookingsLoading) return <LoadingPage />;
 
   const event = eventData?.data;
@@ -79,6 +94,13 @@ export const MicrositePlannerBookings = () => {
       .reduce((sum, b) => sum + (b.pricing?.totalAmount || 0), 0),
   };
 
+  // Calculate total unpaid bookings for private events
+  const totalUnpaid = event?.isPrivate
+    ? allBookings
+        .filter((b) => b.isPaidByPlanner && b.paymentStatus === 'unpaid')
+        .reduce((sum, b) => sum + (b.pricing?.totalAmount || 0), 0)
+    : 0;
+
   const handleApprove = (booking) => {
     if (window.confirm(`Approve booking for ${booking.guestDetails?.name}?`)) {
       approveMutation.mutate(booking._id);
@@ -99,6 +121,107 @@ export const MicrositePlannerBookings = () => {
       bookingId: selectedBooking._id,
       reason: rejectionReason,
     });
+  };
+
+  const handlePayForBookings = async () => {
+    if (!window.Razorpay) {
+      toast.error('Payment system not loaded. Please refresh the page.');
+      return;
+    }
+
+    try {
+      setIsProcessingPayment(true);
+
+      const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
+
+      // 1. Create Razorpay order
+      const orderResponse = await fetch(`${API_BASE_URL}/payments/razorpay/create-order`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+        body: JSON.stringify({
+          amount: totalUnpaid,
+          currency: 'INR',
+          notes: {
+            eventId: event._id,
+            eventName: event.name,
+            type: 'planner_bulk_payment'
+          }
+        })
+      });
+
+      const orderData = await orderResponse.json();
+
+      if (!orderData.success) {
+        throw new Error(orderData.message || 'Failed to create payment order');
+      }
+
+      // 2. Open Razorpay checkout
+      const options = {
+        key: import.meta.env.VITE_RAZORPAY_KEY_ID,
+        amount: orderData.data.amount,
+        currency: orderData.data.currency,
+        order_id: orderData.data.id,
+        name: 'SyncStay',
+        description: `Payment for ${event.name} - All Guest Bookings`,
+        handler: async function(response) {
+          try {
+            // 3. Verify and process payment
+            const paymentResponse = await fetch(`${API_BASE_URL}/events/${event._id}/planner-payment`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('token')}`,
+              },
+              body: JSON.stringify({
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature
+              })
+            });
+
+            const data = await paymentResponse.json();
+
+            if (data.success) {
+              toast.success('Payment successful! All guest bookings confirmed.');
+              queryClient.invalidateQueries(['microsite-bookings']);
+              queryClient.invalidateQueries(['microsite-event']);
+            } else {
+              throw new Error(data.message || 'Payment verification failed');
+            }
+          } catch (error) {
+            console.error('Payment handler error:', error);
+            toast.error('Payment processing failed');
+          } finally {
+            setIsProcessingPayment(false);
+          }
+        },
+        prefill: {
+          name: event.planner?.name || '',
+          email: event.planner?.email || '',
+          contact: event.planner?.phone || ''
+        },
+        theme: {
+          color: '#3b82f6'
+        },
+        modal: {
+          ondismiss: function() {
+            setIsProcessingPayment(false);
+            toast.error('Payment cancelled');
+          }
+        }
+      };
+
+      const razorpay = new window.Razorpay(options);
+      razorpay.open();
+
+    } catch (error) {
+      console.error('Payment initiation error:', error);
+      toast.error(error.message || 'Failed to initiate payment');
+      setIsProcessingPayment(false);
+    }
   };
 
   return (
@@ -133,6 +256,39 @@ export const MicrositePlannerBookings = () => {
             <p className="text-xl font-bold text-primary-900">{formatCurrency(stats.totalRevenue)}</p>
           </div>
         </div>
+
+        {/* Payment Alert for Unpaid Bookings (Private Events) */}
+        {event?.isPrivate && totalUnpaid > 0 && event?.plannerPaymentStatus !== 'paid' && (
+          <div className="card bg-amber-50 border-2 border-amber-300">
+            <div className="flex items-start md:items-center justify-between gap-4 flex-col md:flex-row">
+              <div className="flex items-start gap-4">
+                <div className="bg-amber-100 p-3 rounded-lg">
+                  <CreditCard className="h-6 w-6 text-amber-700" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-amber-900 mb-1">
+                    Payment Required
+                  </h3>
+                  <p className="text-amber-700 text-sm mb-2">
+                    Your guests have made bookings totaling{' '}
+                    <span className="font-bold text-lg">{formatCurrency(totalUnpaid)}</span>
+                  </p>
+                  <p className="text-amber-600 text-sm">
+                    Complete the payment to confirm all guest bookings and activate your event.
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={handlePayForBookings}
+                disabled={isProcessingPayment}
+                className="btn-primary whitespace-nowrap flex items-center gap-2"
+              >
+                <CreditCard className="h-5 w-5" />
+                {isProcessingPayment ? 'Processing...' : `Pay ${formatCurrency(totalUnpaid)}`}
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Filters */}
         <div className="card">

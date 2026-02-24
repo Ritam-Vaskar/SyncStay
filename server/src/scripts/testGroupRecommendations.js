@@ -78,13 +78,13 @@ async function diagnose(eventId) {
     if (h.tboDescription) console.log(`     TBO description snippet: ${h.tboDescription.slice(0, 120)}...`);
   }
 
-  // ── 5. Gemini scoring ─────────────────────────────────────────────────────
+  // ── 5. OpenAI scoring ─────────────────────────────────────────────────────
   console.log('\n' + sep);
-  console.log('STEP 2 — Gemini / fallback scoring');
+  console.log('STEP 2 — OpenAI / fallback scoring');
   console.log(sep);
   let geminiScores;
-  const apiKey = process.env.GEMINI_API_KEY;
-  console.log(`  GEMINI_API_KEY present: ${!!apiKey}`);
+  const apiKey = process.env.OPENAI_API_KEY;
+  console.log(`  OPENAI_API_KEY present: ${!!apiKey}`);
   try {
     geminiScores = await scoreFacilitiesWithGemini(enriched, event, groups);
     console.log(`  ✅ Gemini returned scores for ${Object.keys(geminiScores.eventScores || {}).length} hotels, ${Object.keys(geminiScores.groupScores || {}).length} groups`);

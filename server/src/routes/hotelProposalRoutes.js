@@ -10,12 +10,12 @@ import {
   updateProposal,
   getSelectedProposalsForMicrosite,
 } from '../controllers/hotelProposalController.js';
-import { protect, authorize } from '../middlewares/auth.js';
+import { protect, authorize, optionalAuth } from '../middlewares/auth.js';
 
 const router = express.Router();
 
-// Public routes (must be before protected routes)
-router.get('/microsite/:slug/selected', getSelectedProposalsForMicrosite);
+// Public routes with optional auth (must be before protected routes)
+router.get('/microsite/:slug/selected', optionalAuth, getSelectedProposalsForMicrosite);
 
 // Hotel routes
 router.get('/rfps', protect, authorize('hotel'), getRFPs);

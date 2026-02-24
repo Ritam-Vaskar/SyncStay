@@ -594,8 +594,8 @@ export const updateProposal = asyncHandler(async (req, res) => {
 
 /**
  * @route   GET /api/hotel-proposals/microsite/:slug/selected
- * @desc    Get selected hotel proposals for a microsite (Public)
- * @access  Public
+ * @desc    Get selected hotel proposals for a microsite (filtered by guest group if authenticated)
+ * @access  Public (with optional auth for group filtering)
  */
 export const getSelectedProposalsForMicrosite = asyncHandler(async (req, res) => {
   const { slug } = req.params;
@@ -629,14 +629,52 @@ export const getSelectedProposalsForMicrosite = asyncHandler(async (req, res) =>
 
   // Fetch full proposal details for selected hotels
   const proposalIds = event.selectedHotels.map(sh => sh.proposal);
-  const selectedProposals = await HotelProposal.find({
+  let selectedProposals = await HotelProposal.find({
     _id: { $in: proposalIds },
     // Don't filter by selectedByPlanner - the fact that it's in event.selectedHotels means it's selected
   })
     .populate('hotel', 'name email phone organization')
     .sort({ hotelName: 1 });
 
-  console.log(`✅ Found ${selectedProposals.length} selected proposals`);
+  console.log(`✅ Found ${selectedProposals.length} total selected proposals`);
+
+  // Filter by guest group if user is authenticated and has group assignment
+  if (req.user && req.user.email) {
+    try {
+      // Import InventoryGroup model
+      const InventoryGroup = (await import('../models/InventoryGroup.js')).default;
+      
+      // Find guest's group by email in members array
+      const guestGroup = await InventoryGroup.findOne({
+        event: event._id,
+        'members.guestEmail': req.user.email,
+      }).populate('assignedHotels.hotel', '_id');
+
+      if (guestGroup && guestGroup.assignedHotels && guestGroup.assignedHotels.length > 0) {
+        // Extract hotel IDs from the group's assigned hotels
+        const assignedHotelIds = guestGroup.assignedHotels
+          .map(ah => ah.hotel?._id?.toString() || ah.hotel?.toString())
+          .filter(Boolean);
+
+        console.log(`🎯 Guest ${req.user.email} belongs to group "${guestGroup.name}" with ${assignedHotelIds.length} assigned hotels`);
+
+        // Filter proposals to only show hotels assigned to this guest's group
+        selectedProposals = selectedProposals.filter(proposal => {
+          const hotelId = proposal.hotel?._id?.toString();
+          return assignedHotelIds.includes(hotelId);
+        });
+
+        console.log(`✅ Filtered to ${selectedProposals.length} proposals for guest's group`);
+      } else {
+        console.log(`ℹ️ Guest ${req.user.email} has no group assignment or no hotels assigned to group - showing all hotels`);
+      }
+    } catch (error) {
+      console.error('Error filtering hotels by group:', error);
+      // If filtering fails, show all hotels (fail open for better UX)
+    }
+  } else {
+    console.log('ℹ️ No authenticated user - showing all hotels');
+  }
 
   res.status(200).json({
     success: true,

@@ -870,11 +870,20 @@ export const processPlannerPayment = asyncHandler(async (req, res) => {
     razorpay_signature,
   };
 
-  // Publish microsite and activate event after payment
-  if (!event.micrositeConfig.isPublished) {
-    event.micrositeConfig.isPublished = true;
-    console.log(`🌐 Microsite published for event: ${event.name}`);
-  }
+  // Mark all associated guest bookings as paid
+  const updateResult = await Booking.updateMany(
+    { 
+      event: event._id, 
+      isPaidByPlanner: true,
+      paymentStatus: 'unpaid'  // Only update unpaid bookings
+    },
+    { 
+      paymentStatus: 'paid',
+      status: 'confirmed'  // Auto-confirm bookings when planner pays
+    }
+  );
+  
+  console.log(`💳 Updated ${updateResult.modifiedCount} bookings to 'paid' status`);
   
   // Change status to active so event shows in "Manage Events"
   event.status = 'active';

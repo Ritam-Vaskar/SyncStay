@@ -154,7 +154,7 @@ export async function scoreHotelsForGroups(hotels, event, groups, geminiScores, 
   console.log(`📊 INVENTORY RECOMMENDATION — Event: "${event.name}" (${event.type || 'general'})`);
   console.log(`   Hotels in pool : ${hotels.map(h => h.name).join(', ')}`);
   console.log(`   Groups         : ${groups.map(g => g.name + ' (' + (g.relationshipType || g.type || 'general') + ')').join(', ')}`);
-  console.log(`   Gemini scoring : ${geminiScores?.eventScores ? 'ACTIVE' : 'FALLBACK/RULE-BASED'}`);
+  console.log(`   AI scoring     : ${geminiScores?.eventScores ? 'ACTIVE' : 'FALLBACK/RULE-BASED'}`);
   console.log(`   Activity vector: ${eventVector ? 'FOUND' : 'NOT FOUND — using neutral 50'}`);
   console.log('═'.repeat(70));
 

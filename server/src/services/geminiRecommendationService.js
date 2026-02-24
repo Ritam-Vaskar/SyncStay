@@ -1,20 +1,22 @@
 /**
- * Gemini Recommendation Service
+ * OpenAI Recommendation Service
  *
- * Uses Google Gemini Flash (free tier) to score hotels against groups based on
+ * Uses OpenAI GPT-4o-mini to score hotels against groups based on
  * real TBO HotelFacilities + Description + HotelRating.
  *
- * Gemini understands natural language: "Conference center, Meeting rooms, Business WiFi"
+ * OpenAI understands natural language: "Conference center, Meeting rooms, Business WiFi"
  * → strong match for a corporate group. "Pool, Bar, Rooftop Lounge" → strong match for friends.
  *
  * Falls back to rule-based scoring if the API call fails.
  */
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import OpenAI from 'openai';
 import { getMergedFacilities } from './tboHotelEnrichmentService.js';
 import dotenv from 'dotenv';
 dotenv.config();
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
 
 /**
  * Rule-based fallback: score a hotel for a group based on facilities and group type.
@@ -143,8 +145,8 @@ function ruleBasedEventScore(hotel, event) {
 }
 
 /**
- * Score hotels using Gemini AI for both event-level and group-level fit.
- * Makes a single Gemini call per invocation (batch all groups + hotels together).
+ * Score hotels using OpenAI GPT-4o-mini for both event-level and group-level fit.
+ * Makes a single OpenAI call per invocation (batch all groups + hotels together).
  *
  * @param {Array<Object>} hotels       — TBO-enriched hotel objects
  * @param {Object}        event        — Event document
@@ -155,9 +157,9 @@ function ruleBasedEventScore(hotel, event) {
  * }>}
  */
 export async function scoreFacilitiesWithGemini(hotels, event, groups = []) {
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
-    console.warn('⚠️  GEMINI_API_KEY not set — using rule-based fallback');
+    console.warn('⚠️  OPENAI_API_KEY not set — using rule-based fallback');
     return buildFallbackScores(hotels, event, groups);
   }
 
@@ -235,15 +237,25 @@ OUTPUT: Respond ONLY with valid JSON in this exact format:
 }`;
 
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
-    const result = await model.generateContent(prompt);
-    const text = result.response.text();
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        {
+          role: 'system',
+          content: 'You are a hotel recommendation engine for event planning. You analyze hotels and provide scoring based on facilities, ratings, and group requirements. Always respond with valid JSON.'
+        },
+        {
+          role: 'user',
+          content: prompt
+        }
+      ],
+      response_format: { type: "json_object" },
+      temperature: 0.3,
+      max_tokens: 4000
+    });
 
-    // Extract JSON from response (sometimes wrapped in ```json blocks)
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) throw new Error('No JSON found in Gemini response');
-
-    const parsed = JSON.parse(jsonMatch[0]);
+    const text = response.choices[0].message.content;
+    const parsed = JSON.parse(text);
 
     // Normalise into lookup maps
     const eventScores = {};
@@ -266,16 +278,21 @@ OUTPUT: Respond ONLY with valid JSON in this exact format:
       }
     }
 
-    console.log(`✅ Gemini scored ${Object.keys(eventScores).length} hotels × ${Object.keys(groupScores).length} groups`);
+    console.log(`✅ OpenAI scored ${Object.keys(eventScores).length} hotels × ${Object.keys(groupScores).length} groups`);
     return { eventScores, groupScores };
   } catch (err) {
-    console.warn('⚠️  Gemini API error, falling back to rule-based:', err.message);
+    // Handle rate limit errors specifically
+    if (err.status === 429) {
+      console.warn('⚠️  OpenAI rate limit exceeded, falling back to rule-based scoring');
+    } else {
+      console.warn('⚠️  OpenAI API error, falling back to rule-based:', err.message);
+    }
     return buildFallbackScores(hotels, event, groups);
   }
 }
 
 /**
- * Build rule-based fallback scores in the same shape as Gemini output.
+ * Build rule-based fallback scores in the same shape as OpenAI output.
  */
 export function buildFallbackScores(hotels, event, groups) {
   const eventScores = {};
