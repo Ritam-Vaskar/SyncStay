@@ -21,6 +21,11 @@ export const guestInvitationService = {
     return api.delete(`/guest-invitations/${eventId}/guests/${guestId}`);
   },
 
+  // Update guest group assignment
+  updateGuestGroup: (eventId, guestId, group) => {
+    return api.patch(`/guest-invitations/${eventId}/guests/${guestId}/group`, { group });
+  },
+
   // Toggle event privacy
   toggleEventPrivacy: (eventId, isPrivate) => {
     return api.patch(`/guest-invitations/${eventId}/privacy`, { isPrivate });

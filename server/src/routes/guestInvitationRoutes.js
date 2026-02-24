@@ -6,6 +6,7 @@ import {
   removeGuest,
   verifyGuestAccess,
   toggleEventPrivacy,
+  updateGuestGroup,
 } from '../controllers/guestInvitationController.js';
 import { protect, authorize } from '../middlewares/auth.js';
 
@@ -20,5 +21,6 @@ router.post('/:eventId/guests/upload', protect, authorize('planner'), uploadGues
 router.get('/:eventId/guests', protect, authorize('planner'), getGuestList);
 router.delete('/:eventId/guests/:guestId', protect, authorize('planner'), removeGuest);
 router.patch('/:eventId/privacy', protect, authorize('planner'), toggleEventPrivacy);
+router.patch('/:eventId/guests/:guestId/group', protect, authorize('planner'), updateGuestGroup);
 
 export default router;

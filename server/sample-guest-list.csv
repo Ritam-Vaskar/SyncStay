@@ -1,11 +1,11 @@
-Name,Email,Phone
-Robert Johnson,robert.j@example.com,+1-555-3001
-Amanda White,amanda.w@example.com,+1-555-3002
-Kevin Thompson,kevin.t@example.com,+1-555-3003
-Rachel Green,rachel.g@example.com,+1-555-3004
-Daniel Martinez,daniel.m@example.com,+1-555-3005
-Jessica Lopez,jessica.l@example.com,+1-555-3006
-Matthew Garcia,matthew.g@example.com,+1-555-3007
-Lauren Rodriguez,lauren.r@example.com,+1-555-3008
-Christopher Lee,christopher.l@example.com,+1-555-3009
-Stephanie Walker,stephanie.w@example.com,+1-555-3010
+Name,Email,Phone,Group
+Robert Johnson,robert.j@example.com,+1-555-3001,VIP
+Amanda White,amanda.w@example.com,+1-555-3002,Family
+Kevin Thompson,kevin.t@example.com,+1-555-3003,Friends
+Rachel Green,rachel.g@example.com,+1-555-3004,VIP
+Daniel Martinez,daniel.m@example.com,+1-555-3005,Colleagues
+Jessica Lopez,jessica.l@example.com,+1-555-3006,Family
+Matthew Garcia,matthew.g@example.com,+1-555-3007,Friends
+Lauren Rodriguez,lauren.r@example.com,+1-555-3008,VIP
+Christopher Lee,christopher.l@example.com,+1-555-3009,Colleagues
+Stephanie Walker,stephanie.w@example.com,+1-555-3010,Friends

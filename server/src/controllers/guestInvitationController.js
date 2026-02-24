@@ -1,8 +1,95 @@
 import Event from '../models/Event.js';
+import InventoryGroup from '../models/InventoryGroup.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import { createAuditLog } from '../middlewares/auditLogger.js';
 import xlsx from 'xlsx';
 import sendEmail from '../utils/mail.js';
+
+/**
+ * Helper function to auto-create inventory groups for guest groups
+ */
+const autoCreateInventoryGroups = async (eventId, guests) => {
+  try {
+    console.log(`\n🔍 AutoCreateInventoryGroups called for event ${eventId}`);
+    console.log(`📋 Guests received:`, guests.map(g => ({ name: g.name, group: g.group })));
+    
+    // Extract unique group names from guests
+    const groupNames = [...new Set(
+      guests
+        .map(g => g.group)
+        .filter(g => g && g.trim() !== '')
+    )];
+
+    console.log(`📊 Unique group names found:`, groupNames);
+
+    if (groupNames.length === 0) {
+      console.log(`⚠️  No groups to create`);
+      return;
+    }
+
+    // Check which groups already exist
+    const existingGroups = await InventoryGroup.find({
+      event: eventId,
+      name: { $in: groupNames }
+    });
+
+    console.log(`📦 Existing groups in DB:`, existingGroups.map(g => g.name));
+
+    const existingGroupNames = new Set(existingGroups.map(g => g.name));
+
+    // Create new groups that don't exist
+    const newGroups = groupNames
+      .filter(name => !existingGroupNames.has(name))
+      .map(name => ({
+        event: eventId,
+        name: name,
+        description: `Auto-created from guest group: ${name}`,
+        number: guests.filter(g => g.group === name).length,
+        members: guests
+          .filter(g => g.group === name)
+          .map(g => ({
+            guestEmail: g.email,
+            guestName: g.name,
+            addedAt: new Date()
+          })),
+        type: 'manual',
+        priority: 1
+      }));
+
+    if (newGroups.length > 0) {
+      console.log(`➕ Creating ${newGroups.length} new groups:`, newGroups.map(g => `${g.name} (${g.members.length} members)`));
+      await InventoryGroup.insertMany(newGroups);
+      console.log(`✅ Auto-created ${newGroups.length} inventory groups successfully`);
+    } else {
+      console.log(`ℹ️  No new groups to create - all already exist`);
+    }
+
+    // Update existing groups with new members
+    for (const group of existingGroups) {
+      const groupGuests = guests.filter(g => g.group === group.name);
+      const existingEmails = new Set(group.members.map(m => m.guestEmail.toLowerCase()));
+      
+      const newMembers = groupGuests
+        .filter(g => !existingEmails.has(g.email.toLowerCase()))
+        .map(g => ({
+          guestEmail: g.email,
+          guestName: g.name,
+          addedAt: new Date()
+        }));
+
+      if (newMembers.length > 0) {
+        group.members.push(...newMembers);
+        group.number = group.members.length;
+        await group.save();
+        console.log(`✅ Added ${newMembers.length} members to existing group: ${group.name}`);
+      }
+    }
+  } catch (error) {
+    console.error('❌ Error auto-creating inventory groups:', error.message);
+    console.error('Full error:', error);
+    // Don't throw error - this is a secondary operation
+  }
+};
 
 // @desc    Add guests to private event (manually)
 // @route   POST /api/events/:eventId/guests
@@ -42,6 +129,9 @@ export const addGuests = asyncHandler(async (req, res) => {
 
   event.invitedGuests.push(...newGuests);
   await event.save();
+
+  // Auto-create inventory groups for guests with groups
+  await autoCreateInventoryGroups(eventId, newGuests);
 
   await createAuditLog(req.user.id, 'ADD_GUESTS', 'Event', eventId, {
     guestsAdded: newGuests.length,
@@ -102,18 +192,19 @@ export const uploadGuestList = asyncHandler(async (req, res) => {
     const worksheet = workbook.Sheets[sheetName];
     const data = xlsx.utils.sheet_to_json(worksheet);
 
-    // Expected columns: Name, Email, Phone (optional)
+    // Expected columns: Name, Email, Phone (optional), Group (optional)
     const guests = data.map(row => ({
       name: row.Name || row.name,
       email: row.Email || row.email,
       phone: row.Phone || row.phone || '',
+      group: row.Group || row.group || '',
       addedAt: new Date(),
       hasAccessed: false,
     })).filter(guest => guest.name && guest.email);
 
     if (guests.length === 0) {
       return res.status(400).json({ 
-        message: 'No valid guests found in Excel file. Please ensure columns are named: Name, Email, Phone',
+        message: 'No valid guests found in Excel file. Please ensure columns are named: Name, Email, Phone, Group (optional)',
       });
     }
 
@@ -124,6 +215,9 @@ export const uploadGuestList = asyncHandler(async (req, res) => {
 
     event.invitedGuests.push(...newGuests);
     await event.save();
+
+    // Auto-create inventory groups for guests with groups
+    await autoCreateInventoryGroups(eventId, newGuests);
 
     await createAuditLog(req.user.id, 'UPLOAD_GUEST_LIST', 'Event', eventId, {
       guestsAdded: newGuests.length,
@@ -163,7 +257,7 @@ export const uploadGuestList = asyncHandler(async (req, res) => {
     });
   } catch (error) {
     res.status(400).json({ 
-      message: 'Error parsing Excel file. Please ensure it has columns: Name, Email, Phone',
+      message: 'Error parsing Excel file. Please ensure it has columns: Name, Email, Phone, Group (optional)',
       error: error.message,
     });
   }
@@ -331,5 +425,45 @@ export const toggleEventPrivacy = asyncHandler(async (req, res) => {
     success: true,
     message: `Event is now ${isPrivate ? 'private' : 'public'}`,
     data: { isPrivate: event.isPrivate },
+  });
+});
+
+// @desc    Update guest group assignment
+// @route   PATCH /api/events/:eventId/guests/:guestId/group
+// @access  Private (Planner)
+export const updateGuestGroup = asyncHandler(async (req, res) => {
+  const { eventId, guestId } = req.params;
+  const { group } = req.body;
+
+  const event = await Event.findById(eventId);
+
+  if (!event) {
+    return res.status(404).json({ message: 'Event not found' });
+  }
+
+  if (event.planner.toString() !== req.user.id) {
+    return res.status(403).json({ message: 'Not authorized to manage this event' });
+  }
+
+  // Find the guest in invitedGuests array
+  const guestIndex = event.invitedGuests.findIndex(g => g._id.toString() === guestId);
+
+  if (guestIndex === -1) {
+    return res.status(404).json({ message: 'Guest not found' });
+  }
+
+  // Update the group
+  event.invitedGuests[guestIndex].group = group || '';
+  await event.save();
+
+  await createAuditLog(req.user.id, 'UPDATE_GUEST_GROUP', 'Event', eventId, {
+    guestEmail: event.invitedGuests[guestIndex].email,
+    group,
+  });
+
+  res.status(200).json({
+    success: true,
+    message: 'Guest group updated successfully',
+    data: event.invitedGuests[guestIndex],
   });
 });

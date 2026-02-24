@@ -16,6 +16,9 @@ import {
   MapPin,
   DollarSign,
   Sparkles,
+  ClipboardList,
+  PencilLine,
+  BarChart2,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '@/services/api';
@@ -26,6 +29,7 @@ export const MicrositeInventoryManagement = () => {
   const queryClient = useQueryClient();
   
   const [step, setStep] = useState(1); // 1: Hotels, 2: Groups, 3: Recommendations, 4: Confirm
+  const [viewMode, setViewMode] = useState('analytics'); // 'analytics' | 'wizard'
   const [groups, setGroups] = useState([]);
   const [newGroupName, setNewGroupName] = useState('');
   const [newGroupNumber, setNewGroupNumber] = useState('');
@@ -62,6 +66,30 @@ export const MicrositeInventoryManagement = () => {
     },
     enabled: !!event?._id,
   });
+
+  // Populate groupAssignments from saved DB data when groups + hotels are loaded
+  useEffect(() => {
+    if (groups.length > 0 && populatedHotels.length > 0) {
+      setGroupAssignments((prev) => {
+        const fromDB = {};
+        groups.forEach((g) => {
+          if (g.assignedHotels && g.assignedHotels.length > 0) {
+            const primary = g.assignedHotels.sort((a, b) => (a.priority || 1) - (b.priority || 1))[0];
+            const hotelId = String(primary.hotel?._id || primary.hotel);
+            const fullHotel = populatedHotels.find((ph) => String(ph.hotel?._id) === hotelId)?.hotel;
+            if (!prev[g._id]) {
+              fromDB[g._id] = {
+                hotelId,
+                hotelName: fullHotel?.name || fullHotel?.organization || 'Hotel',
+                fullHotel,
+              };
+            }
+          }
+        });
+        return { ...fromDB, ...prev };
+      });
+    }
+  }, [groups, populatedHotels]);
 
   // Populate hotel details when data is available
   useEffect(() => {
@@ -291,14 +319,174 @@ export const MicrositeInventoryManagement = () => {
     );
   }
 
+  // ── Analytics View (shown when inventory already configured) ─────────────
+  const showAnalytics = viewMode === 'analytics' && selectedHotels.length > 0 && groups.length > 0;
+
   return (
     <MicrositeDashboardLayout event={event}>
       <div className="space-y-6">
         {/* Header */}
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Manage Inventory</h1>
-          <p className="text-gray-600 mt-2">Configure guest groups and get hotel recommendations</p>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Manage Inventory</h1>
+            <p className="text-gray-600 mt-2">Configure guest groups and get hotel recommendations</p>
+          </div>
+          {showAnalytics && (
+            <button
+              onClick={() => { setViewMode('wizard'); setStep(1); }}
+              className="flex items-center gap-2 px-5 py-2.5 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors font-semibold text-sm flex-shrink-0"
+            >
+              <PencilLine className="h-4 w-4" />
+              Edit / Reconfigure
+            </button>
+          )}
         </div>
+
+        {/* ── ANALYTICS VIEW ────────────────────────────────────────────── */}
+        {showAnalytics && (
+          <div className="space-y-6">
+            {/* Stat cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="card flex items-center gap-4">
+                <div className="p-3 bg-blue-100 rounded-xl">
+                  <Hotel className="h-6 w-6 text-blue-600" />
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Hotels Selected</p>
+                  <p className="text-2xl font-bold text-gray-900">{selectedHotels.length}</p>
+                </div>
+              </div>
+              <div className="card flex items-center gap-4">
+                <div className="p-3 bg-purple-100 rounded-xl">
+                  <Users className="h-6 w-6 text-purple-600" />
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Groups Created</p>
+                  <p className="text-2xl font-bold text-gray-900">{groups.length}</p>
+                </div>
+              </div>
+              <div className="card flex items-center gap-4">
+                <div className="p-3 bg-teal-100 rounded-xl">
+                  <ClipboardList className="h-6 w-6 text-teal-600" />
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Hotels Assigned</p>
+                  <p className="text-2xl font-bold text-gray-900">
+                    {Object.keys(groupAssignments).length}
+                    <span className="text-base font-normal text-gray-400"> / {groups.length}</span>
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Selected Hotels */}
+            <div className="card">
+              <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                <Hotel className="h-5 w-5 text-blue-600" />
+                Selected Hotels
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {populatedHotels.map((sh) => (
+                  <div
+                    key={sh.hotel?._id || sh.hotel}
+                    className="flex items-start gap-3 p-3 bg-green-50 border border-green-200 rounded-lg"
+                  >
+                    <CheckCircle2 className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-gray-900 truncate">
+                        {sh.hotel?.name || sh.hotel?.organization || 'Hotel'}
+                      </p>
+                      {sh.hotel?.location?.city && (
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          📍 {sh.hotel.location.city}{sh.hotel.location.country ? `, ${sh.hotel.location.country}` : ''}
+                        </p>
+                      )}
+                      {sh.hotel?.priceRange?.min && (
+                        <p className="text-xs text-gray-500">
+                          💰 ${sh.hotel.priceRange.min} – ${sh.hotel.priceRange.max || sh.hotel.priceRange.min}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Group Hotel Assignments table */}
+            <div className="card">
+              <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                <BarChart2 className="h-5 w-5 text-purple-600" />
+                Group Hotel Assignments
+              </h2>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm border border-gray-200 rounded-lg overflow-hidden">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="text-left px-4 py-3 font-semibold text-gray-700">Group</th>
+                      <th className="text-left px-4 py-3 font-semibold text-gray-700">Guests</th>
+                      <th className="text-left px-4 py-3 font-semibold text-gray-700">Assigned Hotel</th>
+                      <th className="text-left px-4 py-3 font-semibold text-gray-700">City</th>
+                      <th className="text-left px-4 py-3 font-semibold text-gray-700">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {groups.map((g) => {
+                      const assignment = groupAssignments[g._id];
+                      return (
+                        <tr key={g._id} className={assignment ? 'bg-white' : 'bg-amber-50'}>
+                          <td className="px-4 py-3 font-medium text-gray-900">{g.name}</td>
+                          <td className="px-4 py-3 text-gray-600">{g.number || g.members?.length || 0}</td>
+                          <td className="px-4 py-3">
+                            {assignment ? (
+                              <span className="font-semibold text-gray-900">{assignment.hotelName}</span>
+                            ) : (
+                              <span className="text-amber-600 text-xs italic">Not assigned</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-gray-500 text-xs">
+                            {assignment?.fullHotel?.location?.city || '—'}
+                          </td>
+                          <td className="px-4 py-3">
+                            {assignment ? (
+                              <span className="inline-flex items-center gap-1 bg-teal-100 text-teal-700 text-xs px-2 py-1 rounded-full font-semibold">
+                                <CheckCircle2 className="h-3 w-3" /> Assigned
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 bg-amber-100 text-amber-700 text-xs px-2 py-1 rounded-full font-semibold">
+                                ⚠ Unassigned
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {Object.keys(groupAssignments).length < groups.length && (
+                <p className="text-xs text-amber-600 mt-3">
+                  ⚠ Some groups have no hotel assigned. Click &ldquo;Edit / Reconfigure&rdquo; to assign them.
+                </p>
+              )}
+            </div>
+
+            {/* Footer action */}
+            <div className="flex justify-end">
+              <button
+                onClick={() => { setViewMode('wizard'); setStep(1); }}
+                className="flex items-center gap-2 px-6 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors font-semibold"
+              >
+                <PencilLine className="h-4 w-4" />
+                Edit / Reconfigure Inventory
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ── WIZARD (step-by-step) ─────────────────────────────────────── */}
+        {!showAnalytics && (
+        <>
 
         {/* Step Indicator */}
         <div className="bg-white border border-gray-200 rounded-lg p-6">
@@ -473,6 +661,14 @@ export const MicrositeInventoryManagement = () => {
                     placeholder="e.g., VIP Guests, Family, Friends"
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                   />
+                  {newGroupName && invitedGuests.filter(g => g.group && g.group.toLowerCase() === newGroupName.toLowerCase()).length > 0 && (
+                    <div className="mt-2 flex items-start gap-2 p-2 bg-blue-50 border border-blue-200 rounded-lg">
+                      <Sparkles className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                      <p className="text-sm text-blue-700">
+                        <strong>{invitedGuests.filter(g => g.group && g.group.toLowerCase() === newGroupName.toLowerCase()).length}</strong> guest(s) from guest list are already assigned to "{newGroupName}"
+                      </p>
+                    </div>
+                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Number</label>
@@ -566,16 +762,25 @@ export const MicrositeInventoryManagement = () => {
                         </div>
                       </div>
 
-                      {/* Guest assignment (for private events) */}
-                      {event.isPrivate && selectedGroupForGuests !== group._id && (
+                      {/* Guest assignment (for events with invited guests) */}
+                      {invitedGuests.length > 0 && selectedGroupForGuests !== group._id && (
                         <button
                           onClick={() => {
                             setSelectedGroupForGuests(group._id);
-                            setSelectedGuestsForGroup([]);
+                            // Pre-select guests whose group matches this group's name
+                            const matchingGuests = invitedGuests
+                              .filter(g => g.group && g.group.toLowerCase() === group.name.toLowerCase())
+                              .map(g => g.email);
+                            setSelectedGuestsForGroup(matchingGuests);
                           }}
                           className="text-sm text-primary-600 hover:underline font-medium"
                         >
                           + Assign Guests
+                          {invitedGuests.filter(g => g.group && g.group.toLowerCase() === group.name.toLowerCase()).length > 0 && (
+                            <span className="ml-1 text-xs bg-primary-100 text-primary-700 px-1.5 py-0.5 rounded-full">
+                              {invitedGuests.filter(g => g.group && g.group.toLowerCase() === group.name.toLowerCase()).length} matching
+                            </span>
+                          )}
                         </button>
                       )}
 
@@ -600,9 +805,14 @@ export const MicrositeInventoryManagement = () => {
                                   }}
                                   className="rounded border-gray-300"
                                 />
-                                <span className="text-sm text-gray-700">
+                                <span className="text-sm text-gray-700 flex-1">
                                   {guest.name} ({guest.email})
                                 </span>
+                                {guest.group && (
+                                  <span className="text-xs px-2 py-0.5 bg-primary-100 text-primary-700 rounded-full border border-primary-200">
+                                    {guest.group}
+                                  </span>
+                                )}
                               </label>
                             ))}
                           </div>
@@ -1235,7 +1445,7 @@ export const MicrositeInventoryManagement = () => {
               <button
                 onClick={() => {
                   toast.success('Inventory configuration saved!');
-                  navigate(`/microsite/${slug}/dashboard`);
+                  setViewMode('analytics');
                 }}
                 className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-semibold"
               >
@@ -1243,6 +1453,9 @@ export const MicrositeInventoryManagement = () => {
               </button>
             </div>
           </div>
+        )}
+
+        </>
         )}
       </div>
     </MicrositeDashboardLayout>

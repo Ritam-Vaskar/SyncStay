@@ -479,15 +479,12 @@ export const assignHotelToGroup = asyncHandler(async (req, res) => {
     return res.status(404).json({ success: false, message: 'Group not found' });
   }
 
-  // Upsert — remove existing entry for this hotel, then push fresh
-  group.assignedHotels = group.assignedHotels.filter(
-    (ah) => ah.hotel?.toString() !== hotelId
-  );
-  group.assignedHotels.push({
+  // Replace — clear any previous assignment and set this hotel as the sole primary
+  group.assignedHotels = [{
     hotel: hotelId,
-    priority: group.assignedHotels.length + 1,
+    priority: 1,
     assignedAt: new Date(),
-  });
+  }];
   await group.save();
 
   await group.populate('assignedHotels.hotel', 'name organization location tboData priceRange totalRooms averageRating facilities');

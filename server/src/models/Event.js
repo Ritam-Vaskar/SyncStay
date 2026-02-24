@@ -189,6 +189,7 @@ const eventSchema = new mongoose.Schema(
         required: true,
       },
       phone: String,
+      group: String,
       hasAccessed: {
         type: Boolean,
         default: false,
