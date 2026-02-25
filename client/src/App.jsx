@@ -28,6 +28,7 @@ import { PlannerProposalsPage } from './pages/PlannerProposalsPage';
 import { PlannerInventoryPage } from './pages/PlannerInventoryPage';
 import { PlannerBookingsPage } from './pages/PlannerBookingsPage';
 import { PlannerAnalyticsPage } from './pages/PlannerAnalyticsPage';
+import { PlannerFeedbackPage } from './pages/PlannerFeedbackPage';
 import { HotelDashboardPage } from './pages/HotelDashboardPage';
 import { HotelRfpsPage } from './pages/HotelRfpsPage';
 import { HotelInventoryPage } from './pages/HotelInventoryPage';
@@ -238,6 +239,16 @@ function App() {
               <ProtectedRoute allowedRoles={['planner']}>
                 <DashboardLayout>
                   <PlannerAnalyticsPage />
+                </DashboardLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/planner/feedback"
+            element={
+              <ProtectedRoute allowedRoles={['planner']}>
+                <DashboardLayout>
+                  <PlannerFeedbackPage />
                 </DashboardLayout>
               </ProtectedRoute>
             }

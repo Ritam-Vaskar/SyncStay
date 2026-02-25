@@ -18,6 +18,9 @@ export const eventService = {
   reject: (id, reason) => api.put(`/events/${id}/reject`, { reason }),
   addComment: (id, comment) => api.post(`/events/${id}/comment`, { comment }),
   replyToComment: (id, commentId, reply) => api.post(`/events/${id}/comment/${commentId}/reply`, { reply }),
+  // Chat messages
+  sendChatMessage: (id, message) => api.post(`/events/${id}/chat/send`, { message }),
+  getChatMessages: (id) => api.get(`/events/${id}/chat/messages`),
   // Hotel recommendations and selections
   getHotelRecommendations: (id) => api.get(`/events/${id}/recommendations`),
   selectRecommendedHotel: (id, hotelId) => api.post(`/events/${id}/select-recommended-hotel`, { hotelId }),

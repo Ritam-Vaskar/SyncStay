@@ -286,7 +286,7 @@ export const LandingPage = () => {
           <div className="grid md:grid-cols-4 gap-8">
             {[
               { step: '1', title: 'Create Event', desc: 'Set up your event with dates, location, and requirements' },
-              { step: '2', title: 'Get Approved', desc: 'Admin reviews and auto-generates your branded microsite' },
+              { step: '2', title: 'Instant Publish', desc: 'Your branded microsite is auto-generated and published instantly' },
               { step: '3', title: 'Share Link', desc: 'Send the unique microsite URL to your guests' },
               { step: '4', title: 'Approve Bookings', desc: 'Review and approve guest bookings with one click' }
             ].map((item, index) => (

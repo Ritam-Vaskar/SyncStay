@@ -10,7 +10,7 @@ import { io } from 'socket.io-client';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
-export const AdminFeedbackPage = () => {
+export const PlannerFeedbackPage = () => {
   const [expandedEvents, setExpandedEvents] = useState({});
   const [messageInputs, setMessageInputs] = useState({});
   const [socket, setSocket] = useState(null);
@@ -35,7 +35,7 @@ export const AdminFeedbackPage = () => {
     socketInstance.on('new-chat-message', ({ eventId }) => {
       console.log('📨 New chat message received:', eventId);
       // Invalidate queries to refresh messages
-      queryClient.invalidateQueries(['admin-all-events']);
+      queryClient.invalidateQueries(['planner-events']);
       
       // Auto-scroll to bottom if event is expanded
       if (expandedEvents[eventId]) {
@@ -51,15 +51,15 @@ export const AdminFeedbackPage = () => {
   }, [user?.id, expandedEvents]);
 
   const { data: eventsData, isLoading } = useQuery({
-    queryKey: ['admin-all-events'],
+    queryKey: ['planner-events'],
     queryFn: () => eventService.getAll(),
     refetchInterval: 10000, // Refetch every 10 seconds as backup
   });
 
-  // Get events with any chat messages or admin comments (backward compatibility)
+  // Get events with any chat messages or admin comments
   const eventsWithMessages = (eventsData?.data || [])
     .filter(event => 
-      (event.chatMessages && event.chatMessages.length > 0)  ||
+      (event.chatMessages && event.chatMessages.length > 0) ||
       (event.adminComments && event.adminComments.length > 0)
     )
     .sort((a, b) => {
@@ -78,7 +78,7 @@ export const AdminFeedbackPage = () => {
     onSuccess: (_, variables) => {
       toast.success('Message sent');
       setMessageInputs(prev => ({ ...prev, [variables.eventId]: '' }));
-      queryClient.invalidateQueries(['admin-all-events']);
+      queryClient.invalidateQueries(['planner-events']);
       setTimeout(() => scrollToBottom(variables.eventId), 100);
     },
     onError: (error) => {
@@ -185,6 +185,15 @@ export const AdminFeedbackPage = () => {
     return count;
   };
 
+  const hasUnreadMessages = (event) => {
+    // Check if there are any admin messages that haven't been replied to
+    if (event.chatMessages && event.chatMessages.length > 0) {
+      const lastMessage = event.chatMessages[event.chatMessages.length - 1];
+      return lastMessage.senderRole === 'admin';
+    }
+    return false;
+  };
+
   if (isLoading) {
     return (
       <div className="flex justify-center py-12">
@@ -196,21 +205,22 @@ export const AdminFeedbackPage = () => {
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-3xl font-bold">Event Feedback Conversations</h1>
-        <p className="text-gray-600 mt-1">Continuous chat with planners about their events</p>
+        <h1 className="text-3xl font-bold">Admin Messages</h1>
+        <p className="text-gray-600 mt-1">Chat with admin about your events</p>
       </div>
 
       {eventsWithMessages.length === 0 ? (
         <div className="card text-center py-12">
           <MessageSquare className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-          <h3 className="text-xl font-semibold text-gray-900 mb-2">No Conversations Yet</h3>
-          <p className="text-gray-600">Start a conversation from the "All Events" page.</p>
+          <h3 className="text-xl font-semibold text-gray-900 mb-2">No Messages Yet</h3>
+          <p className="text-gray-600">No messages from admin at the moment.</p>
         </div>
       ) : (
         <div className="space-y-4">
           {eventsWithMessages.map((event) => {
             const messages = getAllMessages(event);
             const messageCount = getTotalMessageCount(event);
+            const unread = hasUnreadMessages(event);
             
             return (
               <div key={event._id} className="card overflow-hidden">
@@ -232,6 +242,11 @@ export const AdminFeedbackPage = () => {
                         }`}>
                           {event.status}
                         </span>
+                        {unread && (
+                          <span className="badge bg-red-500 text-white text-xs">
+                            New Message
+                          </span>
+                        )}
                       </div>
                       <div className="grid grid-cols-3 gap-4 text-sm text-gray-600">
                         <div className="flex items-center gap-2">
@@ -247,14 +262,11 @@ export const AdminFeedbackPage = () => {
                           <span>{event.expectedGuests} guests</span>
                         </div>
                       </div>
-                      <div className="mt-2">
-                        <p className="text-sm text-gray-700">
-                          <strong>Planner:</strong> {event.planner?.name} ({event.planner?.email})
-                        </p>
-                      </div>
                     </div>
                     <div className="flex flex-col items-end gap-2">
-                      <div className="flex items-center gap-2 px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">
+                      <div className={`flex items-center gap-2 px-3 py-1 rounded-full text-sm font-medium ${
+                        unread ? 'bg-red-100 text-red-800' : 'bg-blue-100 text-blue-800'
+                      }`}>
                         <MessageSquare className="h-4 w-4" />
                         {messageCount} message{messageCount !== 1 ? 's' : ''}
                       </div>
@@ -276,7 +288,7 @@ export const AdminFeedbackPage = () => {
                         {messages.length === 0 ? (
                           <div className="text-center text-gray-500 py-8">
                             <MessageSquare className="h-12 w-12 mx-auto mb-2 text-gray-300" />
-                            <p>No messages yet. Start the conversation!</p>
+                            <p>No messages yet.</p>
                           </div>
                         ) : (
                           messages.map((msg, idx) => {
@@ -299,7 +311,7 @@ export const AdminFeedbackPage = () => {
                                     </div>
                                     <div>
                                       <p className="text-xs font-semibold text-gray-900">
-                                        {msg.sender?.name || (isAdmin ? 'Admin' : 'Planner')}  
+                                        {msg.sender?.name || (isAdmin ? 'Admin' : 'You')}
                                       </p>
                                       <p className="text-xs text-gray-500">
                                         {new Date(msg.sentAt).toLocaleString('en-US', {
@@ -314,7 +326,7 @@ export const AdminFeedbackPage = () => {
                                   <div className={`rounded-lg p-3 ${
                                     isAdmin 
                                       ? 'bg-blue-600 text-white ml-10'
-                                      : 'bg-white border border-gray-200 text-gray-800 ml-10'
+                                      : 'bg-green-600 text-white ml-10'
                                   }`}>
                                     <p className="text-sm whitespace-pre-wrap break-words">{msg.message}</p>
                                   </div>

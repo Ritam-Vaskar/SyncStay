@@ -77,8 +77,8 @@ export const createEvent = asyncHandler(async (req, res) => {
   // Add planner to event
   req.body.planner = req.user.id;
   
-  // Set status to pending-approval for planner-created events
-  req.body.status = 'pending-approval';
+  // Auto-approve: Set status to rfp-published (no admin approval needed)
+  req.body.status = 'rfp-published';
 
   // Handle location field - convert string to object if needed
   if (req.body.location && typeof req.body.location === 'string') {
@@ -123,14 +123,59 @@ export const createEvent = asyncHandler(async (req, res) => {
     req.body.micrositeConfig = {
       ...req.body.micrositeConfig,
       customSlug: `${slug}-${Date.now()}`,
-      isPublished: false, // Not published until approved
+      isPublished: true, // Auto-publish microsite immediately
+    };
+  } else {
+    // Ensure microsite is published
+    req.body.micrositeConfig = {
+      ...req.body.micrositeConfig,
+      isPublished: true,
     };
   }
 
+  // Grant microsite access immediately
+  req.body.micrositeAccessGranted = true;
+  req.body.micrositeAccessGrantedAt = new Date();
+
   const event = await Event.create(req.body);
 
-  // Note: Embeddings are NOT generated on creation to save costs
-  // They will be generated automatically when the event becomes active
+  // Import recommendation service
+  const { generateHotelRecommendations } = await import('../services/hotelRecommendationService.js');
+
+  // Generate hotel recommendations automatically
+  try {
+    const recommendations = await generateHotelRecommendations(event._id);
+    event.recommendedHotels = recommendations;
+    await event.save();
+    console.log(`✅ Generated ${recommendations.length} hotel recommendations for ${event.name}`);
+  } catch (error) {
+    console.error('Error generating recommendations:', error);
+    // Don't fail event creation if recommendations fail
+  }
+
+  // Auto-generate embeddings for public events
+  if (!event.isPrivate) {
+    try {
+      console.log(`🤖 Generating embeddings for event: ${event.name}`);
+      const embeddingData = await generateEventEmbedding(event);
+      
+      await upsertVector('events_vectors', event._id.toString(), embeddingData.vector, {
+        name: event.name,
+        type: event.type,
+        location: event.location?.city || '',
+        country: event.location?.country || 'India',
+        budgetMin: event.budgetRange?.min || event.budget || 0,
+        budgetMax: event.budgetRange?.max || event.budget || 0,
+        attendees: event.expectedGuests || 0,
+        status: event.status,
+      });
+      
+      console.log(`✅ Embeddings generated and stored for ${event.name}`);
+    } catch (error) {
+      console.error('❌ Error generating embeddings:', error);
+      // Don't fail event creation if embeddings fail
+    }
+  }
 
   // Log action
   await createAuditLog({
@@ -139,37 +184,72 @@ export const createEvent = asyncHandler(async (req, res) => {
     resource: 'Event',
     resourceId: event._id,
     status: 'success',
+    details: `Event created and published: ${event.name}`,
   });
 
+  // Send notification to planner about successful creation and live microsite
   try {
-    const admins = await User.find({ role: 'admin', isActive: true }).select('email name');
-    const adminEmails = admins.map((admin) => admin.email).filter(Boolean);
+    const micrositeUrl = `${process.env.CLIENT_URL || 'http://localhost:3000'}/microsite/${event.micrositeConfig.customSlug}`;
+    await sendEmail({
+      to: req.user.email,
+      subject: `✅ Your event is live - Microsite published!`,
+      html: `
+        <p>Hi ${req.user.name},</p>
+        <p>Great news! Your event <strong>${event.name}</strong> has been created and is now live! 🎉</p>
+        
+        <h3>What's Next:</h3>
+        <ul>
+          <li>✅ Your event microsite is now live and accessible</li>
+          <li>✅ RFP has been sent to all hotels</li>
+          <li>✅ We've recommended hotels based on your requirements</li>
+        </ul>
+        
+        <p><strong>Microsite URL:</strong> <a href="${micrositeUrl}">${micrositeUrl}</a></p>
+        
+        <p>You can now:</p>
+        <ul>
+          <li>Access your microsite and manage your event</li>
+          <li>Review recommended hotels and select your preferred ones</li>
+          <li>Monitor incoming proposals from hotels responding to your RFP</li>
+        </ul>
+        
+        <p>Get started by clicking the "Manage Event" button in your dashboard!</p>
+      `,
+      text: `Your event ${event.name} is live! Your microsite is available at ${micrositeUrl}. Hotels have been notified and recommendations are ready.`,
+    });
+  } catch (error) {
+    console.error('Error sending planner notification email:', error);
+  }
 
-    if (adminEmails.length > 0) {
+  // Send RFP to all hotels
+  try {
+    const hotels = await User.find({ role: 'hotel', isActive: true }).select('email name organization');
+    const hotelEmails = hotels.map((hotel) => hotel.email).filter(Boolean);
+    if (hotelEmails.length > 0) {
       await sendEmail({
-        to: adminEmails,
-        subject: `New event pending approval: ${event.name}`,
+        to: hotelEmails,
+        subject: `New RFP available: ${event.name}`,
         html: `
-          <p>Hi Admin,</p>
-          <p>A new event has been created and is awaiting approval.</p>
+          <p>Hello,</p>
+          <p>A new event RFP is now available.</p>
           <ul>
             <li><strong>Event:</strong> ${event.name}</li>
             <li><strong>Type:</strong> ${event.type}</li>
-            <li><strong>Planner:</strong> ${req.user.name} (${req.user.email})</li>
             <li><strong>Dates:</strong> ${new Date(event.startDate).toLocaleDateString()} - ${new Date(event.endDate).toLocaleDateString()}</li>
+            <li><strong>Location:</strong> ${event.location?.city || 'TBD'}</li>
           </ul>
-          <p>Please review and approve the event in the admin dashboard.</p>
+          <p>Please log in to your hotel dashboard to review and submit your proposal.</p>
         `,
-        text: `New event pending approval: ${event.name}. Planner: ${req.user.name} (${req.user.email}).`,
+        text: `New RFP available: ${event.name}. Please log in to submit your proposal.`,
       });
     }
   } catch (error) {
-    console.error('Error sending admin notification email:', error);
+    console.error('Error sending hotel notification emails:', error);
   }
 
   res.status(201).json({
     success: true,
-    message: 'Event created and submitted for approval',
+    message: 'Event created, microsite published, and recommendations generated',
     data: event,
   });
 });
@@ -733,6 +813,185 @@ export const replyToAdminComment = asyncHandler(async (req, res) => {
     success: true,
     message: 'Reply added successfully',
     data: populatedEvent,
+  });
+});
+
+/**
+ * @route   POST /api/events/:id/chat/send
+ * @desc    Send a chat message (admin or planner)
+ * @access  Private (Admin/Planner)
+ */
+export const sendChatMessage = asyncHandler(async (req, res) => {
+  const { message } = req.body;
+  const { id: eventId } = req.params;
+  
+  const event = await Event.findById(eventId);
+
+  if (!event) {
+    return res.status(404).json({
+      success: false,
+      message: 'Event not found',
+    });
+  }
+
+  // Check authorization: admin can message any event, planner only their own
+  if (req.user.role === 'planner' && event.planner.toString() !== req.user.id) {
+    return res.status(403).json({
+      success: false,
+      message: 'Not authorized to send messages for this event',
+    });
+  }
+
+  if (!message || !message.trim()) {
+    return res.status(400).json({
+      success: false,
+      message: 'Message is required',
+    });
+  }
+
+  // Add message to chat
+  const newMessage = {
+    message: message.trim(),
+    sender: req.user.id,
+    senderRole: req.user.role === 'admin' ? 'admin' : 'planner',
+    sentAt: new Date(),
+    isRead: false,
+  };
+
+  event.chatMessages.push(newMessage);
+  await event.save();
+
+  // Populate the event with user details
+  const populatedEvent = await Event.findById(event._id)
+    .populate('chatMessages.sender', 'name email role')
+    .populate('planner', 'name email');
+
+  // Get the newly added message with populated data
+  const populatedMessage = populatedEvent.chatMessages[populatedEvent.chatMessages.length - 1];
+
+  // Send real-time notification via socket
+  try {
+    const { getIO } = await import('../sockets/socketService.js');
+    const io = getIO();
+    
+    // Emit to event room
+    io.to(`event-${eventId}`).emit('new-chat-message', {
+      eventId,
+      message: populatedMessage,
+    });
+
+    // Notify the other party
+    const recipientId = req.user.role === 'admin' ? event.planner : null;
+    if (recipientId) {
+      io.to(`user-${recipientId}`).emit('notification', {
+        type: 'chat-message',
+        eventId,
+        eventName: event.name,
+        message: `New message from ${req.user.name}`,
+      });
+    }
+  } catch (error) {
+    console.error('Error sending socket notification:', error);
+  }
+
+  // Send email notification to the other party
+  try {
+    if (req.user.role === 'admin') {
+      // Admin sent message, notify planner
+      const planner = await User.findById(event.planner);
+      if (planner?.email) {
+        await sendEmail({
+          to: planner.email,
+          subject: `New message about your event: ${event.name}`,
+          html: `
+            <p>Hi ${planner.name},</p>
+            <p>You have a new message from the admin regarding your event <strong>${event.name}</strong>.</p>
+            <div style="background-color: #f8f9fa; padding: 15px; border-left: 4px solid #667eea; margin: 20px 0;">
+              <p><strong>Message:</strong></p>
+              <p>${message}</p>
+            </div>
+            <p>Please log in to your dashboard to view and respond.</p>
+          `,
+          text: `New message about ${event.name}: ${message}`,
+        });
+      }
+    } else {
+      // Planner sent message, notify admins
+      const admins = await User.find({ role: 'admin', isActive: true }).select('email name');
+      const adminEmails = admins.map((admin) => admin.email).filter(Boolean);
+      if (adminEmails.length > 0) {
+        await sendEmail({
+          to: adminEmails,
+          subject: `New planner message: ${event.name}`,
+          html: `
+            <p>Hi Admin,</p>
+            <p>Planner <strong>${req.user.name}</strong> sent a message about event <strong>${event.name}</strong>.</p>
+            <div style="background-color: #f8f9fa; padding: 15px; border-left: 4px solid #10b981; margin: 20px 0;">
+              <p><strong>Message:</strong></p>
+              <p>${message}</p>
+            </div>
+            <p>Please log in to your dashboard to view and respond.</p>
+          `,
+          text: `New planner message about ${event.name}: ${message}`,
+        });
+      }
+    }
+  } catch (error) {
+    console.error('Error sending email notification:', error);
+  }
+
+  // Log action
+  await createAuditLog({
+    user: req.user.id,
+    action: 'chat_message_send',
+    resource: 'Event',
+    resourceId: event._id,
+    status: 'success',
+    details: `Sent chat message: ${message.substring(0, 100)}`,
+  });
+
+  res.status(201).json({
+    success: true,
+    message: 'Message sent successfully',
+    data: populatedMessage,
+  });
+});
+
+/**
+ * @route   GET /api/events/:id/chat/messages
+ * @desc    Get all chat messages for an event
+ * @access  Private (Admin/Planner)
+ */
+export const getChatMessages = asyncHandler(async (req, res) => {
+  const { id: eventId } = req.params;
+  
+  const event = await Event.findById(eventId)
+    .populate('chatMessages.sender', 'name email role')
+    .populate('planner', 'name email');
+
+  if (!event) {
+    return res.status(404).json({
+      success: false,
+      message: 'Event not found',
+    });
+  }
+
+  // Check authorization
+  if (req.user.role === 'planner' && event.planner._id.toString() !== req.user.id) {
+    return res.status(403).json({
+      success: false,
+      message: 'Not authorized to view messages for this event',
+    });
+  }
+
+  res.status(200).json({
+    success: true,
+    count: event.chatMessages.length,
+    data: {
+      eventId: event._id,
+      eventName: event.name,
+      messages: event.chatMessages,
+    },
   });
 });
 

@@ -48,24 +48,20 @@ export const PlannerProposalsPage = () => {
   const [showProposalDetailsModal, setShowProposalDetailsModal] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentAmount, setPaymentAmount] = useState(0);
-  const [replyingToCommentId, setReplyingToCommentId] = useState(null);
-  const [replyText, setReplyText] = useState('');
-  const [replyingToEventId, setReplyingToEventId] = useState(null);
 
   const { data: eventsData, isLoading } = useQuery({
     queryKey: ['planner-proposals'],
     queryFn: () => eventService.getAll(),
   });
 
-  // Filter proposals (pending-approval, rfp-published, reviewing-proposals, active, rejected)
+  // Filter proposals (rfp-published, reviewing-proposals, active, rejected)
   const proposals = (eventsData?.data || []).filter(e => 
-    ['pending-approval', 'rfp-published', 'reviewing-proposals', 'active', 'rejected'].includes(e.status)
+    ['rfp-published', 'reviewing-proposals', 'active', 'rejected'].includes(e.status)
   );
 
   // Stats
   const stats = {
     total: proposals.length,
-    pending: proposals.filter(p => p.status === 'pending-approval').length,
     rfpPublished: proposals.filter(p => p.status === 'rfp-published').length,
     reviewingProposals: proposals.filter(p => p.status === 'reviewing-proposals').length,
     active: proposals.filter(p => p.status === 'active').length,
@@ -74,9 +70,7 @@ export const PlannerProposalsPage = () => {
 
   // Filter proposals
   let filteredProposals = proposals;
-  if (statusFilter === 'pending') {
-    filteredProposals = proposals.filter(p => p.status === 'pending-approval');
-  } else if (statusFilter === 'awaiting-hotels') {
+  if (statusFilter === 'awaiting-hotels') {
     filteredProposals = proposals.filter(p => p.status === 'rfp-published');
   } else if (statusFilter === 'reviewing') {
     filteredProposals = proposals.filter(p => p.status === 'reviewing-proposals');
@@ -88,13 +82,6 @@ export const PlannerProposalsPage = () => {
 
   const getStatusConfig = (status) => {
     const configs = {
-      'pending-approval': { 
-        color: 'yellow', 
-        bgColor: 'bg-yellow-100', 
-        textColor: 'text-yellow-800',
-        icon: Clock, 
-        label: 'Pending Admin Approval' 
-      },
       'rfp-published': { 
         color: 'blue', 
         bgColor: 'bg-blue-100', 
@@ -124,7 +111,7 @@ export const PlannerProposalsPage = () => {
         label: 'Rejected' 
       }
     };
-    return configs[status] || configs['pending-approval'];
+    return configs[status] || configs['rfp-published'];
   };
 
   const viewHotelProposals = (event) => {
@@ -147,20 +134,6 @@ export const PlannerProposalsPage = () => {
     },
     onError: (error) => {
       toast.error(error.response?.data?.message || 'Failed to publish microsite');
-    },
-  });
-
-  const replyMutation = useMutation({
-    mutationFn: ({ eventId, commentId, reply }) => eventService.replyToComment(eventId, commentId, reply),
-    onSuccess: () => {
-      toast.success('Reply posted successfully!');
-      queryClient.invalidateQueries(['planner-proposals']);
-      setReplyingToCommentId(null);
-      setReplyText('');
-      setReplyingToEventId(null);
-    },
-    onError: (error) => {
-      toast.error(error.response?.data?.message || 'Failed to post reply');
     },
   });
 
@@ -440,165 +413,6 @@ export const PlannerProposalsPage = () => {
                   </div>
                 )}
 
-                {/* Admin Comments/Feedback */}
-                {proposal.adminComments && proposal.adminComments.length > 0 && (
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-2">
-                        <MessageSquare className="h-5 w-5 text-blue-600" />
-                        <h4 className="font-semibold text-blue-900">
-                          Admin Feedback ({proposal.adminComments.length})
-                        </h4>
-                      </div>
-                      {proposal.adminComments.some(c => !c.isRead) && (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-600 text-white">
-                          New
-                        </span>
-                      )}
-                    </div>
-                    <div className="space-y-3 max-h-48 overflow-y-auto pr-2">
-                      {proposal.adminComments.map((comment, idx) => (
-                        <div 
-                          key={idx} 
-                          className={`bg-white rounded-lg p-3 border ${
-                            comment.isRead ? 'border-gray-200' : 'border-blue-300 shadow-sm'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between mb-2">
-                            <div className="flex items-center gap-2">
-                              <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
-                                <span className="text-white text-xs font-semibold">
-                                  {comment.commentedBy?.name?.charAt(0).toUpperCase() || 'A'}
-                                </span>
-                              </div>
-                              <div>
-                                <p className="text-sm font-medium text-gray-900">
-                                  {comment.commentedBy?.name || 'Admin'}
-                                </p>
-                                <p className="text-xs text-gray-500">
-                                  {new Date(comment.commentedAt).toLocaleString('en-US', {
-                                    month: 'short',
-                                    day: 'numeric',
-                                    year: 'numeric',
-                                    hour: '2-digit',
-                                    minute: '2-digit'
-                                  })}
-                                </p>
-                              </div>
-                            </div>
-                            {!comment.isRead && (
-                              <span className="w-2 h-2 bg-blue-600 rounded-full"></span>
-                            )}
-                          </div>
-                          <p className="text-sm text-gray-700 leading-relaxed pl-10">
-                            {comment.comment}
-                          </p>
-
-                          {/* Admin Comment Replies */}
-                          {comment.replies && comment.replies.length > 0 && (
-                            <div className="mt-3 ml-8 pl-3 border-l-2 border-gray-300 space-y-2">
-                              {comment.replies.map((reply, replyIdx) => (
-                                <div key={replyIdx} className="bg-gray-50 rounded p-2">
-                                  <div className="flex items-center gap-2 mb-1">
-                                    <div className="w-6 h-6 bg-gradient-to-br from-green-500 to-teal-600 rounded-full flex items-center justify-center">
-                                      <span className="text-white text-xs font-semibold">
-                                        {reply.repliedBy?.name?.charAt(0).toUpperCase() || 'P'}
-                                      </span>
-                                    </div>
-                                    <div>
-                                      <p className="text-xs font-medium text-gray-900">
-                                        {reply.repliedBy?.name || 'Planner'} (You)
-                                      </p>
-                                      <p className="text-xs text-gray-500">
-                                        {new Date(reply.repliedAt).toLocaleString('en-US', {
-                                          month: 'short',
-                                          day: 'numeric',
-                                          year: 'numeric',
-                                          hour: '2-digit',
-                                          minute: '2-digit'
-                                        })}
-                                      </p>
-                                    </div>
-                                  </div>
-                                  <p className="text-xs text-gray-700 pl-8">
-                                    {reply.reply}
-                                  </p>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-
-                          {/* Reply Input */}
-                          {replyingToCommentId === `${proposal._id}-${idx}` ? (
-                            <div className="mt-3 pt-3 border-t border-gray-200">
-                              <textarea
-                                value={replyText}
-                                onChange={(e) => setReplyText(e.target.value)}
-                                placeholder="Type your reply here..."
-                                className="input text-sm mb-2"
-                                rows="2"
-                              />
-                              <div className="flex gap-2">
-                                <button
-                                  onClick={() => {
-                                    replyMutation.mutate({
-                                      eventId: proposal._id,
-                                      commentId: comment._id,
-                                      reply: replyText
-                                    });
-                                  }}
-                                  disabled={!replyText.trim() || replyMutation.isPending}
-                                  className="btn btn-sm bg-green-600 text-white hover:bg-green-700 flex items-center gap-1"
-                                >
-                                  {replyMutation.isPending ? 'Posting...' : 'Post Reply'}
-                                </button>
-                                <button
-                                  onClick={() => {
-                                    setReplyingToCommentId(null);
-                                    setReplyText('');
-                                  }}
-                                  className="btn btn-sm btn-secondary"
-                                >
-                                  Cancel
-                                </button>
-                              </div>
-                            </div>
-                          ) : (
-                            <button
-                              onClick={() => {
-                                setReplyingToCommentId(`${proposal._id}-${idx}`);
-                                setReplyingToEventId(proposal._id);
-                                setReplyText('');
-                              }}
-                              className="mt-2 text-xs text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1"
-                            >
-                              <MessageSquare className="h-3 w-3" />
-                              Reply
-                            </button>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                    {proposal.status === 'pending-approval' && (
-                      <div className="mt-3 pt-3 border-t border-blue-200">
-                        <div className="flex items-center justify-between">
-                          <p className="text-xs text-blue-700 flex items-center gap-1">
-                            <AlertCircle className="h-3 w-3" />
-                            Please address the admin's feedback and resubmit if needed
-                          </p>
-                          <button
-                            onClick={() => navigate('/planner/proposals/create', { state: { editProposal: proposal } })}
-                            className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-lg transition-colors"
-                          >
-                            <Edit className="h-3.5 w-3.5" />
-                            Edit Proposal
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-
                 {/* Selected Hotels */}
                 {proposal.selectedHotels && proposal.selectedHotels.length > 0 && (
                   <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
@@ -614,13 +428,6 @@ export const PlannerProposalsPage = () => {
 
                 {/* Actions */}
                 <div className="flex items-center gap-3 pt-4 border-t border-gray-200">
-                  {proposal.status === 'pending-approval' && (
-                    <div className="flex items-center gap-2 text-sm text-yellow-700 bg-yellow-50 px-4 py-2 rounded-lg">
-                      <Clock className="h-5 w-5" />
-                      <span>Waiting for admin approval</span>
-                    </div>
-                  )}
-
                   {proposal.status === 'rfp-published' && (
                     <>
                       <div className="flex items-center gap-2 text-sm text-blue-700 bg-blue-50 px-4 py-2 rounded-lg">

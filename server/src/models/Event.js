@@ -58,6 +58,32 @@ const eventSchema = new mongoose.Schema(
     rejectionReason: {
       type: String,
     },
+    // Chat messages between admin and planner
+    chatMessages: [{
+      message: {
+        type: String,
+        required: true,
+      },
+      sender: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        required: true,
+      },
+      senderRole: {
+        type: String,
+        enum: ['admin', 'planner'],
+        required: true,
+      },
+      sentAt: {
+        type: Date,
+        default: Date.now,
+      },
+      isRead: {
+        type: Boolean,
+        default: false,
+      },
+    }],
+    // Keep adminComments for backward compatibility
     adminComments: [{
       comment: {
         type: String,

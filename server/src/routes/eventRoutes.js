@@ -10,6 +10,8 @@ import {
   rejectEvent,
   addAdminComment,
   replyToAdminComment,
+  sendChatMessage,
+  getChatMessages,
   selectHotelsForEvent,
   processPlannerPayment,
   getHotelRecommendations,
@@ -45,6 +47,10 @@ router.put('/:id/approve', authorize('admin'), validateMongoId, auditLogger('eve
 router.put('/:id/reject', authorize('admin'), validateMongoId, auditLogger('event_reject', 'Event'), rejectEvent);
 router.post('/:id/comment', authorize('admin'), validateMongoId, auditLogger('event_comment', 'Event'), addAdminComment);
 router.post('/:id/comment/:commentId/reply', authorize('planner'), validateMongoId, auditLogger('event_comment_reply', 'Event'), replyToAdminComment);
+
+// Chat routes (continuous conversation)
+router.post('/:id/chat/send', authorize('admin', 'planner'), validateMongoId, auditLogger('chat_message', 'Event'), sendChatMessage);
+router.get('/:id/chat/messages', authorize('admin', 'planner'), validateMongoId, getChatMessages);
 
 // Activate event (utility for fixing stuck events)
 router.put('/:id/activate', authorize('planner', 'admin'), validateMongoId, auditLogger('event_update', 'Event'), activateEvent);

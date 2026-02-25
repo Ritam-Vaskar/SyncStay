@@ -41,12 +41,6 @@ export const PlannerEventsPage = () => {
         icon: Clock,
         iconColor: 'text-gray-600'
       },
-      'pending-approval': { 
-        label: 'Pending Approval', 
-        color: 'bg-yellow-100 text-yellow-800',
-        icon: AlertCircle,
-        iconColor: 'text-yellow-600'
-      },
       'rfp-published': {
         label: 'RFP Published - Awaiting Hotels',
         color: 'bg-blue-100 text-blue-800',
@@ -84,7 +78,7 @@ export const PlannerEventsPage = () => {
         iconColor: 'text-red-600'
       },
     };
-    return configs[status] || configs['pending-approval'];
+    return configs[status] || configs['rfp-published'];
   };
 
   const copyMicrositeUrl = (slug) => {
@@ -95,7 +89,6 @@ export const PlannerEventsPage = () => {
 
   const stats = {
     total: events.length,
-    pending: events.filter(e => e.status === 'pending-approval').length,
     rfpPublished: events.filter(e => e.status === 'rfp-published').length,
     reviewing: events.filter(e => e.status === 'reviewing-proposals').length,
     active: events.filter(e => e.status === 'active').length,
@@ -192,7 +185,7 @@ export const PlannerEventsPage = () => {
         <div className="flex items-center gap-4 overflow-x-auto">
           <span className="text-sm font-medium text-gray-700 whitespace-nowrap">Filter:</span>
           <div className="flex gap-2 flex-wrap">
-            {['all', 'pending-approval', 'rfp-published', 'reviewing-proposals', 'active', 'rejected', 'completed'].map((status) => (
+            {['all', 'rfp-published', 'reviewing-proposals', 'active', 'rejected', 'completed'].map((status) => (
               <button
                 key={status}
                 onClick={() => setStatusFilter(status)}
@@ -327,13 +320,6 @@ export const PlannerEventsPage = () => {
                     </>
                   )}
                   
-                  {event.status === 'pending-approval' && (
-                    <div className="flex items-center gap-2 text-sm text-yellow-700 bg-yellow-50 px-4 py-2 rounded-lg">
-                      <AlertCircle className="h-5 w-5" />
-                      <span>Waiting for admin approval</span>
-                    </div>
-                  )}
-
                   {event.status === 'rejected' && event.rejectionReason && (
                     <div className="flex items-center gap-2 text-sm text-red-700 bg-red-50 px-4 py-2 rounded-lg">
                       <XCircle className="h-5 w-5" />

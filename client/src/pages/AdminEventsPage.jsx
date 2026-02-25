@@ -46,7 +46,6 @@ export const AdminEventsPage = () => {
 
   const stats = {
     total: allEvents.length,
-    pending: allEvents.filter(p => p.status === 'pending-approval').length,
     rfpPublished: allEvents.filter(p => p.status === 'rfp-published').length,
     reviewing: allEvents.filter(p => p.status === 'reviewing-proposals').length,
     active: allEvents.filter(p => p.status === 'active').length,
@@ -56,7 +55,6 @@ export const AdminEventsPage = () => {
 
   const getStatusBadge = (status) => {
     const badges = {
-      'pending-approval': { bg: 'bg-yellow-100', text: 'text-yellow-800', icon: Clock, label: 'Pending Approval' },
       'rfp-published': { bg: 'bg-blue-100', text: 'text-blue-800', icon: AlertCircle, label: 'RFP Published' },
       'reviewing-proposals': { bg: 'bg-purple-100', text: 'text-purple-800', icon: Eye, label: 'Reviewing Proposals' },
       'active': { bg: 'bg-green-100', text: 'text-green-800', icon: CheckCircle, label: 'Active' },
@@ -64,7 +62,7 @@ export const AdminEventsPage = () => {
       'rejected': { bg: 'bg-red-100', text: 'text-red-800', icon: XCircle, label: 'Rejected' },
       'cancelled': { bg: 'bg-gray-200', text: 'text-gray-900', icon: XCircle, label: 'Cancelled' },
     };
-    return badges[status] || badges['pending-approval'];
+    return badges[status] || badges['rfp-published'];
   };
 
   const handleViewDetails = (event) => {
@@ -100,16 +98,16 @@ export const AdminEventsPage = () => {
           <p className="text-3xl font-bold text-blue-600">{stats.total}</p>
         </div>
         <div className="card">
-          <p className="text-gray-600 text-sm">Pending Approval</p>
-          <p className="text-3xl font-bold text-yellow-600">{stats.pending}</p>
+          <p className="text-gray-600 text-sm">RFP Published</p>
+          <p className="text-3xl font-bold text-blue-600">{stats.rfpPublished}</p>
         </div>
         <div className="card">
           <p className="text-gray-600 text-sm">Active</p>
           <p className="text-3xl font-bold text-green-600">{stats.active}</p>
         </div>
         <div className="card">
-          <p className="text-gray-600 text-sm">Rejected</p>
-          <p className="text-3xl font-bold text-red-600">{stats.rejected}</p>
+          <p className="text-gray-600 text-sm">Completed</p>
+          <p className="text-3xl font-bold text-gray-600">{stats.completed}</p>
         </div>
       </div>
 
@@ -139,7 +137,6 @@ export const AdminEventsPage = () => {
               className="input"
             >
               <option value="all">All Status</option>
-              <option value="pending-approval">Pending Approval</option>
               <option value="rfp-published">RFP Published</option>
               <option value="reviewing-proposals">Reviewing Proposals</option>
               <option value="active">Active</option>

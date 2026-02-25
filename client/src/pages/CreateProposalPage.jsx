@@ -107,8 +107,8 @@ export const CreateProposalPage = () => {
     },
     onSuccess: () => {
       const message = editProposal?._id 
-        ? 'Event proposal updated successfully! Waiting for admin approval.' 
-        : 'Event proposal submitted successfully! Waiting for admin approval.';
+        ? 'Event updated successfully! Your microsite is live.' 
+        : 'Event created successfully! Your microsite is now live.';
       toast.success(message);
       queryClient.invalidateQueries(['planner-events']);
       queryClient.invalidateQueries(['planner-proposals']);
@@ -244,12 +244,12 @@ export const CreateProposalPage = () => {
       {/* Header */}
       <div>
         <h1 className="text-3xl font-bold text-gray-900">
-          {editProposal ? 'Edit Event Proposal' : 'Create Event Proposal'}
+          {editProposal ? 'Edit Event' : 'Create Event'}
         </h1>
         <p className="text-gray-600 mt-1">
           {editProposal 
-            ? 'Update your event details and resubmit for approval' 
-            : 'Submit your event details for admin approval'
+            ? 'Update your event details and your microsite will be updated automatically' 
+            : 'Create your event and publish your microsite instantly'
           }
         </p>
       </div>
@@ -729,8 +729,8 @@ export const CreateProposalPage = () => {
             className="btn btn-primary"
           >
             {createProposalMutation.isPending 
-              ? (editProposal ? 'Updating...' : 'Submitting...') 
-              : (editProposal ? 'Update & Resubmit for Approval' : 'Submit Proposal for Approval')
+              ? (editProposal ? 'Updating...' : 'Creating...') 
+              : (editProposal ? 'Update Event' : 'Create & Publish Event')
             }
           </button>
         </div>
