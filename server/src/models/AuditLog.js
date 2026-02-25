@@ -35,6 +35,13 @@ const auditLogSchema = new mongoose.Schema(
         'payment_refund',
         'planner_payment_complete',
         'settings_update',
+        'guest_add',
+        'guest_upload',
+        'guest_remove',
+        'guest_update',
+        'event_privacy_toggle',
+        'guest_auto_register',
+        'guest_invite_login',
       ],
     },
     resource: {

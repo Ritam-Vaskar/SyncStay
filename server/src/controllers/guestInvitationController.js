@@ -4,6 +4,14 @@ import asyncHandler from '../utils/asyncHandler.js';
 import { createAuditLog } from '../middlewares/auditLogger.js';
 import xlsx from 'xlsx';
 import sendEmail from '../utils/mail.js';
+import crypto from 'crypto';
+
+/**
+ * Generate unique invitation token for guest
+ */
+const generateInvitationToken = () => {
+  return crypto.randomBytes(32).toString('hex');
+};
 
 /**
  * Helper function to auto-create inventory groups for guest groups
@@ -109,9 +117,11 @@ export const addGuests = asyncHandler(async (req, res) => {
     return res.status(403).json({ message: 'Not authorized to manage this event' });
   }
 
-  // Prepare new guests
+  // Prepare new guests with invitation tokens
   const newGuests = guests.map(guest => ({
     ...guest,
+    invitationToken: generateInvitationToken(),
+    tokenExpiry: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), // 1 year expiry
     addedAt: new Date(),
     hasAccessed: false,
   }));
@@ -133,28 +143,42 @@ export const addGuests = asyncHandler(async (req, res) => {
   // Auto-create inventory groups for guests with groups
   await autoCreateInventoryGroups(eventId, newGuests);
 
-  await createAuditLog(req.user.id, 'ADD_GUESTS', 'Event', eventId, {
-    guestsAdded: newGuests.length,
+  await createAuditLog({
+    user: req.user.id,
+    action: 'guest_add',
+    resource: 'Event',
+    resourceId: eventId,
+    details: { guestsAdded: newGuests.length },
   });
 
   try {
     const clientUrl = (process.env.CLIENT_URL || 'http://localhost:5173').split(',')[0].trim();
     const slug = event.micrositeConfig?.customSlug;
-    const micrositeLink = slug ? `${clientUrl}/microsite/${slug}` : clientUrl;
 
     await Promise.all(
-      newGuests.map((guest) =>
-        sendEmail({
+      newGuests.map((guest) => {
+        const invitationLink = `${clientUrl}/guest-invite/${guest.invitationToken}`;
+        
+        return sendEmail({
           to: guest.email,
           subject: `You're invited to ${event.name}`,
           html: `
-            <p>Hi ${guest.name || 'Guest'},</p>
-            <p>You have been invited to the private event <strong>${event.name}</strong>.</p>
-            <p>Access the event here: <a href="${micrositeLink}">${micrositeLink}</a></p>
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+              <h2 style="color: #4F46E5;">You're Invited!</h2>
+              <p>Hi <strong>${guest.name || 'Guest'}</strong>,</p>
+              <p>You have been invited to the private event <strong>${event.name}</strong>.</p>
+              <p>Click the button below to automatically access the event microsite and start booking your accommodation:</p>
+              <div style="text-align: center; margin: 30px 0;">
+                <a href="${invitationLink}" style="display: inline-block; padding: 14px 28px; background: #4F46E5; color: #fff; border-radius: 8px; text-decoration: none; font-weight: bold;">Access Event Microsite</a>
+              </div>
+              <p style="color: #666; font-size: 14px;">Or copy this link: <a href="${invitationLink}" style="color: #4F46E5;">${invitationLink}</a></p>
+              <p style="color: #666; font-size: 14px; margin-top: 30px;">This is your personal invitation link. No need to register or login - you'll be automatically signed in!</p>
+              <p>We look forward to seeing you there!</p>
+            </div>
           `,
-          text: `You're invited to ${event.name}. Link: ${micrositeLink}`,
-        })
-      )
+          text: `You're invited to ${event.name}. Access the event here: ${invitationLink}`,
+        });
+      })
     );
   } catch (error) {
     console.error('Error sending guest invitation emails:', error);
@@ -198,6 +222,8 @@ export const uploadGuestList = asyncHandler(async (req, res) => {
       email: row.Email || row.email,
       phone: row.Phone || row.phone || '',
       group: row.Group || row.group || '',
+      invitationToken: generateInvitationToken(),
+      tokenExpiry: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), // 1 year expiry
       addedAt: new Date(),
       hasAccessed: false,
     })).filter(guest => guest.name && guest.email);
@@ -219,29 +245,41 @@ export const uploadGuestList = asyncHandler(async (req, res) => {
     // Auto-create inventory groups for guests with groups
     await autoCreateInventoryGroups(eventId, newGuests);
 
-    await createAuditLog(req.user.id, 'UPLOAD_GUEST_LIST', 'Event', eventId, {
-      guestsAdded: newGuests.length,
-      skipped,
+    await createAuditLog({
+      user: req.user.id,
+      action: 'guest_upload',
+      resource: 'Event',
+      resourceId: eventId,
+      details: { guestsAdded: newGuests.length, skipped },
     });
 
     try {
       const clientUrl = (process.env.CLIENT_URL || 'http://localhost:5173').split(',')[0].trim();
-      const slug = event.micrositeConfig?.customSlug;
-      const micrositeLink = slug ? `${clientUrl}/microsite/${slug}` : clientUrl;
 
       await Promise.all(
-        newGuests.map((guest) =>
-          sendEmail({
+        newGuests.map((guest) => {
+          const invitationLink = `${clientUrl}/guest-invite/${guest.invitationToken}`;
+          
+          return sendEmail({
             to: guest.email,
             subject: `You're invited to ${event.name}`,
             html: `
-              <p>Hi ${guest.name || 'Guest'},</p>
-              <p>You have been invited to the private event <strong>${event.name}</strong>.</p>
-              <p>Access the event here: <a href="${micrositeLink}">${micrositeLink}</a></p>
+              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <h2 style="color: #4F46E5;">You're Invited!</h2>
+                <p>Hi <strong>${guest.name || 'Guest'}</strong>,</p>
+                <p>You have been invited to the private event <strong>${event.name}</strong>.</p>
+                <p>Click the button below to automatically access the event microsite and start booking your accommodation:</p>
+                <div style="text-align: center; margin: 30px 0;">
+                  <a href="${invitationLink}" style="display: inline-block; padding: 14px 28px; background: #4F46E5; color: #fff; border-radius: 8px; text-decoration: none; font-weight: bold;">Access Event Microsite</a>
+                </div>
+                <p style="color: #666; font-size: 14px;">Or copy this link: <a href="${invitationLink}" style="color: #4F46E5;">${invitationLink}</a></p>
+                <p style="color: #666; font-size: 14px; margin-top: 30px;">This is your personal invitation link. No need to register or login - you'll be automatically signed in!</p>
+                <p>We look forward to seeing you there!</p>
+              </div>
             `,
-            text: `You're invited to ${event.name}. Link: ${micrositeLink}`,
-          })
-        )
+            text: `You're invited to ${event.name}. Access the event here: ${invitationLink}`,
+          });
+        })
       );
     } catch (error) {
       console.error('Error sending guest invitation emails:', error);
@@ -312,8 +350,12 @@ export const removeGuest = asyncHandler(async (req, res) => {
 
   await event.save();
 
-  await createAuditLog(req.user.id, 'REMOVE_GUEST', 'Event', eventId, {
-    guestId,
+  await createAuditLog({
+    user: req.user.id,
+    action: 'guest_remove',
+    resource: 'Event',
+    resourceId: eventId,
+    details: { guestId },
   });
 
   res.status(200).json({
@@ -417,8 +459,12 @@ export const toggleEventPrivacy = asyncHandler(async (req, res) => {
   event.isPrivate = isPrivate;
   await event.save();
 
-  await createAuditLog(req.user.id, 'TOGGLE_EVENT_PRIVACY', 'Event', eventId, {
-    isPrivate,
+  await createAuditLog({
+    user: req.user.id,
+    action: 'event_privacy_toggle',
+    resource: 'Event',
+    resourceId: eventId,
+    details: { isPrivate },
   });
 
   res.status(200).json({
@@ -456,9 +502,15 @@ export const updateGuestGroup = asyncHandler(async (req, res) => {
   event.invitedGuests[guestIndex].group = group || '';
   await event.save();
 
-  await createAuditLog(req.user.id, 'UPDATE_GUEST_GROUP', 'Event', eventId, {
-    guestEmail: event.invitedGuests[guestIndex].email,
-    group,
+  await createAuditLog({
+    user: req.user.id,
+    action: 'guest_update',
+    resource: 'Event',
+    resourceId: eventId,
+    details: {
+      guestEmail: event.invitedGuests[guestIndex].email,
+      group,
+    },
   });
 
   res.status(200).json({

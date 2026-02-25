@@ -220,6 +220,12 @@ const eventSchema = new mongoose.Schema(
         type: Boolean,
         default: false,
       },
+      invitationToken: {
+        type: String,
+      },
+      tokenExpiry: {
+        type: Date,
+      },
       addedAt: {
         type: Date,
         default: Date.now,

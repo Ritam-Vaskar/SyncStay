@@ -33,6 +33,7 @@ import { HotelDashboardPage } from './pages/HotelDashboardPage';
 import { HotelRfpsPage } from './pages/HotelRfpsPage';
 import { HotelInventoryPage } from './pages/HotelInventoryPage';
 import { HotelBookingsPage } from './pages/HotelBookingsPage';
+import { GuestInvitePage } from './pages/GuestInvitePage';
 import { eventService } from './services/apiServices';
 import { useAuthStore } from './store/authStore';
 import ChatBot from './components/ChatBot';
@@ -100,6 +101,9 @@ function App() {
             path="/register"
             element={isAuthenticated ? <Navigate to="/dashboard" /> : <RegisterPage />}
           />
+
+          {/* Guest Invitation Auto-Login Route */}
+          <Route path="/guest-invite/:token" element={<GuestInvitePage />} />
 
           {/* Public Microsite Route */}
           <Route path="/microsite/:slug" element={<MicrositePage />} />
