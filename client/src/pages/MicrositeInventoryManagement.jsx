@@ -19,9 +19,79 @@ import {
   ClipboardList,
   PencilLine,
   BarChart2,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '@/services/api';
+
+// Helper component for formatted hotel descriptions
+const HotelDescription = ({ description, maxLines = 2, maxChars = 150 }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+  
+  if (!description) return <span className="text-gray-600">Premium accommodation</span>;
+  
+  // Remove HTML tags and clean up the text
+  const cleanText = description.replace(/<[^>]*>/g, '').trim();
+  
+  // Split by common delimiters to find sections
+  const parts = cleanText.split(/(?=HeadLine|Location|Attraction|Rooms|CheckIn|CheckOut|Description|Distance|Address)/i);
+  
+  // Format each part with bold labels
+  const formatPart = (part) => {
+    const labelMatch = part.match(/^(HeadLine|Location|Attraction|Rooms|CheckIn|CheckOut|Description|Distance|Address)\s*[:：]\s*/i);
+    if (labelMatch) {
+      const label = labelMatch[1];
+      const content = part.substring(labelMatch[0].length).trim();
+      return (
+        <div key={label} className="mb-1">
+          <span className="font-bold text-gray-900">{label}:</span>{' '}
+          <span className="text-gray-700">{content}</span>
+        </div>
+      );
+    }
+    return <div key={Math.random()} className="text-gray-700 mb-1">{part.trim()}</div>;
+  };
+  
+  const formattedContent = parts.filter(p => p.trim()).map(formatPart);
+  
+  // Truncate for collapsed view
+  const shouldTruncate = cleanText.length > maxChars;
+  const truncatedText = cleanText.substring(0, maxChars);
+  
+  if (!shouldTruncate) {
+    return <div className="text-sm space-y-1">{formattedContent}</div>;
+  }
+  
+  return (
+    <div className="text-sm">
+      {isExpanded ? (
+        <div className="space-y-1">{formattedContent}</div>
+      ) : (
+        <div className="text-gray-700">
+          {truncatedText}...
+        </div>
+      )}
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          setIsExpanded(!isExpanded);
+        }}
+        className="text-blue-600 hover:text-blue-700 font-medium mt-1 flex items-center gap-1 text-xs"
+      >
+        {isExpanded ? (
+          <>
+            Read Less <ChevronUp className="h-3 w-3" />
+          </>
+        ) : (
+          <>
+            Read More <ChevronDown className="h-3 w-3" />
+          </>
+        )}
+      </button>
+    </div>
+  );
+};
 
 export const MicrositeInventoryManagement = () => {
   const { slug } = useParams();
@@ -545,9 +615,13 @@ export const MicrositeInventoryManagement = () => {
                           <h3 className="font-bold text-gray-900 text-lg">
                             {selectedHotel.hotel?.name || selectedHotel.hotel?.organization || 'Hotel'}
                           </h3>
-                          <p className="text-sm text-gray-600 mt-1">
-                            {selectedHotel.hotel?.description || 'Premium accommodation'}
-                          </p>
+                          <div className="mt-2">
+                            <HotelDescription 
+                              description={selectedHotel.hotel?.description} 
+                              maxChars={150} 
+                              maxLines={2}
+                            />
+                          </div>
                         </div>
                         <CheckCircle2 className="h-6 w-6 text-green-600 flex-shrink-0" />
                       </div>
@@ -942,9 +1016,13 @@ export const MicrositeInventoryManagement = () => {
                                       {/* Hotel Name */}
                                       <div className="mb-4">
                                         <h5 className="font-bold text-gray-900 text-xl">{topHotel.hotelName}</h5>
-                                        {fullHotel?.description && (
-                                          <p className="text-sm text-gray-600 mt-1">{fullHotel.description}</p>
-                                        )}
+                                        <div className="mt-2">
+                                          <HotelDescription 
+                                            description={fullHotel?.description} 
+                                            maxChars={200} 
+                                            maxLines={3}
+                                          />
+                                        </div>
                                       </div>
 
                                       {/* Score - Large and Prominent */}
@@ -1233,9 +1311,13 @@ export const MicrositeInventoryManagement = () => {
                                         </div>
                                         <div>
                                           <h5 className="font-semibold text-gray-900 text-lg">{hotel.hotelName}</h5>
-                                          {fullHotel?.description && (
-                                            <p className="text-sm text-gray-600 mt-1">{fullHotel.description}</p>
-                                          )}
+                                          <div className="mt-2">
+                                            <HotelDescription 
+                                              description={fullHotel?.description} 
+                                              maxChars={150} 
+                                              maxLines={2}
+                                            />
+                                          </div>
                                         </div>
                                       </div>
                                       <div className="flex flex-col items-end gap-1">
