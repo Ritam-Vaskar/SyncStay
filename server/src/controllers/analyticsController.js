@@ -228,3 +228,198 @@ export const getAuditLogs = asyncHandler(async (req, res) => {
     data: logs,
   });
 });
+
+/**
+ * @route   GET /api/analytics/admin/dashboard
+ * @desc    Get comprehensive admin dashboard analytics
+ * @access  Private (Admin)
+ */
+export const getAdminDashboard = asyncHandler(async (req, res) => {
+  // Overview stats
+  const totalUsers = await User.countDocuments();
+  const activeUsers = await User.countDocuments({ isActive: true });
+  const totalEvents = await Event.countDocuments();
+  const activeEvents = await Event.countDocuments({ status: 'active' });
+  const totalBookings = await Booking.countDocuments();
+  const confirmedBookings = await Booking.countDocuments({ status: 'confirmed' });
+  
+  const totalRevenue = await Payment.aggregate([
+    { $match: { status: 'completed' } },
+    { $group: { _id: null, total: { $sum: '$amount' } } },
+  ]);
+
+  // User breakdown by role
+  const usersByRole = await User.aggregate([
+    {
+      $group: {
+        _id: '$role',
+        count: { $sum: 1 },
+      },
+    },
+  ]);
+
+  // Event breakdown by status
+  const eventsByStatus = await Event.aggregate([
+    {
+      $group: {
+        _id: '$status',
+        count: { $sum: 1 },
+      },
+    },
+  ]);
+
+  // Booking breakdown by status
+  const bookingsByStatus = await Booking.aggregate([
+    {
+      $group: {
+        _id: '$status',
+        count: { $sum: 1 },
+      },
+    },
+  ]);
+
+  // Recent activity (last 30 days)
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+  const recentUsers = await User.countDocuments({ createdAt: { $gte: thirtyDaysAgo } });
+  const recentEvents = await Event.countDocuments({ createdAt: { $gte: thirtyDaysAgo } });
+  const recentBookings = await Booking.countDocuments({ createdAt: { $gte: thirtyDaysAgo } });
+
+  // Growth trends (last 7 days)
+  const sevenDaysAgo = new Date();
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+  const userGrowth = await User.aggregate([
+    { $match: { createdAt: { $gte: sevenDaysAgo } } },
+    {
+      $group: {
+        _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
+        count: { $sum: 1 },
+      },
+    },
+    { $sort: { _id: 1 } },
+  ]);
+
+  const eventGrowth = await Event.aggregate([
+    { $match: { createdAt: { $gte: sevenDaysAgo } } },
+    {
+      $group: {
+        _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
+        count: { $sum: 1 },
+      },
+    },
+    { $sort: { _id: 1 } },
+  ]);
+
+  const bookingGrowth = await Booking.aggregate([
+    { $match: { createdAt: { $gte: sevenDaysAgo } } },
+    {
+      $group: {
+        _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
+        count: { $sum: 1 },
+      },
+    },
+    { $sort: { _id: 1 } },
+  ]);
+
+  // Revenue trend (last 30 days)
+  const revenueTrend = await Payment.aggregate([
+    { $match: { status: 'completed', createdAt: { $gte: thirtyDaysAgo } } },
+    {
+      $group: {
+        _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
+        total: { $sum: '$amount' },
+        count: { $sum: 1 },
+      },
+    },
+    { $sort: { _id: 1 } },
+  ]);
+
+  // Top events by bookings
+  const topEvents = await Booking.aggregate([
+    { $group: { _id: '$event', bookingCount: { $sum: 1 } } },
+    { $sort: { bookingCount: -1 } },
+    { $limit: 5 },
+    {
+      $lookup: {
+        from: 'events',
+        localField: '_id',
+        foreignField: '_id',
+        as: 'event',
+      },
+    },
+    { $unwind: '$event' },
+    {
+      $project: {
+        eventName: '$event.name',
+        eventType: '$event.type',
+        bookingCount: 1,
+      },
+    },
+  ]);
+
+  // Top planners by events
+  const topPlanners = await Event.aggregate([
+    { $group: { _id: '$planner', eventCount: { $sum: 1 } } },
+    { $sort: { eventCount: -1 } },
+    { $limit: 5 },
+    {
+      $lookup: {
+        from: 'users',
+        localField: '_id',
+        foreignField: '_id',
+        as: 'planner',
+      },
+    },
+    { $unwind: '$planner' },
+    {
+      $project: {
+        plannerName: '$planner.name',
+        plannerEmail: '$planner.email',
+        eventCount: 1,
+      },
+    },
+  ]);
+
+  res.status(200).json({
+    overview: {
+      totalUsers,
+      activeUsers,
+      totalEvents,
+      activeEvents,
+      totalBookings,
+      confirmedBookings,
+      totalRevenue: totalRevenue[0]?.total || 0,
+    },
+    breakdowns: {
+      usersByRole: usersByRole.reduce((acc, curr) => {
+        acc[curr._id] = curr.count;
+        return acc;
+      }, {}),
+      eventsByStatus: eventsByStatus.reduce((acc, curr) => {
+        acc[curr._id] = curr.count;
+        return acc;
+      }, {}),
+      bookingsByStatus: bookingsByStatus.reduce((acc, curr) => {
+        acc[curr._id] = curr.count;
+        return acc;
+      }, {}),
+    },
+    recentActivity: {
+      users: recentUsers,
+      events: recentEvents,
+      bookings: recentBookings,
+    },
+    trends: {
+      userGrowth,
+      eventGrowth,
+      bookingGrowth,
+      revenueTrend,
+    },
+    topPerformers: {
+      events: topEvents,
+      planners: topPlanners,
+    },
+  });
+});
