@@ -33,6 +33,7 @@ const eventSchema = new mongoose.Schema(
       city: String,
       country: String,
       venue: String,
+      airportCode: String, // Added for flight bookings (e.g., "DEL", "BOM")
     },
     expectedGuests: {
       type: Number,

@@ -12,7 +12,8 @@ import {
   Menu,
   X,
   Home,
-  FileText
+  FileText,
+  Plane
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -32,6 +33,7 @@ export const MicrositeDashboardLayout = ({ children, event }) => {
   const guestNavigation = [
     { name: 'Event Home', href: `/microsite/${slug}`, icon: Home },
     { name: 'My Dashboard', href: `/microsite/${slug}/dashboard`, icon: LayoutDashboard },
+    { name: 'Book Flights', href: `/microsite/${slug}/book-flights`, icon: Plane },
     { name: 'My Bookings', href: `/microsite/${slug}/my-bookings`, icon: Calendar },
     { name: 'Payments', href: `/microsite/${slug}/payments`, icon: CreditCard },
   ];
@@ -41,6 +43,7 @@ export const MicrositeDashboardLayout = ({ children, event }) => {
     { name: 'Dashboard', href: `/microsite/${slug}/dashboard`, icon: LayoutDashboard },
     { name: 'Select Hotels', href: `/microsite/${slug}/hotels`, icon: Hotel },
     { name: 'Manage Inventory', href: `/microsite/${slug}/inventory`, icon: Hotel },
+    { name: 'Manage Flights', href: `/microsite/${slug}/flights`, icon: Plane },
     { name: 'All Bookings', href: `/microsite/${slug}/bookings`, icon: Calendar },
     { name: 'Guest List', href: `/microsite/${slug}/guests`, icon: Users },
     { name: 'Reports', href: `/microsite/${slug}/reports`, icon: FileText },

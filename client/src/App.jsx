@@ -19,6 +19,8 @@ import { MicrositePlannerGuests } from './pages/MicrositePlannerGuests';
 import { MicrositeEventReports } from './pages/MicrositeEventReports';
 import { MicrositeHotelsManagement } from './pages/MicrositeHotelsManagement';
 import { MicrositeInventoryManagement } from './pages/MicrositeInventoryManagement';
+import { MicrositeFlightManagement } from './pages/MicrositeFlightManagement';
+import { MicrositeFlightBooking } from './pages/MicrositeFlightBooking';
 import { AdminApprovalsPage } from './pages/AdminApprovalsPage';
 import { AdminFeedbackPage } from './pages/AdminFeedbackPage';
 import { AdminEventsPage } from './pages/AdminEventsPage';
@@ -126,6 +128,14 @@ function App() {
             }
           />
           <Route
+            path="/microsite/:slug/book-flights"
+            element={
+              <ProtectedRoute allowedRoles={['guest']}>
+                <MicrositeFlightBooking />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/microsite/:slug/payments"
             element={
               <ProtectedRoute allowedRoles={['guest']}>
@@ -170,6 +180,14 @@ function App() {
             element={
               <ProtectedRoute allowedRoles={['planner']}>
                 <MicrositeHotelsManagement />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/microsite/:slug/flights"
+            element={
+              <ProtectedRoute allowedRoles={['planner']}>
+                <MicrositeFlightManagement />
               </ProtectedRoute>
             }
           />

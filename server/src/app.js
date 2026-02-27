@@ -25,6 +25,7 @@ import agentRoutes from './routes/agentRoutes.js';
 import activityRoutes from './routes/activityRoutes.js';
 import recommendationRoutes from './routes/recommendationRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
+import flightRoutes from './routes/flightRoutes.js';
 
 // Initialize Express app
 const app = express();
@@ -116,6 +117,7 @@ app.use('/api/agent', agentRoutes);
 app.use('/api/activity', activityRoutes);
 app.use('/api/recommendations', recommendationRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/flights', flightRoutes);
 
 // Root Route
 app.get('/', (req, res) => {

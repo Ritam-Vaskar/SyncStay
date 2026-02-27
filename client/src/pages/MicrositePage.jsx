@@ -6,9 +6,10 @@ import { guestInvitationService } from '@/services/guestInvitationService';
 import { hotelProposalService } from '@/services/hotelProposalService';
 import { LoadingPage } from '@/components/LoadingSpinner';
 import { formatCurrency, formatDate } from '@/utils/helpers';
-import { Calendar, MapPin, Users, Hotel, Check, X, LogIn, UserPlus, LogOut, LayoutDashboard, Lock, Mail, CheckCircle, CreditCard, Loader2 } from 'lucide-react';
+import { Calendar, MapPin, Users, Hotel, Check, X, LogIn, UserPlus, LogOut, LayoutDashboard, Lock, Mail, CheckCircle, CreditCard, Loader2, Plane, ChevronRight } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '@/store/authStore';
+import api from '@/services/api';
 
 export const MicrositePage = () => {
   const { slug } = useParams();
@@ -48,6 +49,19 @@ export const MicrositePage = () => {
     queryFn: () => hotelProposalService.getSelectedForMicrosite(slug),
     enabled: !!slug,
     refetchInterval: 30000, // Refetch every 30 seconds to show updated availability
+  });
+
+  // Fetch assigned flights
+  const { data: flightData, isLoading: flightLoading } = useQuery({
+    queryKey: ['assigned-flights-home', eventData?.data?._id, user?.email],
+    queryFn: async () => {
+      const response = await api.get(
+        `/flights/events/${eventData.data._id}/assigned?guestEmail=${user.email}`
+      );
+      return response;
+    },
+    enabled: !!eventData?.data?._id && !!user?.email,
+    retry: false,
   });
 
   // Check access for private events - simplified to allow viewing for everyone
@@ -387,6 +401,52 @@ export const MicrositePage = () => {
             </div>
           </div>
         </div>
+
+        {/* Flight Booking Section */}
+        {isAuthenticated && user?.email && flightData && (
+          <div className="card bg-gradient-to-r from-blue-600 to-indigo-700 text-white shadow-xl ms-reveal">
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="bg-white/20 p-3 rounded-lg">
+                    <Plane className="h-8 w-8" />
+                  </div>
+                  <div>
+                    <h3 className="text-2xl font-bold">Flights Available for You!</h3>
+                    <p className="text-blue-100 text-sm">We've configured flight options for your location</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-6 mb-6">
+                  <div>
+                    <p className="text-sm text-blue-200 mb-1">Your Location</p>
+                    <p className="text-lg font-semibold">{flightData.locationGroup} ({flightData.origin})</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-blue-200 mb-1">Event Location</p>
+                    <p className="text-lg font-semibold">{event.location?.city} ({flightData.destination})</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-blue-200 mb-1">Arrival Flights</p>
+                    <p className="text-3xl font-bold">{flightData.arrivalFlights?.length || 0}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-blue-200 mb-1">Departure Flights</p>
+                    <p className="text-3xl font-bold">{flightData.departureFlights?.length || 0}</p>
+                  </div>
+                </div>
+                <Link
+                  to={`/microsite/${slug}/flights`}
+                  className="inline-flex items-center gap-2 px-8 py-4 bg-white text-blue-600 rounded-lg hover:bg-blue-50 font-semibold text-lg shadow-lg transition-all"
+                >
+                  <Plane className="h-5 w-5" />
+                  Book Your Flights Now
+                  <ChevronRight className="h-5 w-5" />
+                </Link>
+              </div>
+              <Plane className="h-32 w-32 text-blue-400 opacity-20 hidden lg:block" />
+            </div>
+          </div>
+        )}
 
         {/* Available Hotels/Inventory */}
         <div>

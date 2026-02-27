@@ -70,3 +70,25 @@ export const analyticsService = {
   getRevenueAnalytics: (params) => api.get('/analytics/revenue', { params }),
   getAuditLogs: (params) => api.get('/analytics/audit-logs', { params }),
 };
+
+export const flightService = {
+  // Planner Operations
+  initializeConfiguration: (eventId) => api.post(`/flights/events/${eventId}/configuration/initialize`),
+  getConfiguration: (eventId) => api.get(`/flights/events/${eventId}/configuration`),
+  updateConfiguration: (eventId, data) => api.put(`/flights/events/${eventId}/configuration`, data),
+  searchFlights: (eventId, groupName, data) => api.post(`/flights/events/${eventId}/groups/${groupName}/search`, data),
+  selectFlights: (eventId, groupName, data) => api.post(`/flights/events/${eventId}/groups/${groupName}/select`, data),
+  publishConfiguration: (eventId) => api.post(`/flights/events/${eventId}/configuration/publish`),
+  
+  // Guest Operations
+  getAssignedFlights: (eventId, guestEmail) => api.get(`/flights/events/${eventId}/assigned`, { params: { guestEmail } }),
+  getFareQuote: (data) => api.post('/flights/fare-quote', data),
+  bookFlight: (data) => api.post('/flights/book', data),
+  ticketFlight: (bookingId, data) => api.post(`/flights/bookings/${bookingId}/ticket`, data),
+  getGuestBookings: (eventId, guestEmail) => api.get(`/flights/events/${eventId}/bookings`, { params: { guestEmail } }),
+  getBookingDetails: (bookingId) => api.get(`/flights/bookings/${bookingId}`),
+  cancelBooking: (bookingId, reason) => api.post(`/flights/bookings/${bookingId}/cancel`, { reason }),
+  
+  // Admin/Planner - View all bookings for event
+  getAllEventBookings: (eventId) => api.get(`/flights/events/${eventId}/all-bookings`),
+};
