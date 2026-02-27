@@ -123,3 +123,8 @@ export const validateBooking = [
  * MongoDB ID Validation
  */
 export const validateMongoId = [param('id').isMongoId().withMessage('Invalid ID'), validate];
+
+/**
+ * MongoDB Event ID Validation
+ */
+export const validateEventId = [param('eventId').isMongoId().withMessage('Invalid event ID'), validate];

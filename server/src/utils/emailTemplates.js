@@ -379,9 +379,108 @@ export const plannerNewBookingTemplate = (data) => {
   return getEmailTemplate(content, eventName);
 };
 
+export const clientEventReviewTemplate = (data) => {
+  const { clientName, eventName, eventDates, location, expectedGuests, totalBudget, selectedHotels = [], micrositeLink } = data;
+  
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
+    }).format(amount);
+  };
+
+  const hotelsTableRows = selectedHotels.map((hotel, index) => `
+    <tr style="border-bottom: 1px solid #e9ecef;">
+      <td style="padding: 12px; text-align: left;">${hotel.name}</td>
+      <td style="padding: 12px; text-align: center;">${hotel.roomType}</td>
+      <td style="padding: 12px; text-align: center;">${hotel.numberOfRooms}</td>
+      <td style="padding: 12px; text-align: right;">${formatCurrency(hotel.pricePerNight)}</td>
+      <td style="padding: 12px; text-align: right; font-weight: 600;">${formatCurrency(hotel.totalPrice)}</td>
+    </tr>
+  `).join('');
+
+  const totalPrice = selectedHotels.reduce((sum, hotel) => sum + (hotel.totalPrice || 0), 0);
+
+  const content = `
+    <div class="greeting">Dear ${clientName},</div>
+    <div class="message">
+      Your event coordinator has selected the best accommodations for your upcoming event. Please review the selected hotels and event details below for your approval.
+    </div>
+
+    <div style="background-color: #e7f3ff; border-left: 4px solid #667eea; padding: 15px; margin: 20px 0; border-radius: 6px;">
+      <p style="margin: 0; font-size: 14px; color: #333;">
+        📎 <strong>PDF Attached:</strong> A detailed event plan document is attached to this email for your records.
+      </p>
+    </div>
+    
+    <div class="info-box">
+      <h3>📅 Event Summary</h3>
+      <div class="info-row">
+        <span class="info-label">Event Name</span>
+        <span class="info-value">${eventName}</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">Event Dates</span>
+        <span class="info-value">${eventDates}</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">Location</span>
+        <span class="info-value">${location}</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">Expected Guests</span>
+        <span class="info-value">${expectedGuests}</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">Expected Budget</span>
+        <span class="info-value" style="color: #667eea; font-weight: 600;">${formatCurrency(totalBudget)}</span>
+      </div>
+    </div>
+
+    <div class="info-box">
+      <h3>🏨 Selected Hotels</h3>
+      <table style="width: 100%; border-collapse: collapse;">
+        <thead>
+          <tr style="background-color: #f8f9fa; border-bottom: 2px solid #667eea;">
+            <th style="padding: 12px; text-align: left; font-weight: 600; color: #333;">Hotel Name</th>
+            <th style="padding: 12px; text-align: center; font-weight: 600; color: #333;">Room Type</th>
+            <th style="padding: 12px; text-align: center; font-weight: 600; color: #333;">Rooms</th>
+            <th style="padding: 12px; text-align: right; font-weight: 600; color: #333;">Price/Night</th>
+            <th style="padding: 12px; text-align: right; font-weight: 600; color: #333;">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${hotelsTableRows}
+          <tr style="background-color: #f8f9fa;">
+            <td colspan="4" style="padding: 12px; text-align: right; font-weight: 600;">Total Accommodation Cost</td>
+            <td style="padding: 12px; text-align: right; font-weight: 600; color: #667eea; font-size: 16px;">${formatCurrency(totalPrice)}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="message">
+      Please review the selected accommodations and provide your feedback if any changes are needed. Your event coordinator is ready to make adjustments based on your preferences.
+    </div>
+
+    <div style="text-align: center; margin: 30px 0;">
+      <a href="${micrositeLink || 'https://syncstay.com/microsite'}" class="button">View Full Event Plan</a>
+    </div>
+
+    <div class="message" style="font-size: 13px; color: #6c757d;">
+      If you have any questions or need modifications, please contact your event coordinator immediately.
+    </div>
+  `;
+  
+  return getEmailTemplate(content, eventName);
+};
+
 export default {
   bookingReceivedTemplate,
   bookingConfirmedTemplate,
   plannerNewBookingTemplate,
+  clientEventReviewTemplate,
   getEmailTemplate
 };

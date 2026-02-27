@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Calendar, MapPin, Users, Clock, DollarSign, Hotel, FileText, Lock, Unlock, Mail, Plus, X } from 'lucide-react';
+import { Calendar, MapPin, Users, Clock, IndianRupee, Hotel, FileText, Lock, Unlock, Mail, Plus, X, ChevronDown, ChevronUp } from 'lucide-react';
 import { eventService } from '@/services/apiServices';
 import toast from 'react-hot-toast';
 
@@ -14,6 +14,7 @@ export const CreateProposalPage = () => {
   const [formData, setFormData] = useState({
     name: '',
     description: '',
+    clientEmail: '',
     eventType: 'conference',
     startDate: '',
     endDate: '',
@@ -43,6 +44,7 @@ export const CreateProposalPage = () => {
   });
 
   const [guestInput, setGuestInput] = useState({ name: '', email: '', phone: '' });
+  const [showAdditionalServices, setShowAdditionalServices] = useState(false);
 
   // Populate form with existing proposal data when editing
   useEffect(() => {
@@ -51,6 +53,7 @@ export const CreateProposalPage = () => {
       setFormData({
         name: editProposal.name || '',
         description: editProposal.description || '',
+        clientEmail: editProposal.clientEmail || '',
         eventType: editProposal.eventType || 'conference',
         startDate: editProposal.startDate ? new Date(editProposal.startDate).toISOString().split('T')[0] : '',
         endDate: editProposal.endDate ? new Date(editProposal.endDate).toISOString().split('T')[0] : '',
@@ -171,49 +174,15 @@ export const CreateProposalPage = () => {
   };
 
   const handleAddGuest = () => {
-    if (!guestInput.name || !guestInput.email) {
-      toast.error('Please provide guest name and email');
-      return;
-    }
-    
-    // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(guestInput.email)) {
-      toast.error('Please provide a valid email address');
-      return;
-    }
-
-    // Check for duplicate emails
-    if (formData.invitedGuests.some(g => g.email === guestInput.email)) {
-      toast.error('This email is already in the guest list');
-      return;
-    }
-
-    setFormData(prev => ({
-      ...prev,
-      invitedGuests: [...prev.invitedGuests, { ...guestInput }]
-    }));
-    
-    setGuestInput({ name: '', email: '', phone: '' });
-    toast.success('Guest added to invitation list');
+    // Removed - guests managed in Guest List Management page
   };
 
   const handleRemoveGuest = (email) => {
-    setFormData(prev => ({
-      ...prev,
-      invitedGuests: prev.invitedGuests.filter(g => g.email !== email)
-    }));
-    toast.success('Guest removed from invitation list');
+    // Removed - guests managed in Guest List Management page
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    
-    // Validate private events
-    if (formData.isPrivate && formData.invitedGuests.length === 0) {
-      toast.error('Private events require at least one invited guest');
-      return;
-    }
     
     // Prepare data for submission
     const submitData = {
@@ -297,6 +266,26 @@ export const CreateProposalPage = () => {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
+                Client Email Address
+              </label>
+              <div className="relative">
+                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                <input
+                  type="email"
+                  name="clientEmail"
+                  value={formData.clientEmail}
+                  onChange={handleChange}
+                  className="input pl-10"
+                  placeholder="client@example.com"
+                />
+              </div>
+              <p className="mt-1 text-xs text-gray-600">
+                Email where the client will receive event updates and confirmations
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
                 Event Type *
               </label>
               <select
@@ -304,7 +293,7 @@ export const CreateProposalPage = () => {
                 value={formData.eventType}
                 onChange={handleChange}
                 required
-                className="input"
+                className="input h-11"
               >
                 <option value="conference">Conference</option>
                 <option value="wedding">Wedding</option>
@@ -315,11 +304,11 @@ export const CreateProposalPage = () => {
               </select>
             </div>
 
-            <div className="md:col-span-2">
+            <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Event Privacy
               </label>
-              <div className="flex items-center gap-4 p-4 border rounded-lg bg-gray-50">
+              <div className="flex items-center gap-3 p-2 border rounded-lg bg-gray-50 h-11">
                 <button
                   type="button"
                   onClick={() => setFormData(prev => ({ ...prev, isPrivate: !prev.isPrivate }))}
@@ -332,95 +321,11 @@ export const CreateProposalPage = () => {
                   {formData.isPrivate ? <Lock className="h-5 w-5" /> : <Unlock className="h-5 w-5" />}
                   {formData.isPrivate ? 'Private Event' : 'Public Event'}
                 </button>
-                <p className="text-sm text-gray-600">
-                  {formData.isPrivate
-                    ? 'Only invited guests can access and book. Add guest emails below.'
-                    : 'Anyone can access the microsite and book accommodations.'}
-                </p>
+                <span className="text-xs text-gray-600">
+                  {formData.isPrivate ? 'Invite-only' : 'Open booking'}
+                </span>
               </div>
             </div>
-
-            {/* Invited Guests Section - Only show for private events */}
-            {formData.isPrivate && (
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Invited Guests * (Private Event)
-                </label>
-                <div className="border rounded-lg p-4 bg-gray-50 space-y-4">
-                  {/* Add Guest Form */}
-                  <div className="grid md:grid-cols-4 gap-3">
-                    <input
-                      type="text"
-                      placeholder="Guest Name"
-                      value={guestInput.name}
-                      onChange={(e) => setGuestInput(prev => ({ ...prev, name: e.target.value }))}
-                      className="input"
-                    />
-                    <input
-                      type="email"
-                      placeholder="Email Address"
-                      value={guestInput.email}
-                      onChange={(e) => setGuestInput(prev => ({ ...prev, email: e.target.value }))}
-                      className="input"
-                    />
-                    <input
-                      type="tel"
-                      placeholder="Phone (optional)"
-                      value={guestInput.phone}
-                      onChange={(e) => setGuestInput(prev => ({ ...prev, phone: e.target.value }))}
-                      className="input"
-                    />
-                    <button
-                      type="button"
-                      onClick={handleAddGuest}
-                      className="btn-primary flex items-center justify-center gap-2"
-                    >
-                      <Plus className="h-5 w-5" />
-                      Add
-                    </button>
-                  </div>
-
-                  {/* Guest List */}
-                  {formData.invitedGuests.length > 0 ? (
-                    <div className="space-y-2">
-                      <p className="text-sm font-medium text-gray-700">
-                        Invited Guests ({formData.invitedGuests.length})
-                      </p>
-                      <div className="space-y-2 max-h-60 overflow-y-auto">
-                        {formData.invitedGuests.map((guest, index) => (
-                          <div
-                            key={index}
-                            className="flex items-center justify-between bg-white p-3 rounded-lg border"
-                          >
-                            <div className="flex items-center gap-3">
-                              <Mail className="h-5 w-5 text-gray-400" />
-                              <div>
-                                <p className="font-medium text-gray-900">{guest.name}</p>
-                                <p className="text-sm text-gray-600">{guest.email}</p>
-                                {guest.phone && (
-                                  <p className="text-xs text-gray-500">{guest.phone}</p>
-                                )}
-                              </div>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveGuest(guest.email)}
-                              className="text-red-600 hover:text-red-700 p-1"
-                            >
-                              <X className="h-5 w-5" />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ) : (
-                    <p className="text-sm text-gray-500 text-center py-4">
-                      No guests added yet. Add at least one guest for private events.
-                    </p>
-                  )}
-                </div>
-              </div>
-            )}
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -512,10 +417,10 @@ export const CreateProposalPage = () => {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Budget (USD) *
+                Budget (INR) *
               </label>
               <div className="relative">
-                <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                <IndianRupee className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
                 <input
                   type="number"
                   name="budget"
@@ -572,76 +477,98 @@ export const CreateProposalPage = () => {
               />
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Single Rooms
-              </label>
-              <input
-                type="number"
-                name="roomTypes.single"
-                value={formData.accommodationNeeds.roomTypes.single}
-                onChange={handleChange}
-                min="0"
-                className="input"
-                placeholder="Number of single rooms"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Double Rooms
-              </label>
-              <input
-                type="number"
-                name="roomTypes.double"
-                value={formData.accommodationNeeds.roomTypes.double}
-                onChange={handleChange}
-                min="0"
-                className="input"
-                placeholder="Number of double rooms"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Suite Rooms
-              </label>
-              <input
-                type="number"
-                name="roomTypes.suite"
-                value={formData.accommodationNeeds.roomTypes.suite}
-                onChange={handleChange}
-                min="0"
-                className="input"
-                placeholder="Number of suites"
-              />
-            </div>
-
             <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-3">
-                Required Amenities
-              </label>
-              <div className="grid md:grid-cols-4 gap-3">
-                {amenitiesOptions.map((amenity) => (
-                  <label key={amenity} className="flex items-center gap-2 cursor-pointer">
+              <details className="border rounded-lg p-4 bg-gray-50">
+                <summary className="cursor-pointer text-sm font-semibold text-gray-900">
+                  Room Types & Amenities
+                </summary>
+                <div className="mt-4 grid md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Single Rooms
+                    </label>
                     <input
-                      type="checkbox"
-                      checked={formData.accommodationNeeds.amenitiesRequired.includes(amenity)}
-                      onChange={() => handleAmenityToggle(amenity)}
-                      className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                      type="number"
+                      name="roomTypes.single"
+                      value={formData.accommodationNeeds.roomTypes.single}
+                      onChange={handleChange}
+                      min="0"
+                      className="input"
+                      placeholder="Number of single rooms"
                     />
-                    <span className="text-sm text-gray-700">{amenity}</span>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Double Rooms
+                    </label>
+                    <input
+                      type="number"
+                      name="roomTypes.double"
+                      value={formData.accommodationNeeds.roomTypes.double}
+                      onChange={handleChange}
+                      min="0"
+                      className="input"
+                      placeholder="Number of double rooms"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Suite Rooms
+                    </label>
+                    <input
+                      type="number"
+                      name="roomTypes.suite"
+                      value={formData.accommodationNeeds.roomTypes.suite}
+                      onChange={handleChange}
+                      min="0"
+                      className="input"
+                      placeholder="Number of suites"
+                    />
+                  </div>
+                </div>
+
+                <div className="mt-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-3">
+                    Required Amenities
                   </label>
-                ))}
-              </div>
+                  <div className="grid md:grid-cols-4 gap-3">
+                    {amenitiesOptions.map((amenity) => (
+                      <label key={amenity} className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={formData.accommodationNeeds.amenitiesRequired.includes(amenity)}
+                          onChange={() => handleAmenityToggle(amenity)}
+                          className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                        />
+                        <span className="text-sm text-gray-700">{amenity}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              </details>
             </div>
           </div>
         </div>
 
-        {/* Additional Services */}
         <div className="card">
-          <h2 className="text-xl font-bold text-gray-900 mb-6">Additional Services</h2>
+          <button
+            type="button"
+            onClick={() => setShowAdditionalServices(!showAdditionalServices)}
+            className="w-full flex items-center justify-between text-left"
+          >
+            <h2 className="text-xl font-bold text-gray-900">Additional Services & Special Requirements</h2>
+            {showAdditionalServices ? (
+              <ChevronUp className="h-6 w-6 text-gray-500" />
+            ) : (
+              <ChevronDown className="h-6 w-6 text-gray-500" />
+            )}
+          </button>
 
+          {showAdditionalServices && (
+            <div className="mt-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Additional Services</h3>
           <div className="space-y-4">
             <label className="flex items-center gap-3 cursor-pointer">
               <input
@@ -699,11 +626,8 @@ export const CreateProposalPage = () => {
               />
             </div>
           </div>
-        </div>
 
-        {/* Special Requirements */}
-        <div className="card">
-          <h2 className="text-xl font-bold text-gray-900 mb-4">Special Requirements</h2>
+              <h3 className="text-lg font-semibold text-gray-900 mt-6 mb-4">Special Requirements</h3>
           <textarea
             name="specialRequirements"
             value={formData.specialRequirements}
@@ -712,6 +636,8 @@ export const CreateProposalPage = () => {
             className="input"
             placeholder="Any special requirements, dietary restrictions, accessibility needs, or other important details..."
           />
+            </div>
+          )}
         </div>
 
         {/* Submit Buttons */}

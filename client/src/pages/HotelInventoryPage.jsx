@@ -8,7 +8,7 @@ import {
   Save,
   X,
   MapPin,
-  DollarSign,
+  IndianRupee,
   Bed
 } from 'lucide-react';
 import { inventoryService } from '@/services/apiServices';
@@ -288,7 +288,7 @@ export const HotelInventoryPage = () => {
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-1 text-gray-900">
-                        <DollarSign className="h-4 w-4" />
+                        <IndianRupee className="h-4 w-4" />
                         <span className="font-medium">{item.pricePerNight?.toFixed(2)}</span>
                       </div>
                     </td>
@@ -418,7 +418,7 @@ export const HotelInventoryPage = () => {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Price Per Night (USD) *
+                    Price Per Night (INR) *
                   </label>
                   <input
                     type="number"

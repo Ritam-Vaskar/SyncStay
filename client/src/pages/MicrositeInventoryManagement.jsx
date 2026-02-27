@@ -14,7 +14,7 @@ import {
   Trash2,
   Star,
   MapPin,
-  DollarSign,
+  IndianRupee,
   Sparkles,
   ClipboardList,
   PencilLine,
@@ -146,12 +146,24 @@ export const MicrositeInventoryManagement = () => {
           if (g.assignedHotels && g.assignedHotels.length > 0) {
             const primary = g.assignedHotels.sort((a, b) => (a.priority || 1) - (b.priority || 1))[0];
             const hotelId = String(primary.hotel?._id || primary.hotel);
-            const fullHotel = populatedHotels.find((ph) => String(ph.hotel?._id) === hotelId)?.hotel;
+            
+            // Try to find the hotel in populatedHotels
+            const fullHotel = populatedHotels.find((ph) => {
+              const phId = String(ph.hotel?._id || ph._id);
+              return phId === hotelId;
+            })?.hotel || populatedHotels.find((ph) => {
+              const phId = String(ph.hotel?._id || ph._id);
+              return phId === hotelId;
+            });
+            
+            // If still not found, try to get from the primary hotel reference directly
+            const hotelData = fullHotel || primary.hotel;
+            
             if (!prev[g._id]) {
               fromDB[g._id] = {
                 hotelId,
-                hotelName: fullHotel?.name || fullHotel?.organization || 'Hotel',
-                fullHotel,
+                hotelName: hotelData?.name || hotelData?.organization || hotelData?.hotelName || 'Hotel',
+                fullHotel: hotelData,
               };
             }
           }
@@ -473,7 +485,7 @@ export const MicrositeInventoryManagement = () => {
                       )}
                       {sh.hotel?.priceRange?.min && (
                         <p className="text-xs text-gray-500">
-                          💰 ${sh.hotel.priceRange.min} – ${sh.hotel.priceRange.max || sh.hotel.priceRange.min}
+                          💰 ₹{sh.hotel.priceRange.min} – ₹{sh.hotel.priceRange.max || sh.hotel.priceRange.min}
                         </p>
                       )}
                     </div>
@@ -514,7 +526,11 @@ export const MicrositeInventoryManagement = () => {
                             )}
                           </td>
                           <td className="px-4 py-3 text-gray-500 text-xs">
-                            {assignment?.fullHotel?.location?.city || '—'}
+                            {assignment?.fullHotel?.location?.city || 
+                             assignment?.fullHotel?.city || 
+                             assignment?.fullHotel?.location?.cityName ||
+                             assignment?.fullHotel?.address?.city ||
+                             '—'}
                           </td>
                           <td className="px-4 py-3">
                             {assignment ? (
@@ -639,9 +655,9 @@ export const MicrositeInventoryManagement = () => {
 
                         {selectedHotel.hotel?.priceRange?.min && (
                           <div className="flex items-center gap-2">
-                            <DollarSign className="h-4 w-4 text-gray-500" />
+                            <IndianRupee className="h-4 w-4 text-gray-500" />
                             <span className="text-sm text-gray-700 font-medium">
-                              ${selectedHotel.hotel.priceRange.min} - ${selectedHotel.hotel.priceRange.max || selectedHotel.hotel.priceRange.min}
+                              ₹{selectedHotel.hotel.priceRange.min} - ₹{selectedHotel.hotel.priceRange.max || selectedHotel.hotel.priceRange.min}
                             </span>
                           </div>
                         )}
@@ -1055,9 +1071,9 @@ export const MicrositeInventoryManagement = () => {
 
                                         {fullHotel?.priceRange?.min && (
                                           <div className="flex items-center gap-2">
-                                            <DollarSign className="h-4 w-4 text-gray-500" />
+                                            <IndianRupee className="h-4 w-4 text-gray-500" />
                                             <span className="text-sm text-gray-700 font-medium">
-                                              ${fullHotel.priceRange.min} - ${fullHotel.priceRange.max || fullHotel.priceRange.min} per night
+                                              ₹{fullHotel.priceRange.min} - ₹{fullHotel.priceRange.max || fullHotel.priceRange.min} per night
                                             </span>
                                           </div>
                                         )}
@@ -1156,9 +1172,9 @@ export const MicrositeInventoryManagement = () => {
 
                                     {fullHotel?.priceRange?.min && (
                                       <div className="flex items-center gap-2">
-                                        <DollarSign className="h-4 w-4 text-gray-500" />
+                                        <IndianRupee className="h-4 w-4 text-gray-500" />
                                         <span className="text-gray-700 font-medium">
-                                          ${fullHotel.priceRange.min} - ${fullHotel.priceRange.max || fullHotel.priceRange.min}
+                                          ₹{fullHotel.priceRange.min} - ₹{fullHotel.priceRange.max || fullHotel.priceRange.min}
                                         </span>
                                       </div>
                                     )}
@@ -1235,7 +1251,7 @@ export const MicrositeInventoryManagement = () => {
                                             <span>📍 {nh.distanceKm.toFixed(1)} km away</span>
                                             {nh.location?.city && <span>{nh.location.city}</span>}
                                             {nh.priceRange?.min && (
-                                              <span>💰 ${nh.priceRange.min}+</span>
+                                              <span>💰 ₹{nh.priceRange.min}+</span>
                                             )}
                                             {nh.totalRooms && (
                                               <span>🛏 {nh.totalRooms} rooms</span>
@@ -1345,9 +1361,9 @@ export const MicrositeInventoryManagement = () => {
 
                                       {fullHotel?.priceRange?.min && (
                                         <div className="flex items-center gap-2">
-                                          <DollarSign className="h-4 w-4 text-gray-500" />
+                                          <IndianRupee className="h-4 w-4 text-gray-500" />
                                           <span className="text-sm text-gray-700 font-medium">
-                                            ${fullHotel.priceRange.min} - ${fullHotel.priceRange.max || fullHotel.priceRange.min} per night
+                                            ₹{fullHotel.priceRange.min} - ₹{fullHotel.priceRange.max || fullHotel.priceRange.min} per night
                                           </span>
                                         </div>
                                       )}
@@ -1444,7 +1460,7 @@ export const MicrositeInventoryManagement = () => {
                           )}
                           {h.hotel?.priceRange?.min && (
                             <p className="text-xs text-gray-600 mt-0.5">
-                              💰 ${h.hotel.priceRange.min} - ${h.hotel.priceRange.max || h.hotel.priceRange.min}
+                              💰 ₹{h.hotel.priceRange.min} - ₹{h.hotel.priceRange.max || h.hotel.priceRange.min}
                             </p>
                           )}
                         </div>

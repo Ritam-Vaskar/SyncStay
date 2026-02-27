@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Calendar, User, Hotel, DollarSign, Search } from 'lucide-react';
+import { Calendar, User, Hotel, IndianRupee, Search } from 'lucide-react';
 import { bookingService } from '@/services/apiServices';
 
 export const PlannerBookingsPage = () => {
@@ -103,7 +103,7 @@ export const PlannerBookingsPage = () => {
               <p className="text-sm font-medium text-gray-600">Total Revenue</p>
               <p className="text-3xl font-bold text-primary-600 mt-2">${stats.totalRevenue.toFixed(2)}</p>
             </div>
-            <DollarSign className="h-12 w-12 text-primary-600 opacity-20" />
+            <IndianRupee className="h-12 w-12 text-primary-600 opacity-20" />
           </div>
         </div>
       </div>

@@ -2,7 +2,7 @@ import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { 
   Calendar, 
-  DollarSign, 
+  IndianRupee, 
   Users, 
   Hotel,
   TrendingUp,
@@ -90,7 +90,7 @@ export const HotelDashboardPage = () => {
               <p className="text-3xl font-bold text-green-600 mt-2">${stats.totalRevenue.toFixed(2)}</p>
               <p className="text-xs text-gray-500 mt-1">From all bookings</p>
             </div>
-            <DollarSign className="h-12 w-12 text-green-600 opacity-20" />
+            <IndianRupee className="h-12 w-12 text-green-600 opacity-20" />
           </div>
         </div>
 

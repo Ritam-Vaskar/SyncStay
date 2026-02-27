@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { eventService, bookingService, inventoryService } from '@/services/apiServices';
 import { MicrositeDashboardLayout } from '@/layouts/MicrositeDashboardLayout';
 import { LoadingPage } from '@/components/LoadingSpinner';
-import { Hotel, Users, CreditCard, TrendingUp, Calendar, DollarSign, Package, CheckCircle } from 'lucide-react';
+import { Hotel, Users, CreditCard, TrendingUp, Calendar, IndianRupee, Package, CheckCircle } from 'lucide-react';
 import { formatCurrency, formatDate } from '@/utils/helpers';
 import toast from 'react-hot-toast';
 
@@ -87,14 +87,14 @@ export const MicrositePlannerDashboard = () => {
             <div className="flex items-center justify-between mb-2">
               <p className="text-sm text-gray-600">Total Revenue</p>
               <div className="bg-green-100 p-2 rounded-lg">
-                <DollarSign className="h-5 w-5 text-green-600" />
+                <IndianRupee className="h-5 w-5 text-green-600" />
               </div>
             </div>
             <p className="text-3xl font-bold text-gray-900">{formatCurrency(stats.totalRevenue)}</p>
             <p className="text-xs text-gray-500 mt-1">From all bookings</p>
           </div>
 
-          <div className="card">
+          {/* <div className="card">
             <div className="flex items-center justify-between mb-2">
               <p className="text-sm text-gray-600">Room Occupancy</p>
               <div className="bg-purple-100 p-2 rounded-lg">
@@ -103,7 +103,7 @@ export const MicrositePlannerDashboard = () => {
             </div>
             <p className="text-3xl font-bold text-gray-900">{occupancyRate}%</p>
             <p className="text-xs text-gray-500 mt-1">{stats.bookedRooms} / {stats.totalInventory} rooms</p>
-          </div>
+          </div> */}
 
           <div className="card">
             <div className="flex items-center justify-between mb-2">
@@ -224,10 +224,10 @@ export const MicrositePlannerDashboard = () => {
                 <span className="badge badge-success">Event Active</span>
               </div>
 
-              <div>
+              {/* <div>
                 <p className="text-sm text-gray-600 mb-2">Total Views (Coming Soon)</p>
                 <p className="text-2xl font-bold text-gray-400">---</p>
-              </div>
+              </div> */}
             </div>
           </div>
         </div>

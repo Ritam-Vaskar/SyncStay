@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, Navigate } from 'react-router-dom';
-import { Calendar, Package, CreditCard, TrendingUp, Users, DollarSign } from 'lucide-react';
+import { Calendar, Package, CreditCard, TrendingUp, Users, IndianRupee } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 import { useQuery } from '@tanstack/react-query';
 import { eventService, bookingService, analyticsService } from '@/services/apiServices';
@@ -66,7 +66,7 @@ export const DashboardPage = () => {
           </div>
         </div>
 
-        <div className="card">
+        {/* <div className="card">
           <div className="flex items-center gap-4">
             <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-blue-100">
               <Package className="h-6 w-6 text-blue-600" />
@@ -78,7 +78,7 @@ export const DashboardPage = () => {
               </p>
             </div>
           </div>
-        </div>
+        </div> */}
 
         <div className="card">
           <div className="flex items-center gap-4">
@@ -109,8 +109,8 @@ export const DashboardPage = () => {
                   <p className="font-medium">{event.name}</p>
                   <p className="text-sm text-gray-600">{event.type}</p>
                 </div>
-                <span className={`badge ${event.status === 'active' ? 'badge-success' : 'badge-info'}`}>
-                  {event.status}
+                <span className={`badge ${event.status === 'active' || event.status === 'rfp-published' ? 'badge-success' : 'badge-info'}`}>
+                  {event.status === 'rfp-published' ? 'active' : event.status}
                 </span>
               </Link>
             ))}
@@ -172,7 +172,7 @@ export const DashboardPage = () => {
         <div className="card">
           <div className="flex items-center gap-4">
             <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-blue-100">
-              <DollarSign className="h-6 w-6 text-blue-600" />
+              <IndianRupee className="h-6 w-6 text-blue-600" />
             </div>
             <div>
               <p className="text-sm text-gray-600">Total Spent</p>
@@ -258,7 +258,7 @@ export const DashboardPage = () => {
         <div className="card">
           <div className="flex items-center gap-4">
             <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-purple-100">
-              <DollarSign className="h-6 w-6 text-purple-600" />
+              <IndianRupee className="h-6 w-6 text-purple-600" />
             </div>
             <div>
               <p className="text-sm text-gray-600">Total Revenue</p>

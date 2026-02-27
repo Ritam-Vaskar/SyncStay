@@ -5,8 +5,11 @@ import Booking from '../models/Booking.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import { createAuditLog } from '../middlewares/auditLogger.js';
 import sendEmail from '../utils/mail.js';
+import { clientEventReviewTemplate } from '../utils/emailTemplates.js';
+import { generateClientEventPDF } from '../utils/pdfGenerator.js';
 import { generateEventEmbedding, updateHotelActivityEmbedding } from '../services/embeddingService.js';
 import { upsertVector } from '../config/qdrant.js';
+import config from '../config/index.js';
 import tboService from '../services/tboService.js';
 import tboSearchService from '../services/tboSearchService.js';
 
@@ -1288,15 +1291,25 @@ function extractFacilities(hotel, event) {
  * @access  Private (Planner only)
  */
 export const selectRecommendedHotel = asyncHandler(async (req, res) => {
+  console.log('🎯 ========== SELECT RECOMMENDED HOTEL CALLED ==========');
+  console.log('Request params - Event ID:', req.params.id);
+  console.log('Request body - Hotel ID:', req.body.hotelId);
+  console.log('User ID:', req.user.id);
+  
   const { hotelId } = req.body;
   const event = await Event.findById(req.params.id);
 
   if (!event) {
+    console.log('❌ Event not found with ID:', req.params.id);
     return res.status(404).json({
       success: false,
       message: 'Event not found',
     });
   }
+  
+  console.log('✅ Event found:', event.name);
+  console.log('Event planner:', event.planner);
+  console.log('Event clientEmail:', event.clientEmail || 'NOT SET');
 
   // Check if user is the planner
   if (event.planner.toString() !== req.user.id) {
@@ -1540,6 +1553,81 @@ export const selectRecommendedHotel = asyncHandler(async (req, res) => {
   }
 
   await event.save();
+
+  // Send email notification to client if clientEmail is provided
+  console.log('📧 Checking if client email should be sent...');
+  console.log('Event clientEmail:', event.clientEmail);
+  console.log('Event name:', event.name);
+  
+  if (event.clientEmail) {
+    console.log('✅ Client email found, preparing to send email to:', event.clientEmail);
+    try {
+      console.log('📦 Fetching selected hotels details...');
+      // Fetch selected hotels with details
+      const selectedHotelsWithDetails = await Promise.all(
+        event.selectedHotels.map(async (sh) => {
+          const hotelUser = await User.findById(sh.hotel);
+          const HotelProposal = (await import('../models/HotelProposal.js')).default;
+          const hotelProposal = await HotelProposal.findById(sh.proposal);
+          
+          return {
+            name: hotelUser?.name || hotelUser?.organization || 'Hotel',
+            roomType: hotelProposal?.roomTypes?.[0] || 'Standard',
+            numberOfRooms: hotelProposal?.numberOfRooms || event.accommodationNeeds?.totalRooms || 0,
+            pricePerNight: hotelProposal?.pricing?.doubleRoom?.pricePerNight || 0,
+            totalPrice: hotelProposal?.totalEstimatedCost || 0,
+          };
+        })
+      );
+      console.log('Hotel details fetched:', selectedHotelsWithDetails.length, 'hotels');
+
+      const eventDates = `${new Date(event.startDate).toLocaleDateString('en-IN')} - ${new Date(event.endDate).toLocaleDateString('en-IN')}`;
+      const micrositeLink = event.micrositeConfig?.isPublished 
+        ? `${config.clientUrl}/microsite/${event.micrositeConfig.customSlug}`
+        : `${config.clientUrl}/events/${event._id}`;
+
+      const emailData = {
+        clientName: 'Valued Client',
+        eventName: event.name,
+        eventDates,
+        location: event.location?.city || event.location,
+        expectedGuests: event.expectedGuests,
+        totalBudget: event.budget || 0,
+        selectedHotels: selectedHotelsWithDetails,
+        micrositeLink,
+      };
+
+      console.log('📝 Generating email template...');
+      const emailHtml = clientEventReviewTemplate(emailData);
+      
+      console.log('📄 Generating PDF...');
+      // Generate PDF
+      const pdfBuffer = await generateClientEventPDF(emailData);
+      console.log('PDF generated, size:', pdfBuffer.length, 'bytes');
+
+      console.log('📨 Sending email to:', event.clientEmail);
+      await sendEmail({
+        to: event.clientEmail,
+        subject: `Hotel Selection Update: ${event.name}`,
+        html: emailHtml,
+        attachments: [
+          {
+            filename: `Event_Plan_${event.name.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`,
+            content: pdfBuffer,
+            contentType: 'application/pdf'
+          }
+        ]
+      });
+
+      console.log(`✅ Client notification email with PDF sent successfully to ${event.clientEmail}`);
+    } catch (emailError) {
+      console.error('❌ Failed to send client notification email:', emailError);
+      console.error('Error stack:', emailError.stack);
+      // Don't fail the request if email fails
+    }
+  } else {
+    console.log('⚠️ No client email configured for this event - skipping email notification');
+  }
 
   // Log action
   await createAuditLog({

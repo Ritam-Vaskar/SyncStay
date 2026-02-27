@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Hotel, Plus, Edit2, Trash2, DollarSign, Bed } from 'lucide-react';
+import { Hotel, Plus, Edit2, Trash2, IndianRupee, Bed } from 'lucide-react';
 import { inventoryService } from '@/services/apiServices';
 import toast from 'react-hot-toast';
 
@@ -250,7 +250,7 @@ export const PlannerInventoryPage = () => {
                         {item.availableRooms}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-gray-900">${item.pricePerNight}</td>
+                    <td className="px-6 py-4 text-gray-900">₹{item.pricePerNight}</td>
                     <td className="px-6 py-4 text-right space-x-2">
                       <button
                         onClick={() => handleEdit(item)}

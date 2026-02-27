@@ -42,10 +42,10 @@ export const PlannerEventsPage = () => {
         iconColor: 'text-gray-600'
       },
       'rfp-published': {
-        label: 'RFP Published - Awaiting Hotels',
-        color: 'bg-blue-100 text-blue-800',
-        icon: Clock,
-        iconColor: 'text-blue-600'
+        label: 'Active',
+        color: 'bg-green-100 text-green-800',
+        icon: CheckCircle,
+        iconColor: 'text-green-600'
       },
       'reviewing-proposals': {
         label: 'Review Hotel Proposals',
@@ -129,7 +129,7 @@ export const PlannerEventsPage = () => {
           </div>
         </div>
 
-        <div className="card">
+        {/* <div className="card">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs font-medium text-gray-600">Pending</p>
@@ -137,15 +137,15 @@ export const PlannerEventsPage = () => {
             </div>
             <AlertCircle className="h-10 w-10 text-yellow-600 opacity-20" />
           </div>
-        </div>
+        </div> */}
 
         <div className="card">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-xs font-medium text-gray-600">RFP Sent</p>
-              <p className="text-2xl font-bold text-blue-600 mt-1">{stats.rfpPublished}</p>
+              <p className="text-xs font-medium text-gray-600">Active</p>
+              <p className="text-2xl font-bold text-green-600 mt-1">{stats.rfpPublished}</p>
             </div>
-            <Clock className="h-10 w-10 text-blue-600 opacity-20" />
+            <CheckCircle className="h-10 w-10 text-green-600 opacity-20" />
           </div>
         </div>
 
@@ -159,7 +159,7 @@ export const PlannerEventsPage = () => {
           </div>
         </div>
 
-        <div className="card">
+        {/* <div className="card">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs font-medium text-gray-600">Active</p>
@@ -167,7 +167,7 @@ export const PlannerEventsPage = () => {
             </div>
             <CheckCircle className="h-10 w-10 text-green-600 opacity-20" />
           </div>
-        </div>
+        </div> */}
 
         <div className="card">
           <div className="flex items-center justify-between">
@@ -185,7 +185,7 @@ export const PlannerEventsPage = () => {
         <div className="flex items-center gap-4 overflow-x-auto">
           <span className="text-sm font-medium text-gray-700 whitespace-nowrap">Filter:</span>
           <div className="flex gap-2 flex-wrap">
-            {['all', 'rfp-published', 'reviewing-proposals', 'active', 'rejected', 'completed'].map((status) => (
+            {['all', 'rfp-published', 'reviewing-proposals', 'rejected', 'completed'].map((status) => (
               <button
                 key={status}
                 onClick={() => setStatusFilter(status)}
@@ -196,7 +196,7 @@ export const PlannerEventsPage = () => {
                 }`}
               >
                 {status === 'all' ? 'All' : 
-                 status === 'rfp-published' ? 'RFP Sent' :
+                 status === 'rfp-published' ? 'Active' :
                  status === 'reviewing-proposals' ? 'Reviewing' :
                  status.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
               </button>

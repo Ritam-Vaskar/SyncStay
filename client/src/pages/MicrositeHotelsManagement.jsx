@@ -9,7 +9,7 @@ import {
   Hotel, 
   Star, 
   MapPin, 
-  DollarSign, 
+  IndianRupee, 
   Users, 
   CheckCircle,
   Eye,
@@ -25,6 +25,7 @@ import {
   Users as UsersIcon,
   Plane,
   ShirtIcon,
+  X,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -67,13 +68,19 @@ export const MicrositeHotelsManagement = () => {
 
   // Select recommended hotel mutation
   const selectHotelMutation = useMutation({
-    mutationFn: ({ eventId, hotelId }) => eventService.selectRecommendedHotel(eventId, hotelId),
-    onSuccess: () => {
+    mutationFn: ({ eventId, hotelId }) => {
+      console.log('🎯 Selecting recommended hotel - Event ID:', eventId, 'Hotel ID:', hotelId);
+      return eventService.selectRecommendedHotel(eventId, hotelId);
+    },
+    onSuccess: (data) => {
+      console.log('✅ Hotel selection successful:', data);
       toast.success('Hotel selected successfully!');
       queryClient.invalidateQueries(['microsite-hotels']);
       queryClient.invalidateQueries(['microsite-event']);
     },
     onError: (error) => {
+      console.error('❌ Hotel selection failed:', error);
+      console.error('Error response:', error.response);
       toast.error(error.response?.data?.message || 'Failed to select hotel');
     },
   });
@@ -162,7 +169,7 @@ export const MicrositeHotelsManagement = () => {
           >
             <div className="flex items-center gap-2">
               <Hotel className="h-5 w-5" />
-              RFP Proposals ({rfpProposals.length})
+              Selected Hotels ({rfpProposals.length})
             </div>
           </button>
         </div>
@@ -198,21 +205,21 @@ export const MicrositeHotelsManagement = () => {
           </div>
         )}
 
-        {/* RFP Proposals Tab */}
+        {/* Selected Hotels Tab */}
         {activeTab === 'proposals' && (
           <div className="space-y-6">
             <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
-              <h3 className="font-semibold text-purple-900 mb-2">📨 Hotels Responding to Your RFP</h3>
+              <h3 className="font-semibold text-purple-900 mb-2">✅ Selected Hotels</h3>
               <p className="text-sm text-purple-800">
-                These hotels have submitted proposals in response to your Request for Proposal.
+                These are the hotels you have selected for your event.
               </p>
             </div>
 
             {rfpProposals.length === 0 ? (
               <div className="card text-center py-12">
                 <Hotel className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-xl font-semibold text-gray-900 mb-2">No Proposals Yet</h3>
-                <p className="text-gray-600">Hotels haven't submitted proposals yet. You can select from recommended hotels in the meantime.</p>
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">No Hotels Selected</h3>
+                <p className="text-gray-600">You haven't selected any hotels yet. Choose from the recommended hotels to get started.</p>
               </div>
             ) : (
               <div className="space-y-4">
@@ -230,6 +237,210 @@ export const MicrositeHotelsManagement = () => {
           </div>
         )}
       </div>
+
+      {/* Proposal Details Modal */}
+      {selectedProposal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            {/* Modal Header */}
+            <div className="sticky top-0 bg-white border-b px-6 py-4 flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900">{selectedProposal.hotelName}</h2>
+                <p className="text-sm text-gray-600">by {selectedProposal.hotel?.name || selectedProposal.hotel?.organization}</p>
+              </div>
+              <button
+                onClick={() => setSelectedProposal(null)}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <X className="h-6 w-6 text-gray-600" />
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-6 space-y-6">
+              {/* Status and Cost */}
+              <div className="grid md:grid-cols-3 gap-4">
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <p className="text-sm text-gray-600 mb-1">Status</p>
+                  <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${
+                    selectedProposal.status === 'selected' ? 'bg-green-100 text-green-800' :
+                    selectedProposal.status === 'under-review' ? 'bg-yellow-100 text-yellow-800' :
+                    'bg-blue-100 text-blue-800'
+                  }`}>
+                    {selectedProposal.status}
+                  </span>
+                </div>
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <p className="text-sm text-gray-600 mb-1">Total Rooms Offered</p>
+                  <p className="text-2xl font-bold text-gray-900">{selectedProposal.totalRoomsOffered}</p>
+                </div>
+                {selectedProposal.totalEstimatedCost && (
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <p className="text-sm text-gray-600 mb-1">Package Cost</p>
+                    <p className="text-2xl font-bold text-gray-900">₹{selectedProposal.totalEstimatedCost.toLocaleString('en-IN')}</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Room Pricing */}
+              {selectedProposal.pricing && (
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-3">Room Pricing & Availability</h3>
+                  <div className="grid md:grid-cols-3 gap-4">
+                    {selectedProposal.pricing.singleRoom && (
+                      <div className="border rounded-lg p-4">
+                        <h4 className="font-semibold text-gray-900 mb-2">Single Room</h4>
+                        <div className="space-y-1 text-sm">
+                          <p className="text-gray-600">Price: <span className="font-semibold text-gray-900">₹{selectedProposal.pricing.singleRoom.pricePerNight}/night</span></p>
+                          <p className="text-gray-600">Available: <span className="font-semibold text-gray-900">{selectedProposal.pricing.singleRoom.availableRooms} rooms</span></p>
+                        </div>
+                      </div>
+                    )}
+                    {selectedProposal.pricing.doubleRoom && (
+                      <div className="border rounded-lg p-4">
+                        <h4 className="font-semibold text-gray-900 mb-2">Double Room</h4>
+                        <div className="space-y-1 text-sm">
+                          <p className="text-gray-600">Price: <span className="font-semibold text-gray-900">₹{selectedProposal.pricing.doubleRoom.pricePerNight}/night</span></p>
+                          <p className="text-gray-600">Available: <span className="font-semibold text-gray-900">{selectedProposal.pricing.doubleRoom.availableRooms} rooms</span></p>
+                        </div>
+                      </div>
+                    )}
+                    {selectedProposal.pricing.suite && (
+                      <div className="border rounded-lg p-4">
+                        <h4 className="font-semibold text-gray-900 mb-2">Suite</h4>
+                        <div className="space-y-1 text-sm">
+                          <p className="text-gray-600">Price: <span className="font-semibold text-gray-900">₹{selectedProposal.pricing.suite.pricePerNight}/night</span></p>
+                          <p className="text-gray-600">Available: <span className="font-semibold text-gray-900">{selectedProposal.pricing.suite.availableRooms} rooms</span></p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Facilities */}
+              {selectedProposal.facilities && (
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-3">Facilities</h3>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    {Object.entries(selectedProposal.facilities).map(([key, value]) => {
+                      if (!value) return null;
+                      const Icon = facilityIcons[key];
+                      const label = key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
+                      return (
+                        <div key={key} className="flex items-center gap-2 bg-green-50 px-3 py-2 rounded-lg">
+                          {Icon && <Icon className="h-4 w-4 text-green-600" />}
+                          <span className="text-sm text-green-900">{label}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Amenities */}
+              {selectedProposal.amenities && selectedProposal.amenities.length > 0 && (
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-3">Amenities</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedProposal.amenities.map((amenity, i) => (
+                      <span key={i} className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm">
+                        {amenity}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Additional Services */}
+              {selectedProposal.additionalServices && (
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-3">Additional Services</h3>
+                  <div className="space-y-3">
+                    {selectedProposal.additionalServices.transportation?.available && (
+                      <div className="border rounded-lg p-4">
+                        <h4 className="font-semibold text-gray-900 mb-1 flex items-center gap-2">
+                          <Car className="h-4 w-4" />
+                          Transportation
+                        </h4>
+                        <p className="text-sm text-gray-600">{selectedProposal.additionalServices.transportation.description}</p>
+                        {selectedProposal.additionalServices.transportation.cost && (
+                          <p className="text-sm font-semibold text-gray-900 mt-1">Cost: ₹{selectedProposal.additionalServices.transportation.cost}</p>
+                        )}
+                      </div>
+                    )}
+                    {selectedProposal.additionalServices.catering?.available && (
+                      <div className="border rounded-lg p-4">
+                        <h4 className="font-semibold text-gray-900 mb-1 flex items-center gap-2">
+                          <UtensilsCrossed className="h-4 w-4" />
+                          Catering
+                        </h4>
+                        <p className="text-sm text-gray-600">{selectedProposal.additionalServices.catering.description}</p>
+                        {selectedProposal.additionalServices.catering.costPerPerson && (
+                          <p className="text-sm font-semibold text-gray-900 mt-1">Cost per person: ₹{selectedProposal.additionalServices.catering.costPerPerson}</p>
+                        )}
+                      </div>
+                    )}
+                    {selectedProposal.additionalServices.avEquipment?.available && (
+                      <div className="border rounded-lg p-4">
+                        <h4 className="font-semibold text-gray-900 mb-1 flex items-center gap-2">
+                          <Building className="h-4 w-4" />
+                          AV Equipment
+                        </h4>
+                        <p className="text-sm text-gray-600">{selectedProposal.additionalServices.avEquipment.description}</p>
+                        {selectedProposal.additionalServices.avEquipment.cost && (
+                          <p className="text-sm font-semibold text-gray-900 mt-1">Cost: ₹{selectedProposal.additionalServices.avEquipment.cost}</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Special Offer */}
+              {selectedProposal.specialOffer && (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                  <h3 className="text-lg font-semibold text-yellow-900 mb-2 flex items-center gap-2">
+                    <Star className="h-5 w-5" />
+                    Special Offer
+                  </h3>
+                  <p className="text-gray-700">{selectedProposal.specialOffer}</p>
+                </div>
+              )}
+
+              {/* Notes */}
+              {selectedProposal.notes && (
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">Additional Notes</h3>
+                  <p className="text-gray-700 bg-gray-50 rounded-lg p-4">{selectedProposal.notes}</p>
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="flex gap-3 pt-4 border-t">
+                <button
+                  onClick={() => setSelectedProposal(null)}
+                  className="btn bg-gray-200 text-gray-700 hover:bg-gray-300 flex-1"
+                >
+                  Close
+                </button>
+                {!selectedProposal.selectedByPlanner && (
+                  <button
+                    onClick={() => {
+                      handleSelectProposal(selectedProposal._id);
+                      setSelectedProposal(null);
+                    }}
+                    className="btn btn-primary flex-1"
+                  >
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    Select This Hotel
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </MicrositeDashboardLayout>
   );
 };
@@ -269,9 +480,9 @@ const RecommendedHotelCard = ({ recommendation, onSelect, isSelecting }) => {
         
         {hotel.priceRange && (hotel.priceRange.min || hotel.priceRange.max) && (
           <div className="flex items-center gap-2 text-gray-600">
-            <DollarSign className="h-4 w-4" />
+            <IndianRupee className="h-4 w-4" />
             <span className="text-sm">
-              ${hotel.priceRange.min || 0} - ${hotel.priceRange.max || 0} per night
+              ₹{hotel.priceRange.min || 0} - ₹{hotel.priceRange.max || 0} per night
             </span>
           </div>
         )}
@@ -405,7 +616,7 @@ const RFPProposalCard = ({ proposal, onSelect, onViewDetails, isSelecting }) => 
         
         {proposal.totalEstimatedCost && (
           <div className="flex items-center gap-2 text-gray-600">
-            <DollarSign className="h-5 w-5" />
+            <IndianRupee className="h-5 w-5" />
             <div>
               <p className="text-xs text-gray-500">Package Cost</p>
               <p className="font-semibold">₹{proposal.totalEstimatedCost.toLocaleString('en-IN')}</p>

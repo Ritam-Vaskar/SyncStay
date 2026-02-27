@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { 
   TrendingUp, 
   Calendar, 
-  DollarSign, 
+  IndianRupee,
   Users, 
   Hotel,
   ArrowUp,
@@ -97,7 +97,7 @@ export const PlannerAnalyticsPage = () => {
               </div>
             </div>
             <div className="bg-green-100 p-3 rounded-lg">
-              <DollarSign className="h-6 w-6 text-green-600" />
+              <IndianRupee className="h-6 w-6 text-green-600" />
             </div>
           </div>
         </div>

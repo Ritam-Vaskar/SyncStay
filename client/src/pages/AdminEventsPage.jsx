@@ -7,7 +7,7 @@ import {
   Calendar,
   MapPin,
   Users,
-  DollarSign,
+  IndianRupee,
   Clock,
   CheckCircle,
   AlertCircle,
@@ -55,7 +55,7 @@ export const AdminEventsPage = () => {
 
   const getStatusBadge = (status) => {
     const badges = {
-      'rfp-published': { bg: 'bg-blue-100', text: 'text-blue-800', icon: AlertCircle, label: 'RFP Published' },
+      'rfp-published': { bg: 'bg-blue-100', text: 'text-blue-800', icon: AlertCircle, label: 'Active' },
       'reviewing-proposals': { bg: 'bg-purple-100', text: 'text-purple-800', icon: Eye, label: 'Reviewing Proposals' },
       'active': { bg: 'bg-green-100', text: 'text-green-800', icon: CheckCircle, label: 'Active' },
       'completed': { bg: 'bg-gray-100', text: 'text-gray-800', icon: CheckCircle, label: 'Completed' },
@@ -211,7 +211,7 @@ export const AdminEventsPage = () => {
                       </div>
 
                       <div className="flex items-center gap-2">
-                        <DollarSign className="h-4 w-4 text-gray-500" />
+                        <IndianRupee className="h-4 w-4 text-gray-500" />
                         <div>
                           <p className="text-gray-600">Budget</p>
                           <p className="font-medium">${formatValue(event.budget)}</p>

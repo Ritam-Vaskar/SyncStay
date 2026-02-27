@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import {
   TrendingUp,
   TrendingDown,
-  DollarSign,
+  IndianRupee,
   Users,
   Hotel,
   Calendar,
@@ -16,6 +16,7 @@ import {
 import { bookingService, eventService } from '@/services/apiServices';
 import { MicrositeDashboardLayout } from '@/layouts/MicrositeDashboardLayout';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { EventActivityLog } from '@/components/EventActivityLog';
 import { formatDate } from '@/utils/helpers';
 
 export const MicrositeEventReports = () => {
@@ -109,14 +110,14 @@ export const MicrositeEventReports = () => {
             <div className="flex items-start justify-between">
               <div className="flex-1">
                 <p className="text-sm font-medium text-gray-600">Total Revenue</p>
-                <p className="text-3xl font-bold text-gray-900 mt-2">${totalRevenue.toFixed(2)}</p>
+                <p className="text-3xl font-bold text-gray-900 mt-2">₹{totalRevenue.toFixed(2)}</p>
                 <div className="flex items-center mt-2 text-sm text-green-600">
                   <ArrowUp className="h-4 w-4 mr-1" />
                   <span>From {confirmedBookings} confirmed bookings</span>
                 </div>
               </div>
               <div className="bg-green-100 p-3 rounded-lg">
-                <DollarSign className="h-6 w-6 text-green-600" />
+                <IndianRupee className="h-6 w-6 text-green-600" />
               </div>
             </div>
           </div>
@@ -194,7 +195,7 @@ export const MicrositeEventReports = () => {
             <div className="flex items-start justify-between">
               <div className="flex-1">
                 <p className="text-sm font-medium text-gray-600">Avg Revenue/Booking</p>
-                <p className="text-3xl font-bold text-gray-900 mt-2">${avgRevenuePerBooking}</p>
+                <p className="text-3xl font-bold text-gray-900 mt-2">₹{avgRevenuePerBooking}</p>
                 <p className="text-sm text-gray-600 mt-2">Total {totalBookings} bookings</p>
               </div>
               <div className="bg-cyan-100 p-3 rounded-lg">
@@ -208,7 +209,9 @@ export const MicrositeEventReports = () => {
             <div className="flex items-start justify-between">
               <div className="flex-1">
                 <p className="text-sm font-medium text-gray-600">Event Status</p>
-                <p className="text-lg font-bold text-gray-900 mt-2 capitalize">{event?.status}</p>
+                <p className="text-lg font-bold text-gray-900 mt-2 capitalize">
+                  {event?.status === 'rfp-published' ? 'Active' : event?.status}
+                </p>
                 <p className="text-sm text-gray-600 mt-2">
                   {formatDate(event?.startDate)} to {formatDate(event?.endDate)}
                 </p>
@@ -333,7 +336,7 @@ export const MicrositeEventReports = () => {
                         </span>
                       </td>
                       <td className="px-6 py-4 text-sm text-right font-semibold text-gray-900">
-                        ${(booking.pricing?.totalAmount || 0).toFixed(2)}
+                        ₹{(booking.pricing?.totalAmount || 0).toFixed(2)}
                       </td>
                       <td className="px-6 py-4">
                         <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium capitalize ${
@@ -370,6 +373,11 @@ export const MicrositeEventReports = () => {
               Booking analytics will appear here once guests start booking accommodations.
             </p>
           </div>
+        )}
+
+        {/* Activity Log */}
+        {event?._id && (
+          <EventActivityLog eventId={event._id} initialCollapsed={true} />
         )}
       </div>
     </MicrositeDashboardLayout>
