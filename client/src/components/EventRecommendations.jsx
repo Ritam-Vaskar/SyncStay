@@ -4,7 +4,7 @@ import {
   Calendar, 
   MapPin, 
   Users, 
-  DollarSign,
+  IndianRupee,
   Sparkles,
   Heart,
   Eye,

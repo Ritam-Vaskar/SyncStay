@@ -36,7 +36,6 @@ export const DashboardLayout = ({ children }) => {
       return [
         ...baseItems,
         { name: 'Events', href: '/planner/events', icon: Calendar },
-        { name: 'Inventory', href: '/planner/inventory', icon: Package },
         { name: 'Proposals', href: '/planner/proposals', icon: FileText },
         { name: 'Bookings', href: '/planner/bookings', icon: CreditCard },
         { name: 'Analytics', href: '/planner/analytics', icon: BarChart3 },

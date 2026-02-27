@@ -125,7 +125,7 @@ export default function AdminAnalyticsPage() {
         />
         <StatCard
           title="Total Revenue"
-          value={`$${(overview?.totalRevenue || 0).toLocaleString()}`}
+          value={`₹${(overview?.totalRevenue || 0).toLocaleString('en-IN')}`}
           subtitle="All time"
           icon={DollarSign}
           color="bg-yellow-500"
@@ -198,40 +198,52 @@ export default function AdminAnalyticsPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Users by Role */}
         <ChartCard title="Users by Role" icon={Users}>
-          <ResponsiveContainer width="100%" height={250}>
+          <ResponsiveContainer width="100%" height={200}>
             <PieChart>
               <Pie
                 data={usersByRoleData}
                 cx="50%"
                 cy="50%"
-                labelLine={false}
-                label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                innerRadius={50}
                 outerRadius={80}
-                fill="#8884d8"
                 dataKey="value"
+                paddingAngle={2}
               >
                 {usersByRoleData.map((entry, index) => (
                   <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                 ))}
               </Pie>
-              <Tooltip />
+              <Tooltip formatter={(value, name) => [value, name]} />
             </PieChart>
           </ResponsiveContainer>
+          <div className="mt-3 flex flex-col gap-1.5 px-2">
+            {usersByRoleData.map((entry, index) => {
+              const total = usersByRoleData.reduce((s, e) => s + e.value, 0);
+              return (
+                <div key={entry.name} className="flex items-center justify-between text-sm">
+                  <div className="flex items-center gap-2">
+                    <span className="inline-block w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: COLORS[index % COLORS.length] }} />
+                    <span className="text-gray-700">{entry.name}</span>
+                  </div>
+                  <span className="font-semibold text-gray-900">{entry.value} <span className="text-gray-400 font-normal">({total > 0 ? ((entry.value / total) * 100).toFixed(0) : 0}%)</span></span>
+                </div>
+              );
+            })}
+          </div>
         </ChartCard>
 
         {/* Events by Status */}
         <ChartCard title="Events by Status" icon={Calendar}>
-          <ResponsiveContainer width="100%" height={250}>
+          <ResponsiveContainer width="100%" height={200}>
             <PieChart>
               <Pie
                 data={eventsByStatusData}
                 cx="50%"
                 cy="50%"
-                labelLine={false}
-                label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                innerRadius={50}
                 outerRadius={80}
-                fill="#8884d8"
                 dataKey="value"
+                paddingAngle={2}
               >
                 {eventsByStatusData.map((entry, index) => (
                   <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
@@ -240,21 +252,34 @@ export default function AdminAnalyticsPage() {
               <Tooltip />
             </PieChart>
           </ResponsiveContainer>
+          <div className="mt-3 flex flex-col gap-1.5 px-2">
+            {eventsByStatusData.map((entry, index) => {
+              const total = eventsByStatusData.reduce((s, e) => s + e.value, 0);
+              return (
+                <div key={entry.name} className="flex items-center justify-between text-sm">
+                  <div className="flex items-center gap-2">
+                    <span className="inline-block w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: COLORS[index % COLORS.length] }} />
+                    <span className="text-gray-700 truncate max-w-[120px]">{entry.name}</span>
+                  </div>
+                  <span className="font-semibold text-gray-900">{entry.value} <span className="text-gray-400 font-normal">({total > 0 ? ((entry.value / total) * 100).toFixed(0) : 0}%)</span></span>
+                </div>
+              );
+            })}
+          </div>
         </ChartCard>
 
         {/* Bookings by Status */}
         <ChartCard title="Bookings by Status" icon={CreditCard}>
-          <ResponsiveContainer width="100%" height={250}>
+          <ResponsiveContainer width="100%" height={200}>
             <PieChart>
               <Pie
                 data={bookingsByStatusData}
                 cx="50%"
                 cy="50%"
-                labelLine={false}
-                label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                innerRadius={50}
                 outerRadius={80}
-                fill="#8884d8"
                 dataKey="value"
+                paddingAngle={2}
               >
                 {bookingsByStatusData.map((entry, index) => (
                   <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
@@ -263,6 +288,20 @@ export default function AdminAnalyticsPage() {
               <Tooltip />
             </PieChart>
           </ResponsiveContainer>
+          <div className="mt-3 flex flex-col gap-1.5 px-2">
+            {bookingsByStatusData.map((entry, index) => {
+              const total = bookingsByStatusData.reduce((s, e) => s + e.value, 0);
+              return (
+                <div key={entry.name} className="flex items-center justify-between text-sm">
+                  <div className="flex items-center gap-2">
+                    <span className="inline-block w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: COLORS[index % COLORS.length] }} />
+                    <span className="text-gray-700">{entry.name}</span>
+                  </div>
+                  <span className="font-semibold text-gray-900">{entry.value} <span className="text-gray-400 font-normal">({total > 0 ? ((entry.value / total) * 100).toFixed(0) : 0}%)</span></span>
+                </div>
+              );
+            })}
+          </div>
         </ChartCard>
       </div>
 

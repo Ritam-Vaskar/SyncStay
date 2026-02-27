@@ -69,6 +69,7 @@ export const analyticsService = {
   getEventAnalytics: (eventId) => api.get(`/analytics/event/${eventId}`),
   getRevenueAnalytics: (params) => api.get('/analytics/revenue', { params }),
   getAuditLogs: (params) => api.get('/analytics/audit-logs', { params }),
+  getEventActivityLogs: (eventId, params) => api.get(`/analytics/events/${eventId}/activity-logs`, { params }),
 };
 
 export const flightService = {

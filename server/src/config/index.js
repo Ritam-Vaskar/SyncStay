@@ -12,6 +12,7 @@ export default {
     refreshExpire: process.env.JWT_REFRESH_EXPIRE || '30d',
   },
   clientUrl: process.env.CLIENT_URL || 'http://localhost:5173',
+  frontendUrl: process.env.CLIENT_URL || 'http://localhost:5173',
   email: {
     host: process.env.EMAIL_HOST,
     port: process.env.EMAIL_PORT,

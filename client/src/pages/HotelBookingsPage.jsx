@@ -12,7 +12,7 @@ import {
   Mail,
   Hotel,
   Bed,
-  DollarSign,
+  IndianRupee,
   MapPin,
   LogIn,
   LogOut,
@@ -278,7 +278,7 @@ export const HotelBookingsPage = () => {
                       </td>
                       <td className="px-6 py-4">
                         <p className="font-medium text-gray-900 flex items-center gap-1">
-                          <DollarSign className="h-4 w-4" />
+                          <IndianRupee className="h-4 w-4" />
                           {booking.pricing?.totalAmount?.toFixed(2) || '0.00'}
                         </p>
                       </td>
@@ -458,14 +458,14 @@ export const HotelBookingsPage = () => {
                 {selectedBooking.pricing && (
                   <div className="card bg-green-50">
                     <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                      <DollarSign className="h-5 w-5 text-green-600" />
+                      <IndianRupee className="h-5 w-5 text-green-600" />
                       Pricing Details
                     </h3>
                     <div className="grid md:grid-cols-3 gap-4">
                       {selectedBooking.pricing.pricePerNight && (
                         <div>
                           <p className="text-sm text-gray-600">Price Per Night</p>
-                          <p className="font-medium text-gray-900">${selectedBooking.pricing.pricePerNight.toFixed(2)}</p>
+                          <p className="font-medium text-gray-900">₹{selectedBooking.pricing.pricePerNight.toFixed(2)}</p>
                         </div>
                       )}
                       {selectedBooking.pricing.numberOfNights && (

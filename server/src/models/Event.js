@@ -21,6 +21,10 @@ const eventSchema = new mongoose.Schema(
       ref: 'User',
       required: true,
     },
+    clientEmail: {
+      type: String,
+      match: [/^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/, 'Please provide a valid email address'],
+    },
     startDate: {
       type: Date,
       required: [true, 'Start date is required'],

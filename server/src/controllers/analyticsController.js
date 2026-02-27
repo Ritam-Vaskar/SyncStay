@@ -2,9 +2,13 @@ import Event from '../models/Event.js';
 import Booking from '../models/Booking.js';
 import Payment from '../models/Payment.js';
 import Inventory from '../models/Inventory.js';
+import InventoryGroup from '../models/InventoryGroup.js';
 import User from '../models/User.js';
 import AuditLog from '../models/AuditLog.js';
+import HotelProposal from '../models/HotelProposal.js';
 import asyncHandler from '../utils/asyncHandler.js';
+
+// Activity logs for event tracking
 
 /**
  * @route   GET /api/analytics/overview
@@ -421,5 +425,187 @@ export const getAdminDashboard = asyncHandler(async (req, res) => {
       events: topEvents,
       planners: topPlanners,
     },
+  });
+});
+
+/**
+ * @route   GET /api/analytics/events/:eventId/activity-logs
+ * @desc    Get activity logs for a specific event
+ * @access  Private (Planner/Admin)
+ */
+export const getEventActivityLogs = asyncHandler(async (req, res) => {
+  const { eventId } = req.params;
+  const { category, limit = 50, skip = 0 } = req.query;
+
+  // Verify event exists and user has access
+  const event = await Event.findById(eventId);
+  if (!event) {
+    return res.status(404).json({
+      success: false,
+      message: 'Event not found',
+    });
+  }
+
+  // Check authorization
+  if (req.user.role !== 'admin' && event.planner.toString() !== req.user.id) {
+    return res.status(403).json({
+      success: false,
+      message: 'Not authorized to view this event activity',
+    });
+  }
+
+  // Get related resource IDs for this event
+  const bookings = await Booking.find({ event: eventId }).distinct('_id');
+  const inventoryGroups = await InventoryGroup.find({ event: eventId }).distinct('_id');
+  const inventoryItems = await Inventory.find({ event: eventId }).distinct('_id');
+  const proposals = await HotelProposal.find({ event: eventId }).distinct('_id');
+  const payments = await Payment.find({ event: eventId }).distinct('_id');
+
+  // Build base query filter - looking for logs related to this event
+  const filter = {
+    $or: [
+      // Direct event logs
+      { resource: 'Event', resourceId: eventId },
+      // Logs with event reference in details
+      { 'details.eventId': eventId },
+      { 'details.event': eventId },
+      // Related resource logs
+      { resource: 'Booking', resourceId: { $in: bookings } },
+      { resource: 'InventoryGroup', resourceId: { $in: inventoryGroups } },
+      { resource: 'Inventory', resourceId: { $in: inventoryItems } },
+      { resource: 'HotelProposal', resourceId: { $in: proposals } },
+      { resource: 'Payment', resourceId: { $in: payments } },
+    ]
+  };
+
+  // Filter by category if provided
+  if (category) {
+    const categoryActions = {
+      all: null,
+      hotels: ['hotel_selection_confirmed', 'hotel_selected', 'hotel_deselected', 'hotel_assigned_to_group'],
+      bookings: ['booking_create', 'booking_update', 'booking_cancel', 'booking_confirm'],
+      payments: ['payment_create', 'payment_success', 'payment_failed', 'planner_payment_initiated', 'planner_payment_completed'],
+      inventory: ['inventory_create', 'inventory_update', 'inventory_lock', 'inventory_unlock', 'inventory_group_create', 'inventory_group_update', 'inventory_group_delete', 'guest_assigned_to_group'],
+      guests: ['guest_invite', 'guest_access', 'guest_assigned_to_group'],
+      proposals: ['proposal_submit', 'proposal_select', 'proposal_reject'],
+      event: ['event_create', 'event_update', 'event_publish', 'event_activate', 'event_complete'],
+    };
+
+    const actions = categoryActions[category];
+    if (actions) {
+      filter.action = { $in: actions };
+    }
+  }
+
+  // Fetch logs with pagination
+  const logs = await AuditLog.find(filter)
+    .populate('user', 'name email role')
+    .sort({ createdAt: -1 })
+    .limit(parseInt(limit))
+    .skip(parseInt(skip))
+    .lean();
+
+  // Enrich logs with additional data
+  const enrichedLogs = await Promise.all(
+    logs.map(async (log) => {
+      const enriched = { ...log };
+
+      // Enrich inventory group actions
+      if (log.action.includes('inventory_group') || log.action === 'guest_assigned_to_group') {
+        try {
+          const group = await InventoryGroup.findById(log.resourceId)
+            .populate('members', 'name email')
+            .populate('assignedHotels.hotel', 'name organization')
+            .lean();
+          
+          if (group) {
+            enriched.groupData = {
+              name: group.name,
+              memberCount: group.members?.length || 0,
+              assignedHotels: group.assignedHotels?.map(h => ({
+                name: h.hotel?.name || h.hotel?.organization,
+                priority: h.priority
+              })) || []
+            };
+          }
+        } catch (err) {
+          console.error('Error enriching group data:', err);
+        }
+      }
+
+      // Enrich inventory actions
+      if (log.action.includes('inventory') && !log.action.includes('group')) {
+        try {
+          const inventory = await Inventory.findById(log.resourceId)
+            .populate('hotel', 'name organization')
+            .lean();
+          
+          if (inventory) {
+            enriched.inventoryData = {
+              hotelName: inventory.hotel?.name || inventory.hotel?.organization,
+              totalRooms: inventory.totalRooms,
+              availableRooms: inventory.availableRooms
+            };
+          }
+        } catch (err) {
+          console.error('Error enriching inventory data:', err);
+        }
+      }
+
+      // Enrich hotel proposal actions
+      if (log.action.includes('hotel') || log.action.includes('proposal')) {
+        try {
+          const proposal = await HotelProposal.findById(log.resourceId)
+            .populate('hotel', 'name organization')
+            .lean();
+          
+          if (proposal) {
+            enriched.proposalData = {
+              hotelName: proposal.hotelName || proposal.hotel?.name || proposal.hotel?.organization,
+              totalCost: proposal.totalEstimatedCost
+            };
+          }
+        } catch (err) {
+          console.error('Error enriching proposal data:', err);
+        }
+      }
+
+      // Enrich booking actions
+      if (log.action.includes('booking')) {
+        try {
+          const booking = await Booking.findById(log.resourceId)
+            .populate('guest', 'name email')
+            .populate('hotelProposal', 'hotelName')
+            .lean();
+          
+          if (booking) {
+            enriched.bookingData = {
+              guestName: booking.guest?.name || booking.guestDetails?.name,
+              hotelName: booking.roomDetails?.hotelName || booking.hotelProposal?.hotelName,
+              roomsBooked: booking.roomDetails?.numberOfRooms,
+              totalAmount: booking.pricing?.totalAmount
+            };
+          }
+        } catch (err) {
+          console.error('Error enriching booking data:', err);
+        }
+      }
+
+      return enriched;
+    })
+  );
+
+  // Get total count for pagination
+  const totalCount = await AuditLog.countDocuments(filter);
+
+  res.status(200).json({
+    success: true,
+    data: enrichedLogs,
+    pagination: {
+      total: totalCount,
+      limit: parseInt(limit),
+      skip: parseInt(skip),
+      hasMore: parseInt(skip) + enrichedLogs.length < totalCount
+    }
   });
 });

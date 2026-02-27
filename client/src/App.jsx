@@ -30,7 +30,6 @@ import AdminAuditLogsPage from './pages/AdminAuditLogsPage';
 import { PlannerEventsPage } from './pages/PlannerEventsPage';
 import { CreateProposalPage } from './pages/CreateProposalPage';
 import { PlannerProposalsPage } from './pages/PlannerProposalsPage';
-import { PlannerInventoryPage } from './pages/PlannerInventoryPage';
 import { PlannerBookingsPage } from './pages/PlannerBookingsPage';
 import { PlannerAnalyticsPage } from './pages/PlannerAnalyticsPage';
 import { PlannerFeedbackPage } from './pages/PlannerFeedbackPage';
@@ -221,16 +220,6 @@ function App() {
               <ProtectedRoute allowedRoles={['planner']}>
                 <DashboardLayout>
                   <CreateProposalPage />
-                </DashboardLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/planner/inventory"
-            element={
-              <ProtectedRoute allowedRoles={['planner']}>
-                <DashboardLayout>
-                  <PlannerInventoryPage />
                 </DashboardLayout>
               </ProtectedRoute>
             }

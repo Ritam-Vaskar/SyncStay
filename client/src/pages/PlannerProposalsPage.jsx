@@ -11,7 +11,7 @@ import {
   Calendar,
   MapPin,
   Users,
-  DollarSign,
+  IndianRupee,
   Hotel,
   AlertCircle,
   Send,
@@ -83,11 +83,11 @@ export const PlannerProposalsPage = () => {
   const getStatusConfig = (status) => {
     const configs = {
       'rfp-published': { 
-        color: 'blue', 
-        bgColor: 'bg-blue-100', 
-        textColor: 'text-blue-800',
-        icon: Send, 
-        label: 'Awaiting Hotel Proposals' 
+        color: 'green', 
+        bgColor: 'bg-green-100', 
+        textColor: 'text-green-800',
+        icon: CheckCircle, 
+        label: 'Active' 
       },
       'reviewing-proposals': { 
         color: 'purple', 
@@ -216,7 +216,7 @@ export const PlannerProposalsPage = () => {
           </div>
         </div>
 
-        <div className="card">
+        {/* <div className="card">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-600">Pending Admin</p>
@@ -224,15 +224,15 @@ export const PlannerProposalsPage = () => {
             </div>
             <Clock className="h-8 w-8 text-yellow-600" />
           </div>
-        </div>
+        </div> */}
 
         <div className="card">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600">Awaiting Hotels</p>
-              <p className="text-2xl font-bold text-blue-600 mt-1">{stats.rfpPublished}</p>
+              <p className="text-sm text-gray-600">Active</p>
+              <p className="text-2xl font-bold text-green-600 mt-1">{stats.rfpPublished}</p>
             </div>
-            <Send className="h-8 w-8 text-blue-600" />
+            <CheckCircle className="h-8 w-8 text-green-600" />
           </div>
         </div>
 
@@ -246,7 +246,7 @@ export const PlannerProposalsPage = () => {
           </div>
         </div>
 
-        <div className="card">
+        {/* <div className="card">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-600">Active</p>
@@ -254,7 +254,7 @@ export const PlannerProposalsPage = () => {
             </div>
             <CheckCircle className="h-8 w-8 text-green-600" />
           </div>
-        </div>
+        </div> */}
       </div>
 
       {/* Filters */}
@@ -270,7 +270,7 @@ export const PlannerProposalsPage = () => {
           >
             All ({stats.total})
           </button>
-          <button
+          {/* <button
             onClick={() => setStatusFilter('pending')}
             className={`px-4 py-2 rounded-lg font-medium transition-colors ${
               statusFilter === 'pending'
@@ -279,16 +279,16 @@ export const PlannerProposalsPage = () => {
             }`}
           >
             Pending Admin ({stats.pending})
-          </button>
+          </button> */}
           <button
             onClick={() => setStatusFilter('awaiting-hotels')}
             className={`px-4 py-2 rounded-lg font-medium transition-colors ${
               statusFilter === 'awaiting-hotels'
-                ? 'bg-blue-600 text-white'
+                ? 'bg-green-600 text-white'
                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
             }`}
           >
-            Awaiting Hotels ({stats.rfpPublished})
+            Active ({stats.rfpPublished})
           </button>
           <button
             onClick={() => setStatusFilter('reviewing')}
@@ -300,7 +300,7 @@ export const PlannerProposalsPage = () => {
           >
             Review Proposals ({stats.reviewingProposals})
           </button>
-          <button
+          {/* <button
             onClick={() => setStatusFilter('active')}
             className={`px-4 py-2 rounded-lg font-medium transition-colors ${
               statusFilter === 'active'
@@ -309,7 +309,7 @@ export const PlannerProposalsPage = () => {
             }`}
           >
             Active ({stats.active})
-          </button>
+          </button> */}
         </div>
       </div>
 
@@ -392,7 +392,7 @@ export const PlannerProposalsPage = () => {
                   </div>
 
                   <div className="flex items-center gap-2 text-gray-600">
-                    <DollarSign className="h-5 w-5 text-primary-600" />
+                    <IndianRupee className="h-5 w-5 text-primary-600" />
                     <div>
                       <p className="text-xs text-gray-500">Budget</p>
                       <p className="text-sm font-medium">${proposal.budget?.toLocaleString() || 'N/A'}</p>
@@ -430,9 +430,9 @@ export const PlannerProposalsPage = () => {
                 <div className="flex items-center gap-3 pt-4 border-t border-gray-200">
                   {proposal.status === 'rfp-published' && (
                     <>
-                      <div className="flex items-center gap-2 text-sm text-blue-700 bg-blue-50 px-4 py-2 rounded-lg">
-                        <Send className="h-5 w-5" />
-                        <span>RFP sent - Microsite is live</span>
+                      <div className="flex items-center gap-2 text-sm text-green-700 bg-green-50 px-4 py-2 rounded-lg">
+                        <CheckCircle className="h-5 w-5" />
+                        <span>Active - Microsite is live</span>
                       </div>
                       
                       {/* NEW: Direct link to microsite for hotel management */}
@@ -836,7 +836,7 @@ const ProposalDetailsModal = ({ proposal, onClose, facilityIcons }) => {
                     <div className="space-y-2 text-sm">
                       <div className="flex justify-between">
                         <span className="text-gray-600">Price/Night:</span>
-                        <span className="font-medium">${room.pricePerNight}</span>
+                        <span className="font-medium">₹{room.pricePerNight}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-600">Available:</span>
