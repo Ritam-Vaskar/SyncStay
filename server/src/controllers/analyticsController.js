@@ -234,208 +234,196 @@ export const getAuditLogs = asyncHandler(async (req, res) => {
 });
 
 /**
- * @route   GET /api/analytics/events/:eventId/activity-logs
- * @desc    Get activity logs for a specific event
- * @access  Private (Planner/Admin)
+ * @route   GET /api/analytics/admin/dashboard
+ * @desc    Get comprehensive admin dashboard analytics
+ * @access  Private (Admin)
  */
-export const getEventActivityLogs = asyncHandler(async (req, res) => {
-  const { eventId } = req.params;
-  const { action, limit = 100 } = req.query;
-
-  // Verify event exists
-  const event = await Event.findById(eventId);
-  if (!event) {
-    return res.status(404).json({
-      success: false,
-      message: 'Event not found',
-    });
-  }
-
-  // Authorization: Planner must own the event or be admin
-  if (req.user.role !== 'admin' && event.planner.toString() !== req.user._id.toString()) {
-    return res.status(403).json({
-      success: false,
-      message: 'Not authorized to view activity logs for this event',
-    });
-  }
-
-  // Build query for event-related activities
-  // We need to query broadly since resourceId might be proposal/booking/guest IDs, not event ID
-  let query = {
-    $or: [
-      { resourceId: eventId },
-      { 'details.eventId': eventId },
-      { 'details.event': eventId },
-    ],
-  };
-
-  // Filter by action type if specified
-  if (action) {
-    query.action = action;
-  }
-
-  // Relevant event actions
-  const eventActions = [
-    // Event actions
-    'event_create',
-    'event_update',
-    'event_delete',
-    'event_approve',
-    'event_reject',
-    'event_comment',
-    'event_comment_reply',
-    'event_privacy_toggle',
-    'event_microsite_publish',
-    // Hotel/Proposal actions
-    'hotel_proposal_select',
-    'hotel_proposal_deselect',
-    'hotel_proposal_submit',
-    'hotel_selection_confirmed',
-    'hotel_select_recommended',
-    'proposal_submit',
-    'proposal_review',
-    // Booking actions
-    'booking_create',
-    'booking_approve',
-    'booking_cancel',
-    'booking_reject',
-    // Payment actions
-    'planner_payment',
-    'planner_payment_complete',
-    'payment_process',
-    'payment_refund',
-    // Guest actions
-    'guest_add',
-    'guest_upload',
-    'guest_remove',
-    'guest_update',
-    'guest_auto_register',
-    'guest_invite_login',
-    // Inventory actions
-    'inventory_create',
-    'inventory_update',
-    'inventory_lock',
-    'inventory_release',
-    // Communication
-    'chat_message_send',
-  ];
-
-  // Only fetch relevant actions if no specific action filter
-  if (!action) {
-    query.action = { $in: eventActions };
-  }
-
-  // For this event, we need to find all related resource IDs
-  // Get all proposals, bookings, inventory, and inventory groups for this event
-  const [proposals, bookings, inventories, inventoryGroups] = await Promise.all([
-    HotelProposal.find({ event: eventId }).select('_id'),
-    Booking.find({ event: eventId }).select('_id'),
-    Inventory.find({ event: eventId }).select('_id'),
-    InventoryGroup.find({ event: eventId }).select('_id'),
+export const getAdminDashboard = asyncHandler(async (req, res) => {
+  // Overview stats
+  const totalUsers = await User.countDocuments();
+  const activeUsers = await User.countDocuments({ isActive: true });
+  const totalEvents = await Event.countDocuments();
+  const activeEvents = await Event.countDocuments({ status: 'active' });
+  const totalBookings = await Booking.countDocuments();
+  const confirmedBookings = await Booking.countDocuments({ status: 'confirmed' });
+  
+  const totalRevenue = await Payment.aggregate([
+    { $match: { status: 'completed' } },
+    { $group: { _id: null, total: { $sum: '$amount' } } },
   ]);
 
-  const relatedResourceIds = [
-    eventId,
-    ...proposals.map(p => p._id.toString()),
-    ...bookings.map(b => b._id.toString()),
-    ...inventories.map(i => i._id.toString()),
-    ...inventoryGroups.map(g => g._id.toString()),
-  ];
-
-  // Update query to include all related resources
-  query = {
-    $and: [
-      {
-        $or: [
-          { resourceId: { $in: relatedResourceIds } },
-          { 'details.eventId': eventId },
-          { 'details.event': eventId },
-        ],
+  // User breakdown by role
+  const usersByRole = await User.aggregate([
+    {
+      $group: {
+        _id: '$role',
+        count: { $sum: 1 },
       },
-      action ? { action } : { action: { $in: eventActions } },
-    ],
-  };
+    },
+  ]);
 
-  const logs = await AuditLog.find(query)
-    .populate('user', 'name email role')
-    .limit(parseInt(limit))
-    .sort('-createdAt');
+  // Event breakdown by status
+  const eventsByStatus = await Event.aggregate([
+    {
+      $group: {
+        _id: '$status',
+        count: { $sum: 1 },
+      },
+    },
+  ]);
 
-  console.log(`[Activity Logs] Event ${eventId}: Found ${logs.length} logs from query`);
+  // Booking breakdown by status
+  const bookingsByStatus = await Booking.aggregate([
+    {
+      $group: {
+        _id: '$status',
+        count: { $sum: 1 },
+      },
+    },
+  ]);
 
-  // Deduplicate logs by _id (in case query conditions overlap)
-  const uniqueLogs = Array.from(
-    new Map(logs.map(log => [log._id.toString(), log])).values()
-  );
+  // Recent activity (last 30 days)
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-  console.log(`[Activity Logs] Event ${eventId}: ${uniqueLogs.length} unique logs after deduplication`);
-  if (logs.length !== uniqueLogs.length) {
-    console.warn(`[Activity Logs] Event ${eventId}: Removed ${logs.length - uniqueLogs.length} duplicate logs`);
-  }
+  const recentUsers = await User.countDocuments({ createdAt: { $gte: thirtyDaysAgo } });
+  const recentEvents = await Event.countDocuments({ createdAt: { $gte: thirtyDaysAgo } });
+  const recentBookings = await Booking.countDocuments({ createdAt: { $gte: thirtyDaysAgo } });
 
-  // Enrich logs with additional context for inventory and groups
-  const enrichedLogs = await Promise.all(uniqueLogs.map(async (log) => {
-    const logObj = log.toObject();
-    
-    // If inventory-related, fetch group and hotel details
-    if (log.action && log.action.includes('inventory')) {
-      try {
-        // Check if details contain groupId or group information
-        if (logObj.details?.groupId) {
-          const group = await InventoryGroup.findById(logObj.details.groupId)
-            .populate('assignedHotels.hotel', 'name email')
-            .select('name category number members assignedHotels');
-          
-          if (group) {
-            logObj.enrichedData = {
-              group: {
-                name: group.name,
-                category: group.category,
-                memberCount: group.number,
-                members: group.members,
-                assignedHotels: group.assignedHotels.map(ah => ({
-                  hotelId: ah.hotel?._id,
-                  hotelName: ah.hotel?.name,
-                  hotelEmail: ah.hotel?.email,
-                  priority: ah.priority,
-                  assignedAt: ah.assignedAt,
-                })),
-              },
-            };
-          }
-        }
-        
-        // Also fetch inventory details if inventoryId is present
-        if (logObj.details?.inventoryId) {
-          const inventory = await Inventory.findById(logObj.details.inventoryId)
-            .populate('hotel', 'name email')
-            .select('hotelName roomType totalRooms availableRooms blockedRooms pricePerNight status');
-          
-          if (inventory) {
-            logObj.enrichedData = logObj.enrichedData || {};
-            logObj.enrichedData.inventory = {
-              hotelName: inventory.hotelName || inventory.hotel?.name,
-              roomType: inventory.roomType,
-              totalRooms: inventory.totalRooms,
-              availableRooms: inventory.availableRooms,
-              blockedRooms: inventory.blockedRooms,
-              pricePerNight: inventory.pricePerNight,
-              status: inventory.status,
-            };
-          }
-        }
-      } catch (err) {
-        // Silently fail enrichment - return log as-is
-        console.error('Error enriching log:', err);
-      }
-    }
-    
-    return logObj;
-  }));
+  // Growth trends (last 7 days)
+  const sevenDaysAgo = new Date();
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+  const userGrowth = await User.aggregate([
+    { $match: { createdAt: { $gte: sevenDaysAgo } } },
+    {
+      $group: {
+        _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
+        count: { $sum: 1 },
+      },
+    },
+    { $sort: { _id: 1 } },
+  ]);
+
+  const eventGrowth = await Event.aggregate([
+    { $match: { createdAt: { $gte: sevenDaysAgo } } },
+    {
+      $group: {
+        _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
+        count: { $sum: 1 },
+      },
+    },
+    { $sort: { _id: 1 } },
+  ]);
+
+  const bookingGrowth = await Booking.aggregate([
+    { $match: { createdAt: { $gte: sevenDaysAgo } } },
+    {
+      $group: {
+        _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
+        count: { $sum: 1 },
+      },
+    },
+    { $sort: { _id: 1 } },
+  ]);
+
+  // Revenue trend (last 30 days)
+  const revenueTrend = await Payment.aggregate([
+    { $match: { status: 'completed', createdAt: { $gte: thirtyDaysAgo } } },
+    {
+      $group: {
+        _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
+        total: { $sum: '$amount' },
+        count: { $sum: 1 },
+      },
+    },
+    { $sort: { _id: 1 } },
+  ]);
+
+  // Top events by bookings
+  const topEvents = await Booking.aggregate([
+    { $group: { _id: '$event', bookingCount: { $sum: 1 } } },
+    { $sort: { bookingCount: -1 } },
+    { $limit: 5 },
+    {
+      $lookup: {
+        from: 'events',
+        localField: '_id',
+        foreignField: '_id',
+        as: 'event',
+      },
+    },
+    { $unwind: '$event' },
+    {
+      $project: {
+        eventName: '$event.name',
+        eventType: '$event.type',
+        bookingCount: 1,
+      },
+    },
+  ]);
+
+  // Top planners by events
+  const topPlanners = await Event.aggregate([
+    { $group: { _id: '$planner', eventCount: { $sum: 1 } } },
+    { $sort: { eventCount: -1 } },
+    { $limit: 5 },
+    {
+      $lookup: {
+        from: 'users',
+        localField: '_id',
+        foreignField: '_id',
+        as: 'planner',
+      },
+    },
+    { $unwind: '$planner' },
+    {
+      $project: {
+        plannerName: '$planner.name',
+        plannerEmail: '$planner.email',
+        eventCount: 1,
+      },
+    },
+  ]);
 
   res.status(200).json({
-    success: true,
-    count: enrichedLogs.length,
-    data: enrichedLogs,
+    overview: {
+      totalUsers,
+      activeUsers,
+      totalEvents,
+      activeEvents,
+      totalBookings,
+      confirmedBookings,
+      totalRevenue: totalRevenue[0]?.total || 0,
+    },
+    breakdowns: {
+      usersByRole: usersByRole.reduce((acc, curr) => {
+        acc[curr._id] = curr.count;
+        return acc;
+      }, {}),
+      eventsByStatus: eventsByStatus.reduce((acc, curr) => {
+        acc[curr._id] = curr.count;
+        return acc;
+      }, {}),
+      bookingsByStatus: bookingsByStatus.reduce((acc, curr) => {
+        acc[curr._id] = curr.count;
+        return acc;
+      }, {}),
+    },
+    recentActivity: {
+      users: recentUsers,
+      events: recentEvents,
+      bookings: recentBookings,
+    },
+    trends: {
+      userGrowth,
+      eventGrowth,
+      bookingGrowth,
+      revenueTrend,
+    },
+    topPerformers: {
+      events: topEvents,
+      planners: topPlanners,
+    },
   });
 });

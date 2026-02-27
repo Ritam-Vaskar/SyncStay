@@ -22,6 +22,9 @@ import { MicrositeInventoryManagement } from './pages/MicrositeInventoryManageme
 import { AdminApprovalsPage } from './pages/AdminApprovalsPage';
 import { AdminFeedbackPage } from './pages/AdminFeedbackPage';
 import { AdminEventsPage } from './pages/AdminEventsPage';
+import AdminUsersPage from './pages/AdminUsersPage';
+import AdminAnalyticsPage from './pages/AdminAnalyticsPage';
+import AdminAuditLogsPage from './pages/AdminAuditLogsPage';
 import { PlannerEventsPage } from './pages/PlannerEventsPage';
 import { CreateProposalPage } from './pages/CreateProposalPage';
 import { PlannerProposalsPage } from './pages/PlannerProposalsPage';
@@ -49,9 +52,6 @@ const queryClient = new QueryClient({
 // Placeholder pages for other roles
 const ProposalsPage = () => <div className="card"><h2 className="text-2xl font-bold">Proposals</h2><p className="mt-4">Proposals management coming soon...</p></div>;
 const GuestBookingsPage = () => <div className="card"><h2 className="text-2xl font-bold">My Bookings</h2><p className="mt-4">Guest bookings page coming soon...</p></div>;
-const AdminUsersPage = () => <div className="card"><h2 className="text-2xl font-bold">Users Management</h2><p className="mt-4">User management coming soon...</p></div>;
-const AdminAnalyticsPage = () => <div className="card"><h2 className="text-2xl font-bold">Admin Analytics</h2><p className="mt-4">Analytics dashboard coming soon...</p></div>;
-const AdminLogsPage = () => <div className="card"><h2 className="text-2xl font-bold">Audit Logs</h2><p className="mt-4">Audit logs coming soon...</p></div>;
 
 // Router to decide which microsite dashboard to show based on role
 const MicrositeDashboardRouter = () => {
@@ -365,7 +365,7 @@ function App() {
             element={
               <ProtectedRoute allowedRoles={['admin']}>
                 <DashboardLayout>
-                  <AdminLogsPage />
+                  <AdminAuditLogsPage />
                 </DashboardLayout>
               </ProtectedRoute>
             }
