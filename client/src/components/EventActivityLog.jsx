@@ -104,6 +104,8 @@ export const EventActivityLog = ({ eventId, initialCollapsed = true }) => {
     }
     if (error) {
       console.error('Activity Logs Error:', error);
+      console.error('Error message:', error?.response?.data?.message || error?.message || 'Unknown error');
+      console.error('Error status:', error?.response?.status);
     }
   }, [logsData, allLogs.length, uniqueLogs.length, eventId, isCollapsed, error]);
 
@@ -202,12 +204,23 @@ export const EventActivityLog = ({ eventId, initialCollapsed = true }) => {
             <div className="text-center py-8">
               <XCircle className="h-12 w-12 text-red-400 mx-auto mb-3" />
               <p className="text-red-600 font-semibold">Failed to load activity logs</p>
-              <p className="text-sm text-gray-600 mt-2">{error?.message || 'Unknown error'}</p>
+              <p className="text-sm text-gray-600 mt-2">
+                {error?.response?.data?.message || error?.message || 'An unknown error occurred'}
+              </p>
               <details className="mt-4 text-left max-w-2xl mx-auto">
                 <summary className="text-sm text-gray-500 cursor-pointer hover:text-gray-700">View error details</summary>
-                <pre className="mt-2 p-4 bg-gray-100 rounded text-xs overflow-auto">
-                  {JSON.stringify(error, null, 2)}
-                </pre>
+                <div className="mt-2 p-4 bg-red-50 border border-red-200 rounded text-xs space-y-2">
+                  <div><strong>Status:</strong> {error?.response?.status || 'N/A'}</div>
+                  <div><strong>Message:</strong> {error?.response?.data?.message || error?.message || 'No error message'}</div>
+                  {error?.response?.data && (
+                    <div>
+                      <strong>Response:</strong>
+                      <pre className="mt-1 p-2 bg-white rounded overflow-auto">
+                        {JSON.stringify(error.response.data, null, 2)}
+                      </pre>
+                    </div>
+                  )}
+                </div>
               </details>
             </div>
           )}

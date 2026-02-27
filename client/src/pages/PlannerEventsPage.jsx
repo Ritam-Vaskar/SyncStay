@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { 
   Calendar, 
   MapPin, 
@@ -20,6 +20,7 @@ import toast from 'react-hot-toast';
 
 export const PlannerEventsPage = () => {
   const [statusFilter, setStatusFilter] = useState('all');
+  const navigate = useNavigate();
 
   const { data: eventsData, isLoading } = useQuery({
     queryKey: ['planner-events'],
@@ -228,7 +229,11 @@ export const PlannerEventsPage = () => {
             const StatusIcon = statusConfig.icon;
 
             return (
-              <div key={event._id} className="card hover:shadow-lg transition-shadow">
+              <div
+                key={event._id}
+                className="card hover:shadow-lg transition-shadow cursor-pointer"
+                onClick={() => { const slug = event.micrositeConfig?.customSlug; if (slug) navigate(`/microsite/${slug}/dashboard`); }}
+              >
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-2">
@@ -293,27 +298,29 @@ export const PlannerEventsPage = () => {
                 )}
 
                 {/* Action Buttons */}
-                <div className="flex items-center gap-3 pt-4 border-t border-gray-200">
-                  {event.status === 'active' && event.micrositeUrl && (
+                <div className="flex items-center gap-3 pt-4 border-t border-gray-200" onClick={(e) => e.stopPropagation()}>
+                  {event.micrositeConfig?.customSlug && (
                     <>
                       <Link
-                        to={`/microsite/${event.micrositeUrl}`}
+                        to={`/microsite/${event.micrositeConfig.customSlug}`}
                         target="_blank"
                         className="btn btn-sm bg-primary-600 text-white hover:bg-primary-700 flex items-center gap-2"
+                        onClick={(e) => e.stopPropagation()}
                       >
                         <ExternalLink className="h-4 w-4" />
                         View Microsite
                       </Link>
                       <button
-                        onClick={() => copyMicrositeUrl(event.micrositeUrl)}
+                        onClick={(e) => { e.stopPropagation(); copyMicrositeUrl(event.micrositeConfig.customSlug); }}
                         className="btn btn-sm bg-gray-100 text-gray-700 hover:bg-gray-200 flex items-center gap-2"
                       >
                         <Copy className="h-4 w-4" />
                         Copy URL
                       </button>
                       <Link
-                        to={`/microsite/${event.micrositeUrl}/dashboard`}
+                        to={`/microsite/${event.micrositeConfig.customSlug}/dashboard`}
                         className="btn btn-sm bg-indigo-600 text-white hover:bg-indigo-700"
+                        onClick={(e) => e.stopPropagation()}
                       >
                         Event Dashboard
                       </Link>

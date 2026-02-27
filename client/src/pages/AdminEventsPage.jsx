@@ -97,10 +97,10 @@ export const AdminEventsPage = () => {
           <p className="text-gray-600 text-sm">Total Events</p>
           <p className="text-3xl font-bold text-blue-600">{stats.total}</p>
         </div>
-        <div className="card">
+        {/* <div className="card">
           <p className="text-gray-600 text-sm">RFP Published</p>
           <p className="text-3xl font-bold text-blue-600">{stats.rfpPublished}</p>
-        </div>
+        </div> */}
         <div className="card">
           <p className="text-gray-600 text-sm">Active</p>
           <p className="text-3xl font-bold text-green-600">{stats.active}</p>
@@ -214,7 +214,7 @@ export const AdminEventsPage = () => {
                         <IndianRupee className="h-4 w-4 text-gray-500" />
                         <div>
                           <p className="text-gray-600">Budget</p>
-                          <p className="font-medium">${formatValue(event.budget)}</p>
+                          <p className="font-medium">₹{formatValue(event.budget)}</p>
                         </div>
                       </div>
                     </div>
@@ -316,7 +316,7 @@ export const AdminEventsPage = () => {
 
               <div className="card bg-gray-50">
                 <p className="text-xs text-gray-500">Budget</p>
-                <p className="text-lg font-semibold">${formatValue(selectedEvent.budget)}</p>
+                <p className="text-lg font-semibold">₹{formatValue(selectedEvent.budget)}</p>
               </div>
 
               <div className="card bg-gray-50">
