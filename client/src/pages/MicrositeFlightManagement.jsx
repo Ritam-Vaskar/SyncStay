@@ -102,9 +102,9 @@ export const MicrositeFlightManagement = () => {
       setConfiguration(response.configuration);
       
       if (!response.configuration.locationGroups || response.configuration.locationGroups.length === 0) {
-        toast.info('Flight configuration initialized. Please upload guest list with locations.');
+        toast.info('No departure cities found. Please assign departure cities to guests first.');
       } else {
-        toast.success(`Flight configuration initialized with ${response.configuration.locationGroups.length} location groups`);
+        toast.success(`Flight groups ready: ${response.configuration.locationGroups.length} departure cities found`);
       }
       
       console.log('✅ Configuration initialized:', response.configuration);
@@ -457,12 +457,21 @@ export const MicrositeFlightManagement = () => {
       <div className="mb-8">
         <div className="flex items-center justify-between">
           <div className="flex-1">
-            <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
-              <Plane className="h-8 w-8 text-primary-600" />
-              Flight Management
-            </h1>
+            <div className="flex items-center gap-4">
+              <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
+                <Plane className="h-8 w-8 text-primary-600" />
+                Flight Management
+              </h1>
+              <button
+                onClick={() => initializeConfiguration(event._id)}
+                className="px-4 py-2 bg-indigo-100 text-indigo-700 rounded-lg hover:bg-indigo-200 text-sm font-medium flex items-center gap-2 transition-colors"
+                title="Re-sync groups from latest guest departure cities"
+              >
+                🔄 Refresh Groups
+              </button>
+            </div>
             <p className="mt-2 text-gray-600">
-              Configure flight options for your guests based on their locations
+              Guests are automatically grouped by their departure city for flight booking
             </p>
             
             {/* Event Airport Code Input */}
@@ -553,20 +562,17 @@ export const MicrositeFlightManagement = () => {
             <div className="flex items-start gap-3">
               <AlertCircle className="h-5 w-5 text-blue-600 mt-0.5" />
               <div>
-                <h3 className="font-semibold text-blue-900 mb-1">Guest List Required</h3>
+                <h3 className="font-semibold text-blue-900 mb-1">Guest Departure Cities Required</h3>
                 <p className="text-sm text-blue-700 mb-3">
-                  To configure flights, you need to upload a guest list with location data. 
-                  The location should be in the format: <code className="bg-blue-100 px-2 py-0.5 rounded">City (AIRPORT_CODE)</code>
-                </p>
-                <p className="text-sm text-blue-700 mb-2">
-                  Example: <code className="bg-blue-100 px-2 py-0.5 rounded">Delhi (DEL)</code>, 
-                  <code className="bg-blue-100 px-2 py-0.5 rounded mx-1">Mumbai (BOM)</code>
+                  To configure flights, each guest needs a departure city assigned. 
+                  Go to Guest Management and assign a departure city (e.g., Mumbai (BOM), Delhi (DEL)) for each guest. 
+                  Then re-initialize the flight configuration.
                 </p>
                 <button
                   onClick={() => navigate(`/microsite/${slug}/guests`)}
                   className="mt-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium"
                 >
-                  Upload Guest List
+                  Go to Guest Management
                 </button>
               </div>
             </div>
@@ -721,22 +727,25 @@ export const MicrositeFlightManagement = () => {
         {/* Left Panel: Location Groups */}
         <div className="lg:col-span-1">
           <div className="bg-white rounded-lg border border-gray-200 p-6">
-            <h2 className="text-lg font-bold text-gray-900 mb-2">Location Groups</h2>
+            <h2 className="text-lg font-bold text-gray-900 mb-2">Departure City Groups</h2>
             <p className="text-xs text-gray-600 mb-4">
-              Click airport code to edit (must be 3 letters: DEL, BOM, BLR, etc.)
+              Guests grouped by their departure city. Click a group to search &amp; assign flights.
             </p>
             
             {!configuration.locationGroups || configuration.locationGroups.length === 0 ? (
               <div className="text-center py-8">
                 <Users className="h-12 w-12 text-gray-400 mx-auto mb-3" />
-                <p className="text-sm text-gray-600 mb-4">
-                  No location groups found. Please upload a guest list with location data first.
+                <p className="text-sm text-gray-600 mb-2">
+                  No departure city groups found.
+                </p>
+                <p className="text-xs text-gray-500 mb-4">
+                  Assign departure cities to guests first, then re-initialize flight configuration.
                 </p>
                 <button
                   onClick={() => navigate(`/microsite/${slug}/guests`)}
                   className="text-sm text-primary-600 hover:text-primary-700 font-medium"
                 >
-                  Go to Guest List →
+                  Go to Guest Management →
                 </button>
               </div>
             ) : (
@@ -868,7 +877,14 @@ export const MicrositeFlightManagement = () => {
                                   >
                                     <div className="flex items-start justify-between">
                                       <div className="flex-1">
-                                        <p className="font-medium text-gray-900 text-sm">{guest.name}</p>
+                                        <div className="flex items-center gap-2">
+                                          <p className="font-medium text-gray-900 text-sm">{guest.name}</p>
+                                          {guest.group && (
+                                            <span className="px-2 py-0.5 bg-purple-100 text-purple-700 text-xs rounded-full font-medium">
+                                              {guest.group}
+                                            </span>
+                                          )}
+                                        </div>
                                         <p className="text-xs text-gray-500">{guest.email}</p>
                                         <div className="flex items-center gap-2 mt-2">
                                           {status.hasArrival && (

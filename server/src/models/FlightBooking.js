@@ -119,8 +119,9 @@ const flightBookingSchema = new mongoose.Schema(
         },
         dateOfBirth: {
           type: Date,
-          required: true,
+          required: false,
         },
+        contactNo: String,
         passportNo: String,
         passportExpiry: Date,
         nationality: String,

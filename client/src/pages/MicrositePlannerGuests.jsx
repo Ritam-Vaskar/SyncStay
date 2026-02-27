@@ -17,7 +17,30 @@ export const MicrositePlannerGuests = () => {
   const queryClient = useQueryClient();
   const [showAddModal, setShowAddModal] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
-  const [newGuests, setNewGuests] = useState([{ name: '', email: '', phone: '', group: '' }]);
+  const [newGuests, setNewGuests] = useState([{ name: '', email: '', phone: '', group: '', location: '' }]);
+
+  const INDIAN_CITIES = [
+    'Mumbai (BOM)',
+    'Delhi (DEL)',
+    'Kolkata (CCU)',
+    'Chennai (MAA)',
+    'Bengaluru (BLR)',
+    'Hyderabad (HYD)',
+    'Ahmedabad (AMD)',
+    'Pune (PNQ)',
+    'Jaipur (JAI)',
+    'Lucknow (LKO)',
+    'Goa (GOI)',
+    'Kochi (COK)',
+    'Chandigarh (IXC)',
+    'Guwahati (GAU)',
+    'Bhubaneswar (BBI)',
+    'Patna (PAT)',
+    'Indore (IDR)',
+    'Nagpur (NAG)',
+    'Varanasi (VNS)',
+    'Coimbatore (CJB)',
+  ];
   const [excelFile, setExcelFile] = useState(null);
   const [activeTab, setActiveTab] = useState('invited'); // 'invited' or 'registered'
 
@@ -61,7 +84,7 @@ export const MicrositePlannerGuests = () => {
       queryClient.invalidateQueries(['guests']);
       queryClient.invalidateQueries(['inventory-groups', eventData.data._id]);
       setShowAddModal(false);
-      setNewGuests([{ name: '', email: '', phone: '', group: '' }]);
+      setNewGuests([{ name: '', email: '', phone: '', group: '', location: '' }]);
       toast.success('Guests added successfully!');
     },
     onError: (error) => {
@@ -142,7 +165,7 @@ export const MicrositePlannerGuests = () => {
   };
 
   const handleAddGuest = () => {
-    setNewGuests([...newGuests, { name: '', email: '', phone: '', group: '' }]);
+    setNewGuests([...newGuests, { name: '', email: '', phone: '', group: '', location: '' }]);
   };
 
   const handleRemoveNewGuest = (index) => {
@@ -190,7 +213,7 @@ export const MicrositePlannerGuests = () => {
   };
 
   const downloadTemplate = () => {
-    const template = 'Name,Email,Phone,Group\nJohn Doe,john@example.com,+1234567890,VIP\nJane Smith,jane@example.com,+0987654321,Family';
+    const template = 'Name,Email,Phone,Group,Location\nJohn Doe,john@example.com,+1234567890,VIP,Mumbai (BOM)\nJane Smith,jane@example.com,+0987654321,Family,Kolkata (CCU)';
     const blob = new Blob([template], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -383,6 +406,7 @@ export const MicrositePlannerGuests = () => {
                           <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Email</th>
                           <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Phone</th>
                           <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Group</th>
+                          <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Location</th>
                           <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Status</th>
                           <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Date Added</th>
                           <th className="px-6 py-4 text-center text-xs font-bold text-gray-700 uppercase tracking-wider">Actions</th>
@@ -400,6 +424,15 @@ export const MicrositePlannerGuests = () => {
                               {guest.group ? (
                                 <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-primary-100 text-primary-800">
                                   {guest.group}
+                                </span>
+                              ) : (
+                                <span className="text-gray-400 text-sm">—</span>
+                              )}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              {guest.location ? (
+                                <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-800">
+                                  ✈️ {guest.location}
                                 </span>
                               ) : (
                                 <span className="text-gray-400 text-sm">—</span>
@@ -682,6 +715,22 @@ export const MicrositePlannerGuests = () => {
                         onChange={(e) => handleGuestChange(index, 'group', e.target.value)}
                         className="input w-full"
                       />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-800 mb-2">
+                        Departure City ✈️
+                      </label>
+                      <select
+                        value={guest.location}
+                        onChange={(e) => handleGuestChange(index, 'location', e.target.value)}
+                        className="input w-full"
+                      >
+                        <option value="">Select departure city</option>
+                        {INDIAN_CITIES.map((city) => (
+                          <option key={city} value={city}>{city}</option>
+                        ))}
+                      </select>
                     </div>
                   </div>
                 </div>

@@ -6,13 +6,13 @@ import {
   Clock, 
   MapPin, 
   Users, 
-  CreditCard,
   Check,
   ArrowRight,
   Loader2,
   AlertCircle,
   CheckCircle,
-  User
+  User,
+  Phone
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '@/services/api';
@@ -29,26 +29,38 @@ export const MicrositeFlightBooking = () => {
   const [assignedFlights, setAssignedFlights] = useState(null);
   const [selectedArrivalFlight, setSelectedArrivalFlight] = useState(null);
   const [selectedDepartureFlight, setSelectedDepartureFlight] = useState(null);
-  const [passengers, setPassengers] = useState([{
-    paxId: 1,
-    title: 'Mr',
-    firstName: '',
-    lastName: '',
-    gender: 'M',
-    dateOfBirth: '',
-    passportNo: '',
-    passportExpiry: '',
-    nationality: 'IN',
-    paxType: '1', // 1=Adult
-  }]);
+  const [passengers, setPassengers] = useState(() => {
+    // Auto-fill first passenger from logged-in user's data
+    const nameParts = (user?.name || '').trim().split(/\s+/);
+    const firstName = nameParts[0] || '';
+    const lastName = nameParts.slice(1).join(' ') || '';
+    return [{
+      paxId: 1,
+      title: 'Mr',
+      firstName,
+      lastName,
+      gender: 'M',
+      contactNo: user?.phone || '',
+      passportNo: '',
+      passportExpiry: '',
+      nationality: 'IN',
+      paxType: '1', // 1=Adult
+    }];
+  });
   const [bookingStep, setBookingStep] = useState('select'); // 'select', 'passengers', 'review', 'payment'
   const [bookingLoading, setBookingLoading] = useState(false);
   const [myBookings, setMyBookings] = useState([]);
 
   useEffect(() => {
     fetchEventAndFlights();
-    fetchMyBookings();
   }, [slug, user]);
+
+  // Fetch bookings once event is loaded
+  useEffect(() => {
+    if (event?._id && user?.email) {
+      fetchMyBookings();
+    }
+  }, [event?._id, user?.email]);
 
   const fetchEventAndFlights = async () => {
     try {
@@ -63,14 +75,19 @@ export const MicrositeFlightBooking = () => {
         const flightsResponse = await api.get(
           `/flights/events/${eventResponse.data._id}/assigned?guestEmail=${user.email}`
         );
-        setAssignedFlights(flightsResponse.data);
+        // api interceptor already unwraps response.data, so flightsResponse IS the data
+        setAssignedFlights(flightsResponse);
       }
     } catch (error) {
       console.error('Error fetching data:', error);
-      if (error.response?.status === 404) {
+      // api interceptor rejects with error.response.data (an object with 'message')
+      const errorMsg = error?.message || error;
+      if (errorMsg === 'Flight bookings not yet available') {
+        toast.error('Flight bookings are not yet available. The planner has not published flight options.');
+      } else if (errorMsg === 'No flights configured for this event' || errorMsg === 'No flight options available for your location' || errorMsg === 'No flights configured for your group') {
         toast.error('No flight options available yet. Please check back later.');
       } else {
-        toast.error('Failed to load flight information');
+        toast.error(errorMsg || 'Failed to load flight information');
       }
     } finally {
       setLoading(false);
@@ -78,13 +95,12 @@ export const MicrositeFlightBooking = () => {
   };
 
   const fetchMyBookings = async () => {
-    if (!user?.email || !event) return;
-    
     try {
       const response = await api.get(
         `/flights/events/${event._id}/bookings?guestEmail=${user.email}`
       );
-      setMyBookings(response.data.bookings || []);
+      // api interceptor already unwraps response.data
+      setMyBookings(response.bookings || []);
     } catch (error) {
       console.error('Error fetching bookings:', error);
     }
@@ -103,7 +119,7 @@ export const MicrositeFlightBooking = () => {
         firstName: '',
         lastName: '',
         gender: 'M',
-        dateOfBirth: '',
+        contactNo: '',
         passportNo: '',
         passportExpiry: '',
         nationality: 'IN',
@@ -130,18 +146,12 @@ export const MicrositeFlightBooking = () => {
   const validatePassengers = () => {
     for (let i = 0; i < passengers.length; i++) {
       const p = passengers[i];
-      if (!p.firstName || !p.lastName || !p.dateOfBirth) {
-        toast.error(`Please fill all required fields for Passenger ${i + 1}`);
+      if (!p.firstName || !p.lastName) {
+        toast.error(`Please fill first name and last name for Passenger ${i + 1}`);
         return false;
       }
     }
     return true;
-  };
-
-  const calculateTotalFare = () => {
-    const arrivalFare = selectedArrivalFlight?.fare?.totalFare || 0;
-    const departureFare = selectedDepartureFlight?.fare?.totalFare || 0;
-    return (arrivalFare + departureFare) * passengers.length;
   };
 
   const handleBookFlight = async () => {
@@ -176,17 +186,16 @@ export const MicrositeFlightBooking = () => {
 
       const response = await api.post('/flights/book', bookingData);
       
-      toast.success('Flight booked successfully! Proceeding to payment...');
+      toast.success('Flight booked successfully!');
       
-      // TODO: Integrate with Razorpay payment
-      // For now, just navigate to bookings
-      setTimeout(() => {
-        navigate(`/microsite/${slug}/my-flight-bookings`);
-      }, 2000);
+      // Refresh bookings to show the confirmed view
+      if (event?._id && user?.email) {
+        await fetchMyBookings();
+      }
       
     } catch (error) {
       console.error('Error booking flight:', error);
-      toast.error(error.response?.data?.message || 'Failed to book flight');
+      toast.error(error?.message || 'Failed to book flight');
     } finally {
       setBookingLoading(false);
     }
@@ -228,10 +237,163 @@ export const MicrositeFlightBooking = () => {
       <MicrositeDashboardLayout event={event}>
         <div className="max-w-2xl mx-auto mt-12 text-center">
           <Plane className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">No Flights Available</h2>
-          <p className="text-gray-600">
-            Flight options for this event are not yet configured. Please check back later.
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">No Flights Available Yet</h2>
+          <p className="text-gray-600 mb-4">
+            The event planner hasn't published flight options yet. Once they configure and publish flights for your departure city, you'll be able to select and book them here.
           </p>
+          <p className="text-sm text-gray-500">
+            Please check back later or contact the event planner for more details.
+          </p>
+        </div>
+      </MicrositeDashboardLayout>
+    );
+  }
+
+  // If guest already has a booking, show booking details instead of booking flow
+  if (myBookings.length > 0) {
+    const latestBooking = myBookings[0];
+    const arrival = latestBooking.flightSelection?.arrival;
+    const departure = latestBooking.flightSelection?.departure;
+    const hasArrival = arrival?.flightDetails?.airline;
+    const hasDeparture = departure?.flightDetails?.airline;
+
+    return (
+      <MicrositeDashboardLayout event={event}>
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          {/* Success Header */}
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center justify-center w-16 h-16 bg-green-100 rounded-full mb-4">
+              <CheckCircle className="h-10 w-10 text-green-600" />
+            </div>
+            <h1 className="text-3xl font-bold text-gray-900">Flight Booking Confirmed</h1>
+            <p className="mt-2 text-gray-600">
+              Booking ID: <span className="font-mono font-semibold text-primary-600">{latestBooking.bookingId}</span>
+            </p>
+            <span className={`inline-block mt-2 px-3 py-1 rounded-full text-sm font-medium ${
+              latestBooking.status === 'booked' ? 'bg-green-100 text-green-800' :
+              latestBooking.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+              'bg-red-100 text-red-800'
+            }`}>
+              {latestBooking.status === 'booked' ? '✓ Booked' : latestBooking.status === 'pending' ? '⏳ Pending' : '✗ ' + latestBooking.status}
+            </span>
+          </div>
+
+          {/* Flight Details */}
+          <div className="space-y-4">
+            {hasArrival && (
+              <div className="bg-white rounded-lg border border-gray-200 p-6">
+                <h3 className="font-semibold text-gray-900 flex items-center gap-2 mb-4">
+                  <Plane className="h-5 w-5 text-primary-600" />
+                  Arrival Flight
+                </h3>
+                <div className="flex items-center justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3 mb-3">
+                      <p className="text-lg font-semibold text-gray-900">{arrival.flightDetails.airline}</p>
+                      <span className="text-sm text-gray-500">
+                        {arrival.flightDetails.airlineCode} {arrival.flightDetails.flightNumber}
+                      </span>
+                      {arrival.flightDetails.stops === 0 && (
+                        <span className="px-2 py-0.5 bg-green-100 text-green-800 text-xs rounded">Non-stop</span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-8">
+                      <div>
+                        <p className="text-xs text-gray-500">From</p>
+                        <p className="font-semibold text-gray-900">{arrival.flightDetails.origin}</p>
+                        <p className="text-sm text-gray-600">{formatTime(arrival.flightDetails.departureTime)}</p>
+                        <p className="text-xs text-gray-500">{formatDate(arrival.flightDetails.departureTime)}</p>
+                      </div>
+                      <div className="flex-1 flex flex-col items-center">
+                        <ArrowRight className="h-5 w-5 text-gray-400" />
+                        <span className="text-xs text-gray-500 mt-1">
+                          {formatDuration(arrival.flightDetails.duration)}
+                        </span>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-xs text-gray-500">To</p>
+                        <p className="font-semibold text-gray-900">{arrival.flightDetails.destination}</p>
+                        <p className="text-sm text-gray-600">{formatTime(arrival.flightDetails.arrivalTime)}</p>
+                        <p className="text-xs text-gray-500">{formatDate(arrival.flightDetails.arrivalTime)}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {hasDeparture && (
+              <div className="bg-white rounded-lg border border-gray-200 p-6">
+                <h3 className="font-semibold text-gray-900 flex items-center gap-2 mb-4">
+                  <Plane className="h-5 w-5 text-primary-600 rotate-180" />
+                  Departure Flight
+                </h3>
+                <div className="flex items-center justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3 mb-3">
+                      <p className="text-lg font-semibold text-gray-900">{departure.flightDetails.airline}</p>
+                      <span className="text-sm text-gray-500">
+                        {departure.flightDetails.airlineCode} {departure.flightDetails.flightNumber}
+                      </span>
+                      {departure.flightDetails.stops === 0 && (
+                        <span className="px-2 py-0.5 bg-green-100 text-green-800 text-xs rounded">Non-stop</span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-8">
+                      <div>
+                        <p className="text-xs text-gray-500">From</p>
+                        <p className="font-semibold text-gray-900">{departure.flightDetails.origin}</p>
+                        <p className="text-sm text-gray-600">{formatTime(departure.flightDetails.departureTime)}</p>
+                        <p className="text-xs text-gray-500">{formatDate(departure.flightDetails.departureTime)}</p>
+                      </div>
+                      <div className="flex-1 flex flex-col items-center">
+                        <ArrowRight className="h-5 w-5 text-gray-400" />
+                        <span className="text-xs text-gray-500 mt-1">
+                          {formatDuration(departure.flightDetails.duration)}
+                        </span>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-xs text-gray-500">To</p>
+                        <p className="font-semibold text-gray-900">{departure.flightDetails.destination}</p>
+                        <p className="text-sm text-gray-600">{formatTime(departure.flightDetails.arrivalTime)}</p>
+                        <p className="text-xs text-gray-500">{formatDate(departure.flightDetails.arrivalTime)}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Passenger Details */}
+            <div className="bg-white rounded-lg border border-gray-200 p-6">
+              <h3 className="font-semibold text-gray-900 flex items-center gap-2 mb-4">
+                <Users className="h-5 w-5 text-primary-600" />
+                Passengers ({latestBooking.passengers?.length || 0})
+              </h3>
+              <div className="space-y-2">
+                {latestBooking.passengers?.map((p, i) => (
+                  <div key={i} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                    <User className="h-5 w-5 text-gray-400" />
+                    <div>
+                      <p className="font-medium text-gray-900">{p.title} {p.firstName} {p.lastName}</p>
+                      <p className="text-xs text-gray-500">
+                        {p.gender === 'M' ? 'Male' : 'Female'}
+                        {p.contactNo ? ` • ${p.contactNo}` : ''}
+                        {p.passportNo ? ` • Passport: ${p.passportNo}` : ''}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Payment Note */}
+            <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
+              <p className="text-sm text-blue-800">
+                <strong>Note:</strong> Payment for the flights will be handled by the event planner. Your booking is confirmed.
+              </p>
+            </div>
+          </div>
         </div>
       </MicrositeDashboardLayout>
     );
@@ -272,7 +434,7 @@ export const MicrositeFlightBooking = () => {
             <div className={`w-8 h-8 rounded-full flex items-center justify-center ${bookingStep === 'review' ? 'bg-primary-600 text-white' : 'bg-gray-200'}`}>
               3
             </div>
-            <span className="font-medium">Review & Pay</span>
+            <span className="font-medium">Review & Confirm</span>
           </div>
         </div>
       </div>
@@ -476,6 +638,32 @@ export const MicrositeFlightBooking = () => {
       {/* Step 2: Passenger Details */}
       {bookingStep === 'passengers' && (
         <div className="space-y-6">
+          {/* Journey Date - Fixed from selected flights */}
+          <div className="bg-blue-50 rounded-lg border border-blue-200 p-4">
+            <h3 className="font-semibold text-blue-900 flex items-center gap-2 mb-3">
+              <Calendar className="h-5 w-5" />
+              Journey Date
+            </h3>
+            <div className="flex flex-wrap gap-6">
+              {selectedArrivalFlight && (
+                <div>
+                  <p className="text-sm text-blue-700">Arrival Flight</p>
+                  <p className="font-medium text-blue-900">
+                    {formatDate(selectedArrivalFlight.flightDetails.departureTime)}
+                  </p>
+                </div>
+              )}
+              {selectedDepartureFlight && (
+                <div>
+                  <p className="text-sm text-blue-700">Departure Flight</p>
+                  <p className="font-medium text-blue-900">
+                    {formatDate(selectedDepartureFlight.flightDetails.departureTime)}
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+
           <div className="bg-white rounded-lg border border-gray-200 p-6">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-bold text-gray-900">Passenger Details</h2>
@@ -491,7 +679,7 @@ export const MicrositeFlightBooking = () => {
             {passengers.map((passenger, index) => (
               <div key={index} className="mb-6 p-4 bg-gray-50 rounded-lg">
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="font-semibold text-gray-900">Passenger {index + 1}</h3>
+                  <h3 className="font-semibold text-gray-900">Passenger {index + 1}{index === 0 ? ' (You)' : ''}</h3>
                   {passengers.length > 1 && (
                     <button
                       onClick={() => removePassenger(index)}
@@ -536,14 +724,16 @@ export const MicrositeFlightBooking = () => {
                     <option value="M">Male</option>
                     <option value="F">Female</option>
                   </select>
-                  <input
-                    type="date"
-                    placeholder="Date of Birth *"
-                    value={passenger.dateOfBirth}
-                    onChange={(e) => updatePassenger(index, 'dateOfBirth', e.target.value)}
-                    className="px-3 py-2 border border-gray-300 rounded-lg"
-                    required
-                  />
+                  <div className="relative">
+                    <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <input
+                      type="tel"
+                      placeholder="Contact Number"
+                      value={passenger.contactNo}
+                      onChange={(e) => updatePassenger(index, 'contactNo', e.target.value)}
+                      className="pl-10 pr-3 py-2 border border-gray-300 rounded-lg w-full"
+                    />
+                  </div>
                   <input
                     type="text"
                     placeholder="Passport No (Optional)"
@@ -589,19 +779,27 @@ export const MicrositeFlightBooking = () => {
               <h3 className="font-semibold text-gray-900 mb-3">Selected Flights</h3>
               {selectedArrivalFlight && (
                 <div className="mb-3 p-3 bg-gray-50 rounded-lg">
-                  <p className="font-medium">Arrival: {selectedArrivalFlight.flightDetails.airline}</p>
-                  <p className="text-sm text-gray-600">
+                  <div className="flex items-center gap-2">
+                    <Plane className="h-4 w-4 text-primary-600" />
+                    <p className="font-medium">Arrival: {selectedArrivalFlight.flightDetails.airline}</p>
+                  </div>
+                  <p className="text-sm text-gray-600 mt-1">
+                    {selectedArrivalFlight.flightDetails.airlineCode} {selectedArrivalFlight.flightDetails.flightNumber} •{' '}
                     {formatDate(selectedArrivalFlight.flightDetails.departureTime)} •{' '}
-                    ₹{selectedArrivalFlight.fare.totalFare.toLocaleString()} per person
+                    {formatTime(selectedArrivalFlight.flightDetails.departureTime)} → {formatTime(selectedArrivalFlight.flightDetails.arrivalTime)}
                   </p>
                 </div>
               )}
               {selectedDepartureFlight && (
                 <div className="p-3 bg-gray-50 rounded-lg">
-                  <p className="font-medium">Departure: {selectedDepartureFlight.flightDetails.airline}</p>
-                  <p className="text-sm text-gray-600">
+                  <div className="flex items-center gap-2">
+                    <Plane className="h-4 w-4 text-primary-600 rotate-180" />
+                    <p className="font-medium">Departure: {selectedDepartureFlight.flightDetails.airline}</p>
+                  </div>
+                  <p className="text-sm text-gray-600 mt-1">
+                    {selectedDepartureFlight.flightDetails.airlineCode} {selectedDepartureFlight.flightDetails.flightNumber} •{' '}
                     {formatDate(selectedDepartureFlight.flightDetails.departureTime)} •{' '}
-                    ₹{selectedDepartureFlight.fare.totalFare.toLocaleString()} per person
+                    {formatTime(selectedDepartureFlight.flightDetails.departureTime)} → {formatTime(selectedDepartureFlight.flightDetails.arrivalTime)}
                   </p>
                 </div>
               )}
@@ -611,22 +809,19 @@ export const MicrositeFlightBooking = () => {
             <div className="mb-6">
               <h3 className="font-semibold text-gray-900 mb-3">Passengers ({passengers.length})</h3>
               {passengers.map((p, i) => (
-                <p key={i} className="text-sm text-gray-600">
-                  {p.title} {p.firstName} {p.lastName}
-                </p>
+                <div key={i} className="flex items-center gap-2 text-sm text-gray-600 mb-1">
+                  <User className="h-4 w-4 text-gray-400" />
+                  <span>{p.title} {p.firstName} {p.lastName}</span>
+                  {p.contactNo && <span className="text-gray-400">• {p.contactNo}</span>}
+                </div>
               ))}
             </div>
 
-            {/* Pricing */}
-            <div className="border-t border-gray-200 pt-4">
-              <div className="flex justify-between mb-2">
-                <span className="text-gray-600">Total Fare</span>
-                <span className="font-semibold">₹{calculateTotalFare().toLocaleString()}</span>
-              </div>
-              <div className="flex justify-between text-lg font-bold">
-                <span>Total Amount</span>
-                <span className="text-primary-600">₹{calculateTotalFare().toLocaleString()}</span>
-              </div>
+            {/* Payment Note */}
+            <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
+              <p className="text-sm text-blue-800">
+                <strong>Note:</strong> Payment for the flights will be handled by the event planner. You just need to confirm your booking.
+              </p>
             </div>
           </div>
 
@@ -650,7 +845,7 @@ export const MicrositeFlightBooking = () => {
               ) : (
                 <>
                   <CheckCircle className="h-5 w-5" />
-                  Confirm & Pay
+                  Confirm Booking
                 </>
               )}
             </button>

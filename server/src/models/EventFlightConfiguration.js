@@ -37,6 +37,7 @@ const eventFlightConfigurationSchema = new mongoose.Schema(
             name: String,
             email: String,
             phone: String,
+            group: String,
           },
         ],
         isActive: {

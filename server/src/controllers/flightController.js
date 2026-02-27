@@ -29,8 +29,18 @@ export const initializeFlightConfiguration = async (req, res) => {
     let configuration = await EventFlightConfiguration.findOne({ event: eventId });
 
     if (configuration) {
+      // Re-sync location groups from current guest data
+      const locationGroups = generateLocationGroups(event.invitedGuests);
+      configuration.locationGroups = locationGroups;
+      configuration.stats = {
+        ...configuration.stats,
+        totalGroups: locationGroups.length,
+        totalGuests: event.invitedGuests?.filter(g => g.location).length || 0,
+      };
+      await configuration.updateStats();
+
       return res.json({
-        message: 'Flight configuration retrieved',
+        message: 'Flight configuration synced with latest guest data',
         configuration,
       });
     }
@@ -54,7 +64,7 @@ export const initializeFlightConfiguration = async (req, res) => {
       searchWindow,
       stats: {
         totalGroups: locationGroups.length,
-        totalGuests: event.invitedGuests?.length || 0,
+        totalGuests: event.invitedGuests?.filter(g => g.location).length || 0,
       },
     });
 
@@ -194,34 +204,79 @@ export const selectFlightsForGroup = async (req, res) => {
     }
 
     // Find or create selected flights for this group
-    let groupFlights = configuration.selectedFlights.find((sf) => sf.groupName === groupName);
+    let groupFlightsIndex = configuration.selectedFlights.findIndex((sf) => sf.groupName === groupName);
     
-    if (!groupFlights) {
-      groupFlights = {
+    if (groupFlightsIndex === -1) {
+      configuration.selectedFlights.push({
         groupName,
         origin: configuration.locationGroups.find((g) => g.groupName === groupName)?.origin,
         arrivalFlights: [],
         departureFlights: [],
-      };
-      configuration.selectedFlights.push(groupFlights);
+      });
+      groupFlightsIndex = configuration.selectedFlights.length - 1;
     }
 
-    // Update flight selections
-    if (flightSelections.arrivalFlights) {
-      groupFlights.arrivalFlights = flightSelections.arrivalFlights.map((flight) => ({
-        ...flight,
+    // Update flight selections by directly setting on the array element
+    if (flightSelections.arrivalFlights && flightSelections.arrivalFlights.length > 0) {
+      configuration.selectedFlights[groupFlightsIndex].arrivalFlights = flightSelections.arrivalFlights.map((flight) => ({
+        traceId: flight.traceId,
+        resultIndex: flight.resultIndex,
+        flightDetails: {
+          airline: flight.flightDetails?.airline || '',
+          airlineCode: flight.flightDetails?.airlineCode || '',
+          flightNumber: flight.flightDetails?.flightNumber || '',
+          origin: flight.flightDetails?.origin || '',
+          destination: flight.flightDetails?.destination || '',
+          departureTime: flight.flightDetails?.departureTime,
+          arrivalTime: flight.flightDetails?.arrivalTime,
+          duration: flight.flightDetails?.duration || '',
+          cabinClass: flight.flightDetails?.cabinClass || '',
+          stops: flight.flightDetails?.stops || 0,
+          baggage: flight.flightDetails?.baggage || '',
+          refundable: flight.flightDetails?.refundable || false,
+        },
+        fare: {
+          baseFare: flight.fare?.baseFare || 0,
+          tax: flight.fare?.tax || 0,
+          totalFare: flight.fare?.totalFare || 0,
+          currency: flight.fare?.currency || 'INR',
+        },
         selectedAt: new Date(),
         isAvailable: true,
       }));
     }
 
-    if (flightSelections.departureFlights) {
-      groupFlights.departureFlights = flightSelections.departureFlights.map((flight) => ({
-        ...flight,
+    if (flightSelections.departureFlights && flightSelections.departureFlights.length > 0) {
+      configuration.selectedFlights[groupFlightsIndex].departureFlights = flightSelections.departureFlights.map((flight) => ({
+        traceId: flight.traceId,
+        resultIndex: flight.resultIndex,
+        flightDetails: {
+          airline: flight.flightDetails?.airline || '',
+          airlineCode: flight.flightDetails?.airlineCode || '',
+          flightNumber: flight.flightDetails?.flightNumber || '',
+          origin: flight.flightDetails?.origin || '',
+          destination: flight.flightDetails?.destination || '',
+          departureTime: flight.flightDetails?.departureTime,
+          arrivalTime: flight.flightDetails?.arrivalTime,
+          duration: flight.flightDetails?.duration || '',
+          cabinClass: flight.flightDetails?.cabinClass || '',
+          stops: flight.flightDetails?.stops || 0,
+          baggage: flight.flightDetails?.baggage || '',
+          refundable: flight.flightDetails?.refundable || false,
+        },
+        fare: {
+          baseFare: flight.fare?.baseFare || 0,
+          tax: flight.fare?.tax || 0,
+          totalFare: flight.fare?.totalFare || 0,
+          currency: flight.fare?.currency || 'INR',
+        },
         selectedAt: new Date(),
         isAvailable: true,
       }));
     }
+
+    // Mark the nested array as modified so Mongoose persists changes
+    configuration.markModified('selectedFlights');
 
     // Update configured groups
     if (!configuration.configuredGroups.includes(groupName)) {
@@ -240,7 +295,7 @@ export const selectFlightsForGroup = async (req, res) => {
     res.json({
       message: 'Flights selected successfully',
       configuration,
-      groupFlights,
+      groupFlights: configuration.selectedFlights[groupFlightsIndex],
     });
   } catch (error) {
     console.error('Select Flights Error:', error);
@@ -438,8 +493,12 @@ export const bookFlight = async (req, res) => {
       return res.status(403).json({ message: 'Flight bookings not available' });
     }
 
+    // Generate a unique booking ID
+    const bookingId = `SYN-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+
     // Create flight booking record
     const flightBooking = new FlightBooking({
+      bookingId,
       event: eventId,
       guest: guestDetails,
       locationGroup,
@@ -710,6 +769,7 @@ export const cancelBooking = async (req, res) => {
 
 /**
  * Generate location groups from invited guests
+ * Groups guests by their departure city/location (e.g., "Mumbai (BOM)", "Delhi (DEL)")
  */
 function generateLocationGroups(invitedGuests) {
   if (!invitedGuests || invitedGuests.length === 0) return [];
@@ -717,8 +777,11 @@ function generateLocationGroups(invitedGuests) {
   const groupsMap = {};
 
   invitedGuests.forEach((guest) => {
-    const locationKey = guest.group || 'Default Group';
+    // Group by location (departure city), fall back to 'Unassigned' if no location set
+    const locationKey = guest.location || 'Unassigned';
     
+    if (locationKey === 'Unassigned') return; // Skip guests without a location
+
     if (!groupsMap[locationKey]) {
       groupsMap[locationKey] = {
         groupName: locationKey,
@@ -735,6 +798,7 @@ function generateLocationGroups(invitedGuests) {
       name: guest.name,
       email: guest.email,
       phone: guest.phone,
+      group: guest.group || '',
     });
   });
 

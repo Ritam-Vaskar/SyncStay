@@ -222,6 +222,7 @@ export const uploadGuestList = asyncHandler(async (req, res) => {
       email: row.Email || row.email,
       phone: row.Phone || row.phone || '',
       group: row.Group || row.group || '',
+      location: row.Location || row.location || '',
       invitationToken: generateInvitationToken(),
       tokenExpiry: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), // 1 year expiry
       addedAt: new Date(),
@@ -230,7 +231,7 @@ export const uploadGuestList = asyncHandler(async (req, res) => {
 
     if (guests.length === 0) {
       return res.status(400).json({ 
-        message: 'No valid guests found in Excel file. Please ensure columns are named: Name, Email, Phone, Group (optional)',
+        message: 'No valid guests found in Excel file. Please ensure columns are named: Name, Email, Phone, Group, Location (optional)',
       });
     }
 
@@ -295,7 +296,7 @@ export const uploadGuestList = asyncHandler(async (req, res) => {
     });
   } catch (error) {
     res.status(400).json({ 
-      message: 'Error parsing Excel file. Please ensure it has columns: Name, Email, Phone, Group (optional)',
+      message: 'Error parsing Excel file. Please ensure it has columns: Name, Email, Phone, Group, Location (optional)',
       error: error.message,
     });
   }
