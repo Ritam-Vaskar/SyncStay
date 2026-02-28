@@ -198,6 +198,10 @@ export const uploadGuestList = asyncHandler(async (req, res) => {
   const { eventId } = req.params;
   const { fileData } = req.body; // Base64 encoded Excel file
 
+  if (!fileData) {
+    return res.status(400).json({ message: 'No file data provided' });
+  }
+
   const event = await Event.findById(eventId);
 
   if (!event) {
@@ -209,29 +213,92 @@ export const uploadGuestList = asyncHandler(async (req, res) => {
   }
 
   try {
-    // Decode base64 and parse Excel
-    const buffer = Buffer.from(fileData, 'base64');
-    const workbook = xlsx.read(buffer, { type: 'buffer' });
+    // Decode base64 and parse Excel/CSV
+    let cleanBase64 = fileData;
+    
+    // Remove data URL prefix if present (e.g., "data:application/vnd.ms-excel;base64,")
+    if (fileData.includes(',')) {
+      cleanBase64 = fileData.split(',')[1];
+    }
+    
+    // Remove any whitespace or newlines
+    cleanBase64 = cleanBase64.replace(/\s/g, '');
+    
+    const buffer = Buffer.from(cleanBase64, 'base64');
+    
+    console.log('=== File Upload Debug ===');
+    console.log('Buffer size:', buffer.length, 'bytes');
+    console.log('First 50 chars of buffer:', buffer.toString('utf8', 0, Math.min(50, buffer.length)));
+    
+    // Parse with xlsx library (supports both Excel and CSV)
+    const workbook = xlsx.read(buffer, { 
+      type: 'buffer',
+      raw: false,
+      cellDates: true,
+      cellNF: false,
+      cellText: false
+    });
+    
+    if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
+      throw new Error('No sheets found in file');
+    }
+    
+    console.log('Sheet names found:', workbook.SheetNames);
+    
     const sheetName = workbook.SheetNames[0];
     const worksheet = workbook.Sheets[sheetName];
-    const data = xlsx.utils.sheet_to_json(worksheet);
+    
+    console.log('Worksheet range:', worksheet['!ref']);
+    
+    // Convert to JSON with options that handle various formats
+    const data = xlsx.utils.sheet_to_json(worksheet, { 
+      raw: false,
+      defval: '',
+      blankrows: false,
+      skipHidden: false
+    });
 
-    // Expected columns: Name, Email, Phone (optional), Group (optional)
-    const guests = data.map(row => ({
-      name: row.Name || row.name,
-      email: row.Email || row.email,
-      phone: row.Phone || row.phone || '',
-      group: row.Group || row.group || '',
-      location: row.Location || row.location || '',
-      invitationToken: generateInvitationToken(),
-      tokenExpiry: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), // 1 year expiry
-      addedAt: new Date(),
-      hasAccessed: false,
-    })).filter(guest => guest.name && guest.email);
+    console.log('=== Guest Upload Debug Info ===');
+    console.log('Parsed data rows:', data.length);
+    if (data.length > 0) {
+      console.log('First row columns:', Object.keys(data[0]));
+      console.log('First row data:', data[0]);
+    }
+    console.log('================================');
+
+    // Expected columns: Name, Email, Phone (optional), Group (optional), Location (optional)
+    // Handle variations: trim whitespace and support both cases
+    const guests = data.map(row => {
+      // Create a normalized key lookup
+      const normalizedRow = {};
+      Object.keys(row).forEach(key => {
+        const normalizedKey = key.trim().toLowerCase();
+        normalizedRow[normalizedKey] = row[key];
+      });
+
+      return {
+        name: normalizedRow['name'] || '',
+        email: normalizedRow['email'] || '',
+        phone: normalizedRow['phone'] || '',
+        group: normalizedRow['group'] || '',
+        location: normalizedRow['location'] || '',
+        invitationToken: generateInvitationToken(),
+        tokenExpiry: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), // 1 year expiry
+        addedAt: new Date(),
+        hasAccessed: false,
+      };
+    }).filter(guest => guest.name && guest.email);
+
+    console.log('Valid guests after filtering:', guests.length);
 
     if (guests.length === 0) {
       return res.status(400).json({ 
-        message: 'No valid guests found in Excel file. Please ensure columns are named: Name, Email, Phone, Group, Location (optional)',
+        message: 'No valid guests found in file. Please ensure columns are named: Name, Email, Phone, Group, Location (optional). Both uppercase and lowercase column names are supported.',
+        debug: data.length > 0 ? { 
+          rowsParsed: data.length,
+          columnsFound: Object.keys(data[0] || {}),
+          sampleRow: data[0]
+        } : { error: 'No data rows found in file' }
       });
     }
 
@@ -295,8 +362,9 @@ export const uploadGuestList = asyncHandler(async (req, res) => {
       },
     });
   } catch (error) {
+    console.error('Error parsing file:', error);
     res.status(400).json({ 
-      message: 'Error parsing Excel file. Please ensure it has columns: Name, Email, Phone, Group, Location (optional)',
+      message: 'Error parsing file. Please ensure it\'s a valid Excel (.xlsx, .xls) or CSV file with columns: Name, Email, Phone, Group, Location (optional)',
       error: error.message,
     });
   }
