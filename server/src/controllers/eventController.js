@@ -156,26 +156,39 @@ export const createEvent = asyncHandler(async (req, res) => {
     // Don't fail event creation if recommendations fail
   }
 
-  // Auto-generate embeddings for public events
+  // Auto-generate embeddings for public events via ML server
   if (!event.isPrivate) {
     try {
-      console.log(`🤖 Generating embeddings for event: ${event.name}`);
-      const embeddingData = await generateEventEmbedding(event);
-      
-      await upsertVector('events_vectors', event._id.toString(), embeddingData.vector, {
-        name: event.name,
-        type: event.type,
-        location: event.location?.city || '',
-        country: event.location?.country || 'India',
-        budgetMin: event.budgetRange?.min || event.budget || 0,
-        budgetMax: event.budgetRange?.max || event.budget || 0,
-        attendees: event.expectedGuests || 0,
-        status: event.status,
+      console.log(`🤖 Sending event to ML server for embedding: ${event.name}`);
+      const mlUrl = config.mlServerUrl;
+      const embeddingResponse = await fetch(`${mlUrl}/event/embedding`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: event._id.toString(),
+          name: event.name,
+          type: event.type || 'general',
+          description: event.description || '',
+          startDate: event.startDate ? new Date(event.startDate).toISOString() : '',
+          endDate: event.endDate ? new Date(event.endDate).toISOString() : '',
+          location: event.location ? {
+            city: event.location.city || '',
+            country: event.location.country || '',
+            venue: event.location.venue || '',
+          } : { city: '', country: '', venue: '' },
+          customSlug: event.micrositeConfig?.customSlug || '',
+        }),
       });
-      
-      console.log(`✅ Embeddings generated and stored for ${event.name}`);
+
+      if (!embeddingResponse.ok) {
+        const errBody = await embeddingResponse.text();
+        throw new Error(`ML server responded with ${embeddingResponse.status}: ${errBody}`);
+      }
+
+      const embeddingResult = await embeddingResponse.json();
+      console.log(`✅ Embeddings generated and stored via ML server for ${event.name} (${embeddingResult.chunks_created} chunks)`);
     } catch (error) {
-      console.error('❌ Error generating embeddings:', error);
+      console.error('❌ Error generating embeddings via ML server:', error);
       // Don't fail event creation if embeddings fail
     }
   }

@@ -39,12 +39,13 @@ async def fetch_similar_events(request: EventSearchRequest) -> List[SimilarEvent
         embedding = OpenAIEmbeddings(model="text-embedding-3-large")
         query_vector = await embedding.aembed_query(request.query)
 
-        # Search Qdrant for similar event chunks
+        # Search Qdrant (cloud)
         url = os.getenv("QDRANT_URL")
-        client = QdrantClient(url=url)
+        api_key = os.getenv("QDRANT_API_KEY")
+        client = QdrantClient(url=url, api_key=api_key)
 
         search_results = client.query_points(
-            collection_name="syncstay_event_embeddings",
+            collection_name="events_vectors",
             query=query_vector,
             limit=request.top_k * 10,  # fetch extra to deduplicate across chunks
             with_payload=True,

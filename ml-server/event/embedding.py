@@ -102,14 +102,16 @@ async def create_event_embedding(event: EventPost):
             model="text-embedding-3-large",
         )
 
-        # Store in Qdrant
+        # Store in Qdrant (cloud)
         import os
         url = os.getenv("QDRANT_URL")
+        api_key = os.getenv("QDRANT_API_KEY")
         qdrant = QdrantVectorStore.from_documents(
             chunks,
             embedding,
             url=url,
-            collection_name="syncstay_event_embeddings",
+            api_key=api_key,
+            collection_name="events_vectors",
         )
 
         return {
