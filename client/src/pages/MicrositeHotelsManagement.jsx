@@ -451,127 +451,197 @@ const RecommendedHotelCard = ({ recommendation, onSelect, isSelecting }) => {
   const isSelected = recommendation.isSelectedByPlanner;
   const matchScore = Math.round(recommendation.score || 0);
 
+  const getMatchQuality = (score) => {
+    if (score >= 80) return { label: 'Excellent Match', badge: 'bg-green-50 text-green-700 border-green-200' };
+    if (score >= 60) return { label: 'Good Match', badge: 'bg-blue-50 text-blue-700 border-blue-200' };
+    return { label: 'Fair Match', badge: 'bg-orange-50 text-orange-700 border-orange-200' };
+  };
+
+  const matchQuality = getMatchQuality(matchScore);
+
   return (
-    <div className={`card border-2 transition-all ${isSelected ? 'border-green-500 bg-green-50' : 'border-primary-200 hover:border-primary-400'}`}>
-      {/* Match Score Badge */}
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-xl font-bold text-gray-900">{hotel?.name || hotel?.organization || 'Hotel'}</h3>
-        <div className="bg-gradient-to-r from-green-100 to-blue-100 px-3 py-1 rounded-full flex items-center gap-1">
-          <Sparkles className="h-4 w-4 text-green-600" />
-          <span className="text-green-800 font-bold">{matchScore}% Match</span>
+    <div className={`bg-white rounded-xl transition-all duration-300 hover:shadow-lg ${
+      isSelected 
+        ? 'ring-2 ring-green-400 shadow-md shadow-green-50' 
+        : 'shadow-md border border-gray-200 hover:border-blue-300'
+    }`}>
+      {/* Card Header */}
+      <div className="p-4 border-b border-gray-100">
+        <div className="flex items-start justify-between gap-3 mb-2">
+          <h3 className="text-lg font-bold text-gray-900 flex-1">
+            {hotel?.name || hotel?.organization || 'Hotel'}
+          </h3>
+          
+          {/* Match Score Badge */}
+          <div className={`px-3 py-1 rounded-full border ${matchQuality.badge} flex items-center gap-1.5 whitespace-nowrap`}>
+            <Sparkles className="h-3.5 w-3.5" />
+            <span className="font-bold text-xs">{matchScore}%</span>
+          </div>
         </div>
-      </div>
 
-      {/* Hotel Details */}
-      <div className="space-y-2 mb-4">
-        <div className="flex items-center gap-2 text-gray-600">
-          <MapPin className="h-4 w-4" />
-          <span className="text-sm">
-            {hotel.location?.city ? `${hotel.location.city}, ${hotel.location.country || ''}` : 'Location not specified'}
-          </span>
-        </div>
-        
-        {hotel.totalRooms && (
-          <div className="flex items-center gap-2 text-gray-600">
-            <Hotel className="h-4 w-4" />
-            <span className="text-sm">{hotel.totalRooms} rooms available</span>
+        {/* Selected Badge */}
+        {isSelected && (
+          <div className="inline-flex items-center gap-1.5 bg-green-50 text-green-700 px-2.5 py-1 rounded-full border border-green-200">
+            <CheckCircle className="h-3.5 w-3.5" />
+            <span className="text-xs font-semibold">SELECTED</span>
           </div>
         )}
-        
-        {hotel.priceRange && (hotel.priceRange.min || hotel.priceRange.max) && (
-          <div className="flex items-center gap-2 text-gray-600">
-            <IndianRupee className="h-4 w-4" />
-            <span className="text-sm">
-              ₹{hotel.priceRange.min || 0} - ₹{hotel.priceRange.max || 0} per night
+      </div>
+
+      {/* Card Content */}
+      <div className="p-4">
+        {/* Hotel Details */}
+        <div className="space-y-2 mb-3">
+          <div className="flex items-center gap-2 text-gray-700">
+            <div className="flex-shrink-0 w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center">
+              <MapPin className="h-3.5 w-3.5 text-blue-600" />
+            </div>
+            <span className="text-xs font-medium">
+              {hotel.location?.city ? `${hotel.location.city}, ${hotel.location.country || ''}` : 'Location not specified'}
             </span>
           </div>
-        )}
-      </div>
+          
+          {hotel.totalRooms && (
+            <div className="flex items-center gap-2 text-gray-700">
+              <div className="flex-shrink-0 w-7 h-7 rounded-lg bg-purple-50 flex items-center justify-center">
+                <Building className="h-3.5 w-3.5 text-purple-600" />
+              </div>
+              <span className="text-xs font-medium">{hotel.totalRooms} rooms available</span>
+            </div>
+          )}
+          
+          {hotel.priceRange && (hotel.priceRange.min || hotel.priceRange.max) && (
+            <div className="flex items-center gap-2 text-gray-700">
+              <div className="flex-shrink-0 w-7 h-7 rounded-lg bg-green-50 flex items-center justify-center">
+                <IndianRupee className="h-3.5 w-3.5 text-green-600" />
+              </div>
+              <span className="text-xs font-medium">
+                ₹{hotel.priceRange.min || 0} - ₹{hotel.priceRange.max || 0} per night
+              </span>
+            </div>
+          )}
+        </div>
 
-      {/* Reasons */}
-      {recommendation.reasons && recommendation.reasons.length > 0 && (
-        <div className="bg-blue-50 rounded-lg p-3 mb-4">
-          <p className="text-sm font-semibold text-blue-900 mb-2">Why Recommended:</p>
-          <ul className="text-sm text-blue-800 space-y-1">
-            {recommendation.reasons.map((reason, i) => (
-              <li key={i} className="flex items-start gap-2">
-                <CheckCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                <span>{reason}</span>
-              </li>
+        {/* Why Recommended Section */}
+        {recommendation.reasons && recommendation.reasons.length > 0 && (
+          <div className="mb-3 bg-blue-50 rounded-lg p-3 border border-blue-100">
+            <p className="text-xs font-bold text-blue-900 mb-2 flex items-center gap-1.5">
+              <TrendingUp className="h-3.5 w-3.5" />
+              Why Recommended:
+            </p>
+            <ul className="space-y-1.5">
+              {recommendation.reasons.map((reason, i) => (
+                <li key={i} className="flex items-start gap-2 text-xs text-blue-800">
+                  <CheckCircle className="h-3.5 w-3.5 mt-0.5 flex-shrink-0 text-blue-600" />
+                  <span className="leading-relaxed">{reason}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* AI Match Breakdown with Progress Bars */}
+        {recommendation.breakdown && (
+          <div className="mb-3 bg-purple-50 rounded-lg p-3 border border-purple-100">
+            <p className="text-xs font-bold text-purple-900 mb-2 flex items-center gap-1.5">
+              <Sparkles className="h-3.5 w-3.5" />
+              AI Match Breakdown:
+            </p>
+            <div className="space-y-2">
+              {recommendation.breakdown.vector !== undefined && (
+                <div>
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-xs font-semibold text-purple-700">AI Similarity</span>
+                    <span className="text-xs font-bold text-purple-900">{Math.round(recommendation.breakdown.vector)}%</span>
+                  </div>
+                  <div className="h-1.5 bg-purple-100 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-gradient-to-r from-purple-400 to-pink-400 rounded-full transition-all duration-500"
+                      style={{ width: `${Math.round(recommendation.breakdown.vector)}%` }}
+                    ></div>
+                  </div>
+                </div>
+              )}
+              {recommendation.breakdown.location !== undefined && (
+                <div>
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-xs font-semibold text-purple-700">Location Match</span>
+                    <span className="text-xs font-bold text-purple-900">{Math.round(recommendation.breakdown.location)}%</span>
+                  </div>
+                  <div className="h-1.5 bg-blue-100 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-gradient-to-r from-blue-400 to-cyan-400 rounded-full transition-all duration-500"
+                      style={{ width: `${Math.round(recommendation.breakdown.location)}%` }}
+                    ></div>
+                  </div>
+                </div>
+              )}
+              {recommendation.breakdown.budget !== undefined && (
+                <div>
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-xs font-semibold text-purple-700">Budget Match</span>
+                    <span className="text-xs font-bold text-purple-900">{Math.round(recommendation.breakdown.budget)}%</span>
+                  </div>
+                  <div className="h-1.5 bg-green-100 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-gradient-to-r from-green-400 to-emerald-400 rounded-full transition-all duration-500"
+                      style={{ width: `${Math.round(recommendation.breakdown.budget)}%` }}
+                    ></div>
+                  </div>
+                </div>
+              )}
+              {recommendation.breakdown.capacity !== undefined && (
+                <div>
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-xs font-semibold text-purple-700">Capacity Match</span>
+                    <span className="text-xs font-bold text-purple-900">{Math.round(recommendation.breakdown.capacity)}%</span>
+                  </div>
+                  <div className="h-1.5 bg-orange-100 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-gradient-to-r from-orange-400 to-amber-400 rounded-full transition-all duration-500"
+                      style={{ width: `${Math.round(recommendation.breakdown.capacity)}%` }}
+                    ></div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Specialization Tags */}
+        {hotel.specialization && hotel.specialization.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 mb-3">
+            {hotel.specialization.map((spec, i) => (
+              <span key={i} className="text-xs font-medium bg-purple-50 text-purple-700 px-2 py-1 rounded-full border border-purple-200">
+                {spec}
+              </span>
             ))}
-          </ul>
-        </div>
-      )}
-
-      {/* AI Score Breakdown */}
-      {recommendation.breakdown && (
-        <div className="bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg p-3 mb-4">
-          <p className="text-sm font-semibold text-purple-900 mb-2 flex items-center gap-1">
-            <Sparkles className="h-4 w-4" />
-            AI Match Breakdown:
-          </p>
-          <div className="grid grid-cols-2 gap-2 text-xs">
-            {recommendation.breakdown.vector && (
-              <div className="flex justify-between">
-                <span className="text-purple-700">AI Similarity:</span>
-                <span className="font-semibold text-purple-900">{Math.round(recommendation.breakdown.vector)}%</span>
-              </div>
-            )}
-            {recommendation.breakdown.location !== undefined && (
-              <div className="flex justify-between">
-                <span className="text-purple-700">Location:</span>
-                <span className="font-semibold text-purple-900">{Math.round(recommendation.breakdown.location)}%</span>
-              </div>
-            )}
-            {recommendation.breakdown.budget !== undefined && (
-              <div className="flex justify-between">
-                <span className="text-purple-700">Budget:</span>
-                <span className="font-semibold text-purple-900">{Math.round(recommendation.breakdown.budget)}%</span>
-              </div>
-            )}
-            {recommendation.breakdown.capacity !== undefined && (
-              <div className="flex justify-between">
-                <span className="text-purple-700">Capacity:</span>
-                <span className="font-semibold text-purple-900">{Math.round(recommendation.breakdown.capacity)}%</span>
-              </div>
-            )}
           </div>
-        </div>
-      )}
-
-      {/* Specialization Tags */}
-      {hotel.specialization && hotel.specialization.length > 0 && (
-        <div className="flex flex-wrap gap-2 mb-4">
-          {hotel.specialization.map((spec, i) => (
-            <span key={i} className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded-full">
-              {spec}
-            </span>
-          ))}
-        </div>
-      )}
-
-      {/* Action Button */}
-      <button
-        onClick={() => onSelect(hotel._id)}
-        disabled={isSelected || isSelecting}
-        className={`w-full ${
-          isSelected
-            ? 'btn bg-green-600 text-white cursor-not-allowed'
-            : 'btn btn-primary hover:bg-primary-700'
-        }`}
-      >
-        {isSelected ? (
-          <>
-            <CheckCircle className="h-5 w-5 mr-2" />
-            Selected
-          </>
-        ) : (
-          <>
-            <Star className="h-5 w-5 mr-2" />
-            Select Hotel
-          </>
         )}
-      </button>
+
+        {/* Action Button */}
+        <button
+          onClick={() => onSelect(hotel._id)}
+          disabled={isSelected || isSelecting}
+          className={`w-full py-2.5 px-4 rounded-lg font-semibold text-sm transition-all duration-300 flex items-center justify-center gap-2 ${
+            isSelected
+              ? 'bg-gradient-to-r from-green-400 to-emerald-500 text-white cursor-not-allowed'
+              : 'bg-gradient-to-r from-blue-500 to-purple-500 text-white hover:from-blue-600 hover:to-purple-600 hover:shadow-md'
+          }`}
+        >
+          {isSelected ? (
+            <>
+              <CheckCircle className="h-4 w-4" />
+              Selected Hotel
+            </>
+          ) : (
+            <>
+              <Star className="h-4 w-4" />
+              Select Hotel
+            </>
+          )}
+        </button>
+      </div>
     </div>
   );
 };

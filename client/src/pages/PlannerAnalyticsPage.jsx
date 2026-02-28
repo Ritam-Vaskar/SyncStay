@@ -17,6 +17,7 @@ import {
   Activity
 } from 'lucide-react';
 import { bookingService, eventService, inventoryService } from '@/services/apiServices';
+import { useThemeStore } from '@/store/themeStore';
 import {
   BarChart,
   Bar,
@@ -37,6 +38,12 @@ import {
 
 export const PlannerAnalyticsPage = () => {
   const [timeRange, setTimeRange] = useState('30'); // 7, 30, 90 days
+  const { isDark } = useThemeStore();
+  const chartGridColor = isDark ? '#374151' : '#e5e7eb';
+  const chartTickColor = isDark ? '#9ca3af' : '#6b7280';
+  const chartTooltipStyle = isDark
+    ? { backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px', color: '#f3f4f6' }
+    : { backgroundColor: 'white', border: '1px solid #e5e7eb', borderRadius: '8px' };
 
   const { data: bookingsData } = useQuery({
     queryKey: ['planner-bookings'],
@@ -172,7 +179,7 @@ export const PlannerAnalyticsPage = () => {
         </div>
         
         {/* Time Range Filter */}
-        <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-lg p-1">
+        <div className="flex items-center gap-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-1">
           {[
             { value: '7', label: '7 Days' },
             { value: '30', label: '30 Days' },
@@ -184,7 +191,7 @@ export const PlannerAnalyticsPage = () => {
               className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
                 timeRange === range.value
                   ? 'bg-primary-600 text-white'
-                  : 'text-gray-600 hover:bg-gray-100'
+                  : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
               }`}
             >
               {range.label}
@@ -208,7 +215,7 @@ export const PlannerAnalyticsPage = () => {
                 <span>From confirmed bookings</span>
               </div>
             </div>
-            <div className="bg-gradient-to-br from-green-100 to-green-200 p-3 rounded-lg">
+            <div className="bg-gradient-to-br from-green-100 to-green-200 dark:from-green-900/40 dark:to-green-800/40 p-3 rounded-lg">
               <IndianRupee className="h-6 w-6 text-green-600" />
             </div>
           </div>
@@ -224,7 +231,7 @@ export const PlannerAnalyticsPage = () => {
                 <span>{trendPercentage}% in selected period</span>
               </div>
             </div>
-            <div className="bg-gradient-to-br from-blue-100 to-blue-200 p-3 rounded-lg">
+            <div className="bg-gradient-to-br from-blue-100 to-blue-200 dark:from-blue-900/40 dark:to-blue-800/40 p-3 rounded-lg">
               <Calendar className="h-6 w-6 text-blue-600" />
             </div>
           </div>
@@ -240,7 +247,7 @@ export const PlannerAnalyticsPage = () => {
                 <span>Across {activeEvents} active events</span>
               </div>
             </div>
-            <div className="bg-gradient-to-br from-purple-100 to-purple-200 p-3 rounded-lg">
+            <div className="bg-gradient-to-br from-purple-100 to-purple-200 dark:from-purple-900/40 dark:to-purple-800/40 p-3 rounded-lg">
               <Users className="h-6 w-6 text-purple-600" />
             </div>
           </div>
@@ -256,7 +263,7 @@ export const PlannerAnalyticsPage = () => {
                 <span>{bookedRooms}/{effectiveTotalRooms} rooms booked</span>
               </div>
             </div>
-            <div className="bg-gradient-to-br from-orange-100 to-orange-200 p-3 rounded-lg">
+            <div className="bg-gradient-to-br from-orange-100 to-orange-200 dark:from-orange-900/40 dark:to-orange-800/40 p-3 rounded-lg">
               <Hotel className="h-6 w-6 text-orange-600" />
             </div>
           </div>
@@ -280,16 +287,16 @@ export const PlannerAnalyticsPage = () => {
                 <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
               </linearGradient>
             </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+            <CartesianGrid strokeDasharray="3 3" stroke={chartGridColor} />
             <XAxis 
               dataKey="date" 
-              tick={{ fontSize: 11 }} 
+              tick={{ fontSize: 11, fill: chartTickColor }} 
               angle={-45} 
               textAnchor="end" 
               height={60}
             />
             <YAxis 
-              tick={{ fontSize: 11 }} 
+              tick={{ fontSize: 11, fill: chartTickColor }} 
               tickFormatter={(value) => `₹${value.toLocaleString('en-IN', { notation: 'compact' })}`}
             />
             <Tooltip 
@@ -297,7 +304,7 @@ export const PlannerAnalyticsPage = () => {
                 if (name === 'Revenue (₹)') return [`₹${value.toLocaleString('en-IN')}`, 'Revenue'];
                 return [value, 'Bookings'];
               }}
-              contentStyle={{ backgroundColor: 'white', border: '1px solid #e5e7eb', borderRadius: '8px' }}
+              contentStyle={chartTooltipStyle}
             />
             <Legend wrapperStyle={{ paddingTop: '10px' }} />
             <Area 
@@ -370,14 +377,14 @@ export const PlannerAnalyticsPage = () => {
             <ResponsiveContainer width="100%" height={350}>
               <BarChart data={topEventsChartData} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis type="number" tick={{ fontSize: 12 }} />
-                <YAxis dataKey="name" type="category" width={120} tick={{ fontSize: 11 }} />
+                <XAxis type="number" tick={{ fontSize: 12, fill: chartTickColor }} />
+                <YAxis dataKey="name" type="category" width={120} tick={{ fontSize: 11, fill: chartTickColor }} />
                 <Tooltip 
                   formatter={(value, name) => {
                     if (name === 'Revenue (₹)') return [`₹${value.toLocaleString('en-IN')}`, 'Revenue'];
                     return [value, 'Bookings'];
                   }}
-                  contentStyle={{ backgroundColor: 'white', border: '1px solid #e5e7eb', borderRadius: '8px' }}
+                  contentStyle={chartTooltipStyle}
                 />
                 <Legend wrapperStyle={{ paddingTop: '10px' }} />
                 <Bar dataKey="revenue" fill="#10b981" name="Revenue (₹)" radius={[0, 8, 8, 0]} barSize={20} />
@@ -402,7 +409,7 @@ export const PlannerAnalyticsPage = () => {
           {revenueByEvent.slice(0, 10).map((event, index) => {
             const percentage = totalRevenue > 0 ? ((event.revenue / totalRevenue) * 100).toFixed(1) : 0;
             return (
-              <div key={index} className="flex items-center gap-4 p-4 bg-gradient-to-r from-gray-50 to-white rounded-lg border border-gray-100 hover:border-primary-300 transition-all">
+              <div key={index} className="flex items-center gap-4 p-4 bg-gradient-to-r from-gray-50 to-white dark:from-gray-800 dark:to-gray-900 rounded-lg border border-gray-100 dark:border-gray-700 hover:border-primary-300 dark:hover:border-primary-700 transition-all">
                 <div className="flex-shrink-0 w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center">
                   <span className="text-sm font-bold text-primary-600">#{index + 1}</span>
                 </div>

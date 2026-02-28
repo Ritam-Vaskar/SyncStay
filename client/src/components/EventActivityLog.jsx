@@ -144,15 +144,15 @@ export const EventActivityLog = ({ eventId, initialCollapsed = true }) => {
       {/* Header - Always Visible */}
       <button
         onClick={handleToggle}
-        className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors border-b border-gray-200"
+        className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors border-b border-gray-200 dark:border-gray-700"
       >
         <div className="flex items-center gap-3">
           <div className="bg-primary-100 p-2 rounded-lg">
             <Activity className="h-5 w-5 text-primary-600" />
           </div>
           <div className="text-left">
-            <h2 className="text-xl font-bold text-gray-900">Activity Log</h2>
-            <p className="text-sm text-gray-600">
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white">Activity Log</h2>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
               {isCollapsed 
                 ? 'Click to view event timeline and activities' 
                 : `${logs.length} ${logs.length === 1 ? 'activity' : 'activities'} recorded`}
@@ -166,9 +166,9 @@ export const EventActivityLog = ({ eventId, initialCollapsed = true }) => {
             </span>
           )}
           {isCollapsed ? (
-            <ChevronDown className="h-6 w-6 text-gray-400" />
+            <ChevronDown className="h-6 w-6 text-gray-400 dark:text-gray-500" />
           ) : (
-            <ChevronUp className="h-6 w-6 text-gray-400" />
+            <ChevronUp className="h-6 w-6 text-gray-400 dark:text-gray-500" />
           )}
         </div>
       </button>
@@ -182,7 +182,7 @@ export const EventActivityLog = ({ eventId, initialCollapsed = true }) => {
             <select
               value={actionFilter}
               onChange={(e) => setActionFilter(e.target.value)}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-sm"
+              className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-sm dark:bg-gray-800 dark:text-gray-100"
             >
               {filterOptions.map((option) => (
                 <option key={option.value} value={option.value}>
@@ -322,7 +322,7 @@ export const EventActivityLog = ({ eventId, initialCollapsed = true }) => {
                 return (
                   <div 
                     key={log._id}
-                    className="flex gap-4 pb-4 border-b border-gray-100 last:border-0 hover:bg-gray-50 -mx-2 px-2 py-2 rounded-lg transition-colors"
+                    className="flex gap-4 pb-4 border-b border-gray-100 dark:border-gray-800 last:border-0 hover:bg-gray-50 dark:hover:bg-gray-800/50 -mx-2 px-2 py-2 rounded-lg transition-colors"
                   >
                     {/* Icon */}
                     <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center ${colorClass}`}>
@@ -331,18 +331,18 @@ export const EventActivityLog = ({ eventId, initialCollapsed = true }) => {
 
                     {/* Content */}
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-900">
+                      <p className="text-sm font-medium text-gray-900 dark:text-white">
                         {message}
                       </p>
                       
-                      <div className="flex items-center gap-3 mt-1 text-xs text-gray-500">
+                        <div className="flex items-center gap-3 mt-1 text-xs text-gray-500 dark:text-gray-400">
                         <div className="flex items-center gap-1">
                           <Clock className="h-3 w-3" />
                           <span>{timeAgo}</span>
                         </div>
                         
                         {log.user && (
-                          <span className="px-2 py-0.5 bg-gray-100 text-gray-700 rounded-full capitalize">
+                          <span className="px-2 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-full capitalize">
                             {log.user.role}
                           </span>
                         )}
@@ -363,14 +363,14 @@ export const EventActivityLog = ({ eventId, initialCollapsed = true }) => {
                             <FileText className="h-3 w-3" />
                             View details
                           </summary>
-                          <div className="mt-3 text-xs bg-gray-50 p-3 rounded border border-gray-200 space-y-2">
+                          <div className="mt-3 text-xs bg-gray-50 dark:bg-gray-800 p-3 rounded border border-gray-200 dark:border-gray-700 space-y-2">
                             {/* User Information */}
                             {log.user && (
-                              <div className="flex items-start gap-2 pb-2 border-b border-gray-200">
-                                <span className="font-semibold text-gray-700 min-w-[80px]">Performed By:</span>
+                              <div className="flex items-start gap-2 pb-2 border-b border-gray-200 dark:border-gray-700">
+                                <span className="font-semibold text-gray-700 dark:text-gray-300 min-w-[80px]">Performed By:</span>
                                 <div className="flex-1">
-                                  <div className="text-gray-900 font-medium">{log.user.name}</div>
-                                  <div className="text-gray-600">{log.user.email}</div>
+                                  <div className="text-gray-900 dark:text-white font-medium">{log.user.name}</div>
+                                  <div className="text-gray-600 dark:text-gray-400">{log.user.email}</div>
                                   <span className="inline-block mt-1 px-2 py-0.5 bg-primary-100 text-primary-700 rounded-full text-xs capitalize">
                                     {log.user.role}
                                   </span>
@@ -379,37 +379,37 @@ export const EventActivityLog = ({ eventId, initialCollapsed = true }) => {
                             )}
 
                             {/* Timestamp */}
-                            <div className="flex items-center gap-2 pb-2 border-b border-gray-200">
-                              <span className="font-semibold text-gray-700 min-w-[80px]">Date & Time:</span>
-                              <span className="text-gray-900">{formatDate(log.createdAt, 'MMM dd, yyyy hh:mm a')}</span>
+                            <div className="flex items-center gap-2 pb-2 border-b border-gray-200 dark:border-gray-700">
+                              <span className="font-semibold text-gray-700 dark:text-gray-300 min-w-[80px]">Date & Time:</span>
+                              <span className="text-gray-900 dark:text-white">{formatDate(log.createdAt, 'MMM dd, yyyy hh:mm a')}</span>
                             </div>
 
                             {/* Action Type */}
-                            <div className="flex items-center gap-2 pb-2 border-b border-gray-200">
-                              <span className="font-semibold text-gray-700 min-w-[80px]">Action:</span>
-                              <span className="text-gray-900 font-mono text-xs bg-gray-200 px-2 py-1 rounded">{log.action}</span>
+                            <div className="flex items-center gap-2 pb-2 border-b border-gray-200 dark:border-gray-700">
+                              <span className="font-semibold text-gray-700 dark:text-gray-300 min-w-[80px]">Action:</span>
+                              <span className="text-gray-900 dark:text-white font-mono text-xs bg-gray-200 dark:bg-gray-700 px-2 py-1 rounded">{log.action}</span>
                             </div>
 
                             {/* Resource Information */}
                             {log.resourceType && (
-                              <div className="flex items-center gap-2 pb-2 border-b border-gray-200">
-                                <span className="font-semibold text-gray-700 min-w-[80px]">Resource:</span>
-                                <span className="text-gray-900 capitalize">{log.resourceType}</span>
+                              <div className="flex items-center gap-2 pb-2 border-b border-gray-200 dark:border-gray-700">
+                                <span className="font-semibold text-gray-700 dark:text-gray-300 min-w-[80px]">Resource:</span>
+                                <span className="text-gray-900 dark:text-white capitalize">{log.resourceType}</span>
                               </div>
                             )}
 
                             {/* IP Address */}
                             {log.ipAddress && (
-                              <div className="flex items-center gap-2 pb-2 border-b border-gray-200">
-                                <span className="font-semibold text-gray-700 min-w-[80px]">IP Address:</span>
-                                <span className="text-gray-900 font-mono text-xs">{log.ipAddress}</span>
+                              <div className="flex items-center gap-2 pb-2 border-b border-gray-200 dark:border-gray-700">
+                                <span className="font-semibold text-gray-700 dark:text-gray-300 min-w-[80px]">IP Address:</span>
+                                <span className="text-gray-900 dark:text-white font-mono text-xs">{log.ipAddress}</span>
                               </div>
                             )}
 
                             {/* Status */}
                             {log.status && (
-                              <div className="flex items-center gap-2 pb-2 border-b border-gray-200">
-                                <span className="font-semibold text-gray-700 min-w-[80px]">Status:</span>
+                              <div className="flex items-center gap-2 pb-2 border-b border-gray-200 dark:border-gray-700">
+                                <span className="font-semibold text-gray-700 dark:text-gray-300 min-w-[80px]">Status:</span>
                                 <span className={`inline-block px-2 py-1 rounded capitalize ${
                                   log.status === 'success' ? 'bg-green-100 text-green-700' :
                                   log.status === 'failure' ? 'bg-red-100 text-red-700' : 
@@ -423,14 +423,14 @@ export const EventActivityLog = ({ eventId, initialCollapsed = true }) => {
                             {/* Custom Details */}
                             {log.details && Object.keys(log.details).length > 0 && (
                               <div className="pt-2">
-                                <div className="font-semibold text-gray-700 mb-2">Additional Information:</div>
+                                <div className="font-semibold text-gray-700 dark:text-gray-300 mb-2">Additional Information:</div>
                                 <div className="space-y-1 pl-2">
                                   {Object.entries(log.details).map(([key, value]) => (
                                     <div key={key} className="flex gap-2">
-                                      <span className="font-medium text-gray-600 capitalize min-w-[100px]">
+                                      <span className="font-medium text-gray-600 dark:text-gray-400 capitalize min-w-[100px]">
                                         {key.replace(/([A-Z])/g, ' $1').trim()}:
                                       </span>
-                                      <span className="text-gray-900 break-all flex-1">
+                                      <span className="text-gray-900 dark:text-white break-all flex-1">
                                         {typeof value === 'object' 
                                           ? JSON.stringify(value, null, 2) 
                                           : String(value)}
@@ -443,39 +443,39 @@ export const EventActivityLog = ({ eventId, initialCollapsed = true }) => {
 
                             {/* Enriched Group & Hotel Data for Inventory Actions */}
                             {log.enrichedData && log.enrichedData.group && (
-                              <div className="pt-3 border-t border-gray-200">
-                                <div className="font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                              <div className="pt-3 border-t border-gray-200 dark:border-gray-700">
+                                <div className="font-semibold text-gray-700 dark:text-gray-200 mb-2 flex items-center gap-2">
                                   <Package className="h-4 w-4 text-primary-600" />
                                   Group Information:
                                 </div>
-                                <div className="bg-white border border-gray-200 rounded p-3 space-y-2">
+                                <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded p-3 space-y-2">
                                   <div className="flex gap-2">
-                                    <span className="font-medium text-gray-600 min-w-[120px]">Group Name:</span>
-                                    <span className="text-gray-900 font-semibold">{log.enrichedData.group.name}</span>
+                                    <span className="font-medium text-gray-600 dark:text-gray-400 min-w-[120px]">Group Name:</span>
+                                    <span className="text-gray-900 dark:text-white font-semibold">{log.enrichedData.group.name}</span>
                                   </div>
                                   {log.enrichedData.group.category && (
                                     <div className="flex gap-2">
-                                      <span className="font-medium text-gray-600 min-w-[120px]">Category:</span>
-                                      <span className="text-gray-900 capitalize">{log.enrichedData.group.category}</span>
+                                      <span className="font-medium text-gray-600 dark:text-gray-400 min-w-[120px]">Category:</span>
+                                      <span className="text-gray-900 dark:text-white capitalize">{log.enrichedData.group.category}</span>
                                     </div>
                                   )}
                                   <div className="flex gap-2">
-                                    <span className="font-medium text-gray-600 min-w-[120px]">Members:</span>
-                                    <span className="text-gray-900">{log.enrichedData.group.memberCount} guest(s)</span>
+                                    <span className="font-medium text-gray-600 dark:text-gray-400 min-w-[120px]">Members:</span>
+                                    <span className="text-gray-900 dark:text-white">{log.enrichedData.group.memberCount} guest(s)</span>
                                   </div>
                                   
                                   {/* Assigned Hotels */}
                                   {log.enrichedData.group.assignedHotels && log.enrichedData.group.assignedHotels.length > 0 && (
-                                    <div className="pt-2 border-t border-gray-100">
-                                      <div className="font-medium text-gray-700 mb-2 flex items-center gap-2">
+                                    <div className="pt-2 border-t border-gray-100 dark:border-gray-700">
+                                      <div className="font-medium text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
                                         <Hotel className="h-3 w-3" />
                                         Assigned Hotels:
                                       </div>
                                       <div className="space-y-2">
                                         {log.enrichedData.group.assignedHotels.map((hotel, idx) => (
-                                          <div key={idx} className="bg-gray-50 rounded p-2 text-xs">
-                                            <div className="font-medium text-gray-900">{hotel.hotelName}</div>
-                                            <div className="text-gray-600">{hotel.hotelEmail}</div>
+                                          <div className="bg-gray-50 dark:bg-gray-800 rounded p-2 text-xs">
+                                            <div className="font-medium text-gray-900 dark:text-white">{hotel.hotelName}</div>
+                                            <div className="text-gray-600 dark:text-gray-400">{hotel.hotelEmail}</div>
                                             <div className="flex gap-3 mt-1 text-xs">
                                               <span className="text-gray-500">
                                                 Priority: <span className="font-medium text-gray-700">{hotel.priority}</span>
@@ -492,16 +492,16 @@ export const EventActivityLog = ({ eventId, initialCollapsed = true }) => {
                                   
                                   {/* Group Members */}
                                   {log.enrichedData.group.members && log.enrichedData.group.members.length > 0 && (
-                                    <div className="pt-2 border-t border-gray-100">
-                                      <div className="font-medium text-gray-700 mb-2 flex items-center gap-2">
+                                    <div className="pt-2 border-t border-gray-100 dark:border-gray-700">
+                                      <div className="font-medium text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
                                         <Users className="h-3 w-3" />
                                         Group Members ({log.enrichedData.group.members.length}):
                                       </div>
                                       <div className="space-y-1 max-h-40 overflow-y-auto">
                                         {log.enrichedData.group.members.map((member, idx) => (
-                                          <div key={idx} className="bg-gray-50 rounded px-2 py-1 text-xs flex justify-between">
-                                            <span className="font-medium text-gray-900">{member.guestName}</span>
-                                            <span className="text-gray-600">{member.guestEmail}</span>
+                                          <div className="bg-gray-50 dark:bg-gray-800 rounded px-2 py-1 text-xs flex justify-between">
+                                            <span className="font-medium text-gray-900 dark:text-white">{member.guestName}</span>
+                                            <span className="text-gray-600 dark:text-gray-400">{member.guestEmail}</span>
                                           </div>
                                         ))}
                                       </div>
@@ -513,36 +513,36 @@ export const EventActivityLog = ({ eventId, initialCollapsed = true }) => {
 
                             {/* Enriched Inventory Data */}
                             {log.enrichedData && log.enrichedData.inventory && (
-                              <div className="pt-3 border-t border-gray-200">
-                                <div className="font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                              <div className="pt-3 border-t border-gray-200 dark:border-gray-700">
+                                <div className="font-semibold text-gray-700 dark:text-gray-200 mb-2 flex items-center gap-2">
                                   <Hotel className="h-4 w-4 text-primary-600" />
                                   Inventory Details:
                                 </div>
-                                <div className="bg-white border border-gray-200 rounded p-3 space-y-2 text-xs">
+                                <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded p-3 space-y-2 text-xs">
                                   <div className="grid grid-cols-2 gap-2">
                                     <div>
-                                      <span className="font-medium text-gray-600">Hotel:</span>
-                                      <div className="text-gray-900">{log.enrichedData.inventory.hotelName}</div>
+                                      <span className="font-medium text-gray-600 dark:text-gray-400">Hotel:</span>
+                                      <div className="text-gray-900 dark:text-white">{log.enrichedData.inventory.hotelName}</div>
                                     </div>
                                     <div>
-                                      <span className="font-medium text-gray-600">Room Type:</span>
-                                      <div className="text-gray-900">{log.enrichedData.inventory.roomType}</div>
+                                      <span className="font-medium text-gray-600 dark:text-gray-400">Room Type:</span>
+                                      <div className="text-gray-900 dark:text-white">{log.enrichedData.inventory.roomType}</div>
                                     </div>
                                     <div>
-                                      <span className="font-medium text-gray-600">Total Rooms:</span>
-                                      <div className="text-gray-900">{log.enrichedData.inventory.totalRooms}</div>
+                                      <span className="font-medium text-gray-600 dark:text-gray-400">Total Rooms:</span>
+                                      <div className="text-gray-900 dark:text-white">{log.enrichedData.inventory.totalRooms}</div>
                                     </div>
                                     <div>
-                                      <span className="font-medium text-gray-600">Available:</span>
-                                      <div className="text-gray-900">{log.enrichedData.inventory.availableRooms}</div>
+                                      <span className="font-medium text-gray-600 dark:text-gray-400">Available:</span>
+                                      <div className="text-gray-900 dark:text-white">{log.enrichedData.inventory.availableRooms}</div>
                                     </div>
                                     <div>
-                                      <span className="font-medium text-gray-600">Blocked:</span>
-                                      <div className="text-gray-900">{log.enrichedData.inventory.blockedRooms}</div>
+                                      <span className="font-medium text-gray-600 dark:text-gray-400">Blocked:</span>
+                                      <div className="text-gray-900 dark:text-white">{log.enrichedData.inventory.blockedRooms}</div>
                                     </div>
                                     <div>
-                                      <span className="font-medium text-gray-600">Status:</span>
-                                      <div className="text-gray-900 capitalize">{log.enrichedData.inventory.status}</div>
+                                      <span className="font-medium text-gray-600 dark:text-gray-400">Status:</span>
+                                      <div className="text-gray-900 dark:text-white capitalize">{log.enrichedData.inventory.status}</div>
                                     </div>
                                   </div>
                                 </div>
@@ -561,7 +561,7 @@ export const EventActivityLog = ({ eventId, initialCollapsed = true }) => {
           {/* Show More Indicator */}
           {!isLoading && logs.length >= 100 && (
             <div className="mt-6 text-center">
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-gray-500 dark:text-gray-400">
                 Showing most recent 100 activities
               </p>
             </div>

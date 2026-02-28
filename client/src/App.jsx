@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router-dom';
 import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
 import { Toaster } from 'react-hot-toast';
@@ -40,6 +40,7 @@ import { HotelBookingsPage } from './pages/HotelBookingsPage';
 import { GuestInvitePage } from './pages/GuestInvitePage';
 import { eventService } from './services/apiServices';
 import { useAuthStore } from './store/authStore';
+import { useThemeStore } from './store/themeStore';
 import ChatBot from './components/ChatBot';
 
 const queryClient = new QueryClient({
@@ -85,6 +86,16 @@ const MicrositePaymentsPlaceholder = () => {
 
 function App() {
   const { isAuthenticated } = useAuthStore();
+  const { isDark } = useThemeStore();
+
+  useEffect(() => {
+    const root = document.documentElement;
+    if (isDark) {
+      root.classList.add('dark');
+    } else {
+      root.classList.remove('dark');
+    }
+  }, [isDark]);
 
   return (
     <QueryClientProvider client={queryClient}>

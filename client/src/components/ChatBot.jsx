@@ -123,7 +123,7 @@ const ChatBot = () => {
 
       {/* Chat window */}
       {isOpen && (
-        <div className="fixed bottom-24 right-6 z-50 flex w-80 sm:w-96 flex-col rounded-2xl border border-gray-200 bg-white shadow-2xl overflow-hidden"
+        <div className="fixed bottom-24 right-6 z-50 flex w-80 sm:w-96 flex-col rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-2xl overflow-hidden"
              style={{ height: '28rem' }}>
           {/* Header */}
           <div className="flex items-center gap-2 bg-primary-600 px-4 py-3 text-white">
@@ -134,14 +134,14 @@ const ChatBot = () => {
           </div>
 
           {/* Messages */}
-          <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3 bg-gray-50">
+          <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3 bg-gray-50 dark:bg-gray-800">
             {messages.map((msg, i) => (
               <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                 <div
                   className={`max-w-[80%] rounded-xl px-3 py-2 text-sm leading-relaxed whitespace-pre-wrap ${
                     msg.role === 'user'
                       ? 'bg-primary-600 text-white rounded-br-none'
-                      : 'bg-white text-gray-800 border border-gray-200 rounded-bl-none shadow-sm'
+                      : 'bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-100 border border-gray-200 dark:border-gray-600 rounded-bl-none shadow-sm'
                   }`}
                 >
                   {msg.role === 'assistant' ? renderMessageText(msg.text) : msg.text}
@@ -151,7 +151,7 @@ const ChatBot = () => {
 
             {loading && (
               <div className="flex justify-start">
-                <div className="bg-white text-gray-400 border border-gray-200 rounded-xl rounded-bl-none px-3 py-2 text-sm shadow-sm flex items-center gap-1">
+                <div className="bg-white dark:bg-gray-700 text-gray-400 dark:text-gray-400 border border-gray-200 dark:border-gray-600 rounded-xl rounded-bl-none px-3 py-2 text-sm shadow-sm flex items-center gap-1">
                   <span className="animate-bounce inline-block" style={{ animationDelay: '0ms' }}>●</span>
                   <span className="animate-bounce inline-block" style={{ animationDelay: '150ms' }}>●</span>
                   <span className="animate-bounce inline-block" style={{ animationDelay: '300ms' }}>●</span>
@@ -162,7 +162,7 @@ const ChatBot = () => {
           </div>
 
           {/* Input */}
-          <div className="border-t border-gray-200 bg-white px-3 py-2 flex items-center gap-2">
+          <div className="border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 flex items-center gap-2">
             <input
               ref={inputRef}
               value={input}
@@ -170,7 +170,7 @@ const ChatBot = () => {
               onKeyDown={handleKeyDown}
               placeholder="Ask about events…"
               disabled={loading}
-              className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 disabled:opacity-50"
+              className="flex-1 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 disabled:opacity-50"
             />
             <button
               onClick={sendMessage}

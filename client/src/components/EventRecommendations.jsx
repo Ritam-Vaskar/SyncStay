@@ -4,7 +4,6 @@ import {
   Calendar, 
   MapPin, 
   Users, 
-  IndianRupee,
   Sparkles,
   Heart,
   Eye,
@@ -157,18 +156,20 @@ export const EventRecommendations = () => {
 
   if (loading) {
     return (
-      <section className="py-20 bg-gradient-to-br from-primary-50 via-purple-50 to-white">
-        <div className="container mx-auto px-6">
+      <section className="py-20 bg-gray-50 dark:bg-gray-900 border-y border-gray-100 dark:border-gray-800">
+        <div className="max-w-7xl mx-auto px-6">
           <div className="text-center mb-12">
-            <div className="h-8 bg-gray-200 rounded w-64 mx-auto mb-4 animate-pulse"></div>
-            <div className="h-4 bg-gray-200 rounded w-96 mx-auto animate-pulse"></div>
+            <div className="h-5 bg-gray-200 dark:bg-gray-700 rounded w-48 mx-auto mb-4 animate-pulse"></div>
+            <div className="h-7 bg-gray-200 dark:bg-gray-700 rounded w-72 mx-auto mb-3 animate-pulse"></div>
+            <div className="h-4 bg-gray-100 dark:bg-gray-800 rounded w-96 mx-auto animate-pulse"></div>
           </div>
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
             {[1, 2, 3].map(i => (
-              <div key={i} className="bg-white rounded-xl shadow-lg p-6 animate-pulse">
-                <div className="h-48 bg-gray-200 rounded-lg mb-4"></div>
-                <div className="h-6 bg-gray-200 rounded w-3/4 mb-2"></div>
-                <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+              <div key={i} className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 p-6 animate-pulse">
+                <div className="h-5 bg-gray-100 dark:bg-gray-800 rounded w-1/3 mb-4"></div>
+                <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-3/4 mb-2"></div>
+                <div className="h-4 bg-gray-100 dark:bg-gray-800 rounded w-full mb-6"></div>
+                <div className="h-4 bg-gray-100 dark:bg-gray-800 rounded w-1/2"></div>
               </div>
             ))}
           </div>
@@ -179,181 +180,163 @@ export const EventRecommendations = () => {
 
   if (recommendations.length === 0 && !loading) {
     return (
-      <section className="py-20 bg-gradient-to-br from-primary-50 via-purple-50 to-white">
-        <div className="container mx-auto px-6">
+      <section className="py-20 bg-gray-50 dark:bg-gray-900 border-y border-gray-100 dark:border-gray-800">
+        <div className="max-w-7xl mx-auto px-6">
           <div className="text-center">
-            <Calendar className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-2xl font-bold text-gray-900 mb-2">No Events Available</h3>
-            <p className="text-gray-600">Check back soon for exciting events!</p>
+            <div className="w-14 h-14 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Calendar className="h-7 w-7 text-gray-400" />
+            </div>
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">No Events Available</h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400">Check back soon for exciting events!</p>
           </div>
         </div>
       </section>
     );
   }
 
+  const normalizeScore = (score) => {
+    if (!score || score === 0) return 0;
+    // If score is already a 0-1 decimal, use as-is; if it's 0-100 range, divide by 100
+    return score > 1 ? Math.min(score / 100, 1) : score;
+  };
+
   return (
-    <section className="py-20 bg-gradient-to-br from-primary-50 via-purple-50 to-white">
-      <div className="container mx-auto px-6">
+    <section className="py-20 bg-gray-50 dark:bg-gray-900 border-y border-gray-100 dark:border-gray-800">
+      <div className="max-w-7xl mx-auto px-6">
         {/* Section Header */}
         <div className="text-center mb-12">
-          <div className="inline-flex items-center gap-2 px-4 py-2 bg-white rounded-full shadow-sm mb-4">
-            <Sparkles className="h-5 w-5 text-primary-600" />
-            <span className="text-sm font-medium text-gray-700">
-              {isColdStart ? '🔥 Trending Events' : '✨ Personalized For You'}
-            </span>
+          <div className="inline-flex items-center gap-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 text-xs font-semibold px-3 py-1.5 rounded-full mb-5">
+            <Sparkles className="h-3.5 w-3.5 text-indigo-500" />
+            {isColdStart ? 'Trending Events' : 'Personalized For You'}
           </div>
-          <h2 className="text-4xl font-bold text-gray-900 mb-4">
+          <h2 className="text-4xl font-bold text-gray-900 dark:text-white mb-3">
             {isColdStart ? 'Popular Events Right Now' : 'Recommended Just For You'}
           </h2>
-          <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-            {isColdStart 
-              ? 'Start exploring these trending events. View and bookmark events to get personalized recommendations!'
-              : 'Based on your interests and activity, here are events you might love'
-            }
+          <p className="text-gray-500 dark:text-gray-400 max-w-xl mx-auto">
+            {isColdStart
+              ? 'Explore trending events. View and bookmark to unlock personalized picks.'
+              : 'Based on your interests and activity, here are events you might love.'}
           </p>
         </div>
 
         {/* Events Grid */}
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 mb-12">
-          {recommendations.filter(item => item && item.event).map(({ event, score, reason }) => (
-            <Link
-              key={event._id}
-              to={`/microsite/${event.micrositeConfig?.customSlug || event._id}`}
-              onClick={() => handleEventClick(event._id)}
-              className="group bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2"
-            >
-              {/* Event Image */}
-              <div className="relative h-48 bg-gradient-to-br from-primary-400 to-purple-600 overflow-hidden">
-                <div className="absolute inset-0 bg-black/20"></div>
-                <div className="absolute top-4 left-4 flex gap-2">
-                  {isAuthenticated && score > 0.8 && (
-                    <span className="px-3 py-1 bg-yellow-500 text-white text-xs font-bold rounded-full flex items-center gap-1">
-                      <Sparkles className="h-3 w-3" />
-                      Best Match
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5 mb-10">
+          {recommendations.filter(item => item && item.event).map(({ event, score, reason }) => {
+            const pct = normalizeScore(score);
+            return (
+              <Link
+                key={event._id}
+                to={`/microsite/${event.micrositeConfig?.customSlug || event._id}`}
+                onClick={() => handleEventClick(event._id)}
+                className="group bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 hover:border-indigo-100 dark:hover:border-indigo-900 hover:shadow-md transition-all duration-200 p-6 flex flex-col"
+              >
+                {/* Header row */}
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {isAuthenticated && pct > 0.8 && (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-50 text-amber-700 text-xs font-semibold rounded-full">
+                        <Sparkles className="h-3 w-3" />
+                        Best Match
+                      </span>
+                    )}
+                    {isColdStart && (
+                      <span className="px-2.5 py-1 bg-orange-50 text-orange-600 text-xs font-semibold rounded-full">
+                        Trending
+                      </span>
+                    )}
+                    <span className={`px-2.5 py-1 text-xs font-semibold rounded-full ${
+                      event.status === 'active' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
+                    }`}>
+                      {event.status === 'active' ? 'Active' : 'Pending'}
                     </span>
-                  )}
-                  {event.status === 'active' && (
-                    <span className="px-3 py-1 bg-green-500 text-white text-xs font-bold rounded-full">
-                      Active
+                    <span className="px-2.5 py-1 bg-indigo-50 text-indigo-700 text-xs font-semibold rounded-full capitalize">
+                      {event.type || 'Event'}
                     </span>
-                  )}
-                </div>
-                <div className="absolute top-4 right-4">
+                  </div>
                   <button
                     onClick={(e) => handleBookmark(event._id, e)}
-                    className={`p-2 rounded-full transition-all ${
-                      bookmarkedEvents.has(event._id)
-                        ? 'bg-red-500 text-white'
-                        : 'bg-white/90 text-gray-600 hover:bg-white'
+                    className={`p-1.5 rounded-lg transition-colors flex-shrink-0 ${
+                      bookmarkedEvents.has(event._id) ? 'text-rose-500' : 'text-gray-300 dark:text-gray-600 hover:text-gray-500 dark:hover:text-gray-400'
                     }`}
                   >
-                    <Heart 
-                      className="h-5 w-5" 
-                      fill={bookmarkedEvents.has(event._id) ? 'currentColor' : 'none'}
-                    />
+                    <Heart className="h-4 w-4" fill={bookmarkedEvents.has(event._id) ? 'currentColor' : 'none'} />
                   </button>
                 </div>
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <Calendar className="h-20 w-20 text-white/30" />
-                </div>
-              </div>
 
-              {/* Event Details */}
-              <div className="p-6">
-                {/* Event Type Badge */}
-                <div className="flex items-center gap-2 mb-3">
-                  <span className="px-3 py-1 bg-primary-100 text-primary-700 text-xs font-semibold rounded-full capitalize">
-                    {event.type || 'Event'}
-                  </span>
-                  {!isColdStart && reason && (
-                    <span className="text-xs text-gray-500 flex items-center gap-1">
-                      <TrendingUp className="h-3 w-3" />
-                      {reason}
-                    </span>
-                  )}
-                  {isColdStart && (
-                    <span className="text-xs text-orange-600 flex items-center gap-1 font-semibold">
-                      🔥 Trending
-                    </span>
-                  )}
-                </div>
-
-                {/* Event Name */}
-                <h3 className="text-xl font-bold text-gray-900 mb-2 group-hover:text-primary-600 transition-colors line-clamp-2">
+                {/* Title */}
+                <h3 className="text-base font-bold text-gray-900 dark:text-white mb-1.5 group-hover:text-indigo-600 transition-colors line-clamp-2">
                   {event.name}
                 </h3>
 
-                {/* Event Info */}
-                <div className="space-y-2 mb-4">
-                  <div className="flex items-center gap-2 text-gray-600">
-                    <MapPin className="h-4 w-4 text-primary-600" />
-                    <span className="text-sm">
-                      {event.location?.city || 'Location TBD'}, {event.location?.country || ''}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2 text-gray-600">
-                    <Calendar className="h-4 w-4 text-primary-600" />
-                    <span className="text-sm">
-                      {formatDate(event.startDate)} - {formatDate(event.endDate)}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2 text-gray-600">
-                    <Users className="h-4 w-4 text-primary-600" />
-                    <span className="text-sm">{event.attendees || 0} attendees</span>
-                  </div>
-                </div>
-
-                {/* Match Score (only for personalized recommendations) */}
-                {!isColdStart && score > 0 && (
-                  <div className="mb-4">
-                    <div className="flex items-center justify-between text-xs text-gray-600 mb-1">
-                      <span>Match Score</span>
-                      <span className="font-semibold">{Math.round(score * 100)}%</span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div 
-                        className="bg-gradient-to-r from-primary-500 to-purple-500 h-2 rounded-full transition-all duration-500"
-                        style={{ width: `${score * 100}%` }}
-                      ></div>
-                    </div>
-                  </div>
+                {/* Reason tag */}
+                {!isColdStart && reason && (
+                  <p className="text-xs text-indigo-500 flex items-center gap-1 mb-3">
+                    <TrendingUp className="h-3 w-3" />
+                    {reason}
+                  </p>
                 )}
 
-                {/* Call to Action for Cold Start */}
-                {isColdStart && (
-                  <div className="mb-4 p-3 bg-gradient-to-r from-orange-50 to-yellow-50 rounded-lg border border-orange-200">
-                    <p className="text-xs text-orange-800">
-                      💡 <strong>Pro tip:</strong> View and bookmark events to get personalized recommendations!
-                    </p>
-                  </div>
-                )}
-
-                {/* View Details Button */}
-                <div className="flex items-center justify-between pt-4 border-t border-gray-100">
-                  <span className="text-sm font-semibold text-primary-600 flex items-center gap-2 group-hover:gap-3 transition-all">
-                    View Details
-                    <ArrowRight className="h-4 w-4" />
-                  </span>
-                  {event.viewCount > 0 && (
-                    <span className="text-xs text-gray-500 flex items-center gap-1">
-                      <Eye className="h-3 w-3" />
-                      {event.viewCount} views
+                {/* Meta info */}
+                <div className="border-t border-gray-100 dark:border-gray-800 pt-4 mt-auto space-y-2">
+                  <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
+                    <MapPin className="h-3.5 w-3.5 text-indigo-400 flex-shrink-0" />
+                    <span className="text-xs truncate">
+                      {event.location?.city || 'Location TBD'}{event.location?.country ? `, ${event.location.country}` : ''}
                     </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
+                      <Calendar className="h-3.5 w-3.5 text-indigo-400 flex-shrink-0" />
+                      <span className="text-xs">{formatDate(event.startDate)} – {formatDate(event.endDate)}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-gray-500 dark:text-gray-400">
+                      <Users className="h-3.5 w-3.5 text-indigo-400" />
+                      <span className="text-xs">{event.attendees || 0}</span>
+                    </div>
+                  </div>
+
+                  {/* Match score bar */}
+                  {!isColdStart && pct > 0 && (
+                    <div className="pt-1">
+                      <div className="flex items-center justify-between text-xs text-gray-400 dark:text-gray-500 mb-1">
+                        <span>Match</span>
+                        <span className="font-semibold text-indigo-600">{Math.round(pct * 100)}%</span>
+                      </div>
+                      <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-1.5">
+                        <div
+                          className="bg-indigo-500 h-1.5 rounded-full transition-all duration-500"
+                          style={{ width: `${Math.min(pct * 100, 100)}%` }}
+                        />
+                      </div>
+                    </div>
                   )}
+
+                  {/* CTA row */}
+                  <div className="flex items-center justify-between pt-2">
+                    <span className="text-xs font-semibold text-indigo-600 flex items-center gap-1 group-hover:gap-2 transition-all">
+                      View Details <ArrowRight className="h-3.5 w-3.5" />
+                    </span>
+                    {event.viewCount > 0 && (
+                      <span className="text-xs text-gray-400 dark:text-gray-500 flex items-center gap-1">
+                        <Eye className="h-3 w-3" />
+                        {event.viewCount}
+                      </span>
+                    )}
+                  </div>
                 </div>
-              </div>
-            </Link>
-          ))}
+              </Link>
+            );
+          })}
         </div>
 
         {/* View All Button */}
         <div className="text-center">
-          <Link 
-            to="/events" 
-            className="inline-flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-primary-600 to-purple-600 text-white font-semibold rounded-lg hover:shadow-lg transform hover:scale-105 transition-all"
+          <Link
+            to="/events"
+            className="inline-flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 transition-colors"
           >
             Browse All Events
-            <ArrowRight className="h-5 w-5" />
+            <ArrowRight className="h-4 w-4" />
           </Link>
         </div>
       </div>

@@ -219,29 +219,29 @@ export const DashboardPage = () => {
             Quick Actions
           </h3>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <Link to="/planner/proposals/create" className="flex flex-col items-center gap-2 p-4 rounded-xl border-2 border-dashed border-primary-200 hover:border-primary-400 hover:bg-primary-50 transition-all group">
-              <div className="h-10 w-10 rounded-xl bg-primary-100 flex items-center justify-center group-hover:bg-primary-200 transition-colors">
+            <Link to="/planner/proposals/create" className="flex flex-col items-center gap-2 p-4 rounded-xl border-2 border-dashed border-primary-200 dark:border-primary-900 hover:border-primary-400 dark:hover:border-primary-700 hover:bg-primary-50 dark:hover:bg-primary-950 transition-all group">
+              <div className="h-10 w-10 rounded-xl bg-primary-100 dark:bg-primary-950 flex items-center justify-center group-hover:bg-primary-200 dark:group-hover:bg-primary-900 transition-colors">
                 <Calendar className="h-5 w-5 text-primary-600" />
               </div>
-              <span className="text-xs font-medium text-gray-700 text-center">Create Event</span>
+              <span className="text-xs font-medium text-gray-700 dark:text-gray-300 text-center">Create Event</span>
             </Link>
-            <Link to="/planner/bookings" className="flex flex-col items-center gap-2 p-4 rounded-xl border-2 border-dashed border-green-200 hover:border-green-400 hover:bg-green-50 transition-all group">
-              <div className="h-10 w-10 rounded-xl bg-green-100 flex items-center justify-center group-hover:bg-green-200 transition-colors">
+            <Link to="/planner/bookings" className="flex flex-col items-center gap-2 p-4 rounded-xl border-2 border-dashed border-green-200 dark:border-green-900 hover:border-green-400 dark:hover:border-green-700 hover:bg-green-50 dark:hover:bg-green-950 transition-all group">
+              <div className="h-10 w-10 rounded-xl bg-green-100 dark:bg-green-950 flex items-center justify-center group-hover:bg-green-200 dark:group-hover:bg-green-900 transition-colors">
                 <CreditCard className="h-5 w-5 text-green-600" />
               </div>
-              <span className="text-xs font-medium text-gray-700 text-center">View Bookings</span>
+              <span className="text-xs font-medium text-gray-700 dark:text-gray-300 text-center">View Bookings</span>
             </Link>
-            <Link to="/planner/events" className="flex flex-col items-center gap-2 p-4 rounded-xl border-2 border-dashed border-purple-200 hover:border-purple-400 hover:bg-purple-50 transition-all group">
-              <div className="h-10 w-10 rounded-xl bg-purple-100 flex items-center justify-center group-hover:bg-purple-200 transition-colors">
+            <Link to="/planner/events" className="flex flex-col items-center gap-2 p-4 rounded-xl border-2 border-dashed border-purple-200 dark:border-purple-900 hover:border-purple-400 dark:hover:border-purple-700 hover:bg-purple-50 dark:hover:bg-purple-950 transition-all group">
+              <div className="h-10 w-10 rounded-xl bg-purple-100 dark:bg-purple-950 flex items-center justify-center group-hover:bg-purple-200 dark:group-hover:bg-purple-900 transition-colors">
                 <Users className="h-5 w-5 text-purple-600" />
               </div>
-              <span className="text-xs font-medium text-gray-700 text-center">My Events</span>
+              <span className="text-xs font-medium text-gray-700 dark:text-gray-300 text-center">My Events</span>
             </Link>
-            <Link to="/planner/analytics" className="flex flex-col items-center gap-2 p-4 rounded-xl border-2 border-dashed border-yellow-200 hover:border-yellow-400 hover:bg-yellow-50 transition-all group">
-              <div className="h-10 w-10 rounded-xl bg-yellow-100 flex items-center justify-center group-hover:bg-yellow-200 transition-colors">
+            <Link to="/planner/analytics" className="flex flex-col items-center gap-2 p-4 rounded-xl border-2 border-dashed border-yellow-200 dark:border-yellow-900 hover:border-yellow-400 dark:hover:border-yellow-700 hover:bg-yellow-50 dark:hover:bg-yellow-950 transition-all group">
+              <div className="h-10 w-10 rounded-xl bg-yellow-100 dark:bg-yellow-950 flex items-center justify-center group-hover:bg-yellow-200 dark:group-hover:bg-yellow-900 transition-colors">
                 <TrendingUp className="h-5 w-5 text-yellow-600" />
               </div>
-              <span className="text-xs font-medium text-gray-700 text-center">Analytics</span>
+              <span className="text-xs font-medium text-gray-700 dark:text-gray-300 text-center">Analytics</span>
             </Link>
           </div>
         </div>
@@ -302,7 +302,7 @@ export const DashboardPage = () => {
             <Link
               key={booking._id}
               to={`/guest/bookings/${booking._id}`}
-              className="flex items-center justify-between p-4 rounded-lg hover:bg-gray-50 transition-colors border"
+              className="flex items-center justify-between p-4 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors border border-gray-200 dark:border-gray-700"
             >
               <div>
                 <p className="font-semibold">{booking.roomDetails?.hotelName}</p>
@@ -486,29 +486,29 @@ export const DashboardPage = () => {
             Admin Controls
           </h3>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <Link to="/admin/events" className="flex flex-col items-center gap-2 p-4 rounded-xl border-2 border-dashed border-green-200 hover:border-green-400 hover:bg-green-50 transition-all group">
-              <div className="h-10 w-10 rounded-xl bg-green-100 flex items-center justify-center group-hover:bg-green-200 transition-colors">
+            <Link to="/admin/events" className="flex flex-col items-center gap-2 p-4 rounded-xl border-2 border-dashed border-green-200 dark:border-green-900 hover:border-green-400 dark:hover:border-green-700 hover:bg-green-50 dark:hover:bg-green-950 transition-all group">
+              <div className="h-10 w-10 rounded-xl bg-green-100 dark:bg-green-950 flex items-center justify-center group-hover:bg-green-200 dark:group-hover:bg-green-900 transition-colors">
                 <Calendar className="h-5 w-5 text-green-600" />
               </div>
-              <span className="text-xs font-medium text-gray-700 text-center">All Events</span>
+              <span className="text-xs font-medium text-gray-700 dark:text-gray-300 text-center">All Events</span>
             </Link>
-            <Link to="/admin/users" className="flex flex-col items-center gap-2 p-4 rounded-xl border-2 border-dashed border-blue-200 hover:border-blue-400 hover:bg-blue-50 transition-all group">
-              <div className="h-10 w-10 rounded-xl bg-blue-100 flex items-center justify-center group-hover:bg-blue-200 transition-colors">
+            <Link to="/admin/users" className="flex flex-col items-center gap-2 p-4 rounded-xl border-2 border-dashed border-blue-200 dark:border-blue-900 hover:border-blue-400 dark:hover:border-blue-700 hover:bg-blue-50 dark:hover:bg-blue-950 transition-all group">
+              <div className="h-10 w-10 rounded-xl bg-blue-100 dark:bg-blue-950 flex items-center justify-center group-hover:bg-blue-200 dark:group-hover:bg-blue-900 transition-colors">
                 <Users className="h-5 w-5 text-blue-600" />
               </div>
-              <span className="text-xs font-medium text-gray-700 text-center">Manage Users</span>
+              <span className="text-xs font-medium text-gray-700 dark:text-gray-300 text-center">Manage Users</span>
             </Link>
-            <Link to="/admin/analytics" className="flex flex-col items-center gap-2 p-4 rounded-xl border-2 border-dashed border-yellow-200 hover:border-yellow-400 hover:bg-yellow-50 transition-all group">
-              <div className="h-10 w-10 rounded-xl bg-yellow-100 flex items-center justify-center group-hover:bg-yellow-200 transition-colors">
+            <Link to="/admin/analytics" className="flex flex-col items-center gap-2 p-4 rounded-xl border-2 border-dashed border-yellow-200 dark:border-yellow-900 hover:border-yellow-400 dark:hover:border-yellow-700 hover:bg-yellow-50 dark:hover:bg-yellow-950 transition-all group">
+              <div className="h-10 w-10 rounded-xl bg-yellow-100 dark:bg-yellow-950 flex items-center justify-center group-hover:bg-yellow-200 dark:group-hover:bg-yellow-900 transition-colors">
                 <BarChart3 className="h-5 w-5 text-yellow-600" />
               </div>
-              <span className="text-xs font-medium text-gray-700 text-center">Analytics</span>
+              <span className="text-xs font-medium text-gray-700 dark:text-gray-300 text-center">Analytics</span>
             </Link>
-            <Link to="/admin/logs" className="flex flex-col items-center gap-2 p-4 rounded-xl border-2 border-dashed border-gray-200 hover:border-gray-400 hover:bg-gray-50 transition-all group">
-              <div className="h-10 w-10 rounded-xl bg-gray-100 flex items-center justify-center group-hover:bg-gray-200 transition-colors">
-                <FileText className="h-5 w-5 text-gray-600" />
+            <Link to="/admin/logs" className="flex flex-col items-center gap-2 p-4 rounded-xl border-2 border-dashed border-gray-200 dark:border-gray-700 hover:border-gray-400 dark:hover:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800 transition-all group">
+              <div className="h-10 w-10 rounded-xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center group-hover:bg-gray-200 dark:group-hover:bg-gray-700 transition-colors">
+                <FileText className="h-5 w-5 text-gray-600 dark:text-gray-400" />
               </div>
-              <span className="text-xs font-medium text-gray-700 text-center">Audit Logs</span>
+              <span className="text-xs font-medium text-gray-700 dark:text-gray-300 text-center">Audit Logs</span>
             </Link>
           </div>
         </div>

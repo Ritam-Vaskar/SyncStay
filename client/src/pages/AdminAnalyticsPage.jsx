@@ -1,6 +1,7 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { useThemeStore } from '@/store/themeStore';
 import {
   Users,
   Calendar,
@@ -35,6 +36,13 @@ import {
 const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899'];
 
 export default function AdminAnalyticsPage() {
+  const { isDark } = useThemeStore();
+  const chartGrid = isDark ? '#374151' : '#e5e7eb';
+  const chartTick = isDark ? '#9ca3af' : '#6b7280';
+  const chartTooltip = isDark
+    ? { backgroundColor: '#1f2937', border: '1px solid #374151', color: '#f3f4f6', borderRadius: '8px' }
+    : {};
+
   const { data: dashboardData, isLoading } = useQuery({
     queryKey: ['admin-dashboard'],
     queryFn: async () => {
@@ -138,10 +146,10 @@ export default function AdminAnalyticsPage() {
         <ChartCard title="User Growth (Last 7 Days)" icon={Users}>
           <ResponsiveContainer width="100%" height={300}>
             <LineChart data={userGrowthData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="date" />
-              <YAxis />
-              <Tooltip />
+              <CartesianGrid strokeDasharray="3 3" stroke={chartGrid} />
+              <XAxis dataKey="date" tick={{ fill: chartTick }} />
+              <YAxis tick={{ fill: chartTick }} />
+              <Tooltip contentStyle={chartTooltip} />
               <Legend />
               <Line type="monotone" dataKey="users" stroke="#3B82F6" strokeWidth={2} />
             </LineChart>
@@ -152,10 +160,10 @@ export default function AdminAnalyticsPage() {
         <ChartCard title="Event Growth (Last 7 Days)" icon={Calendar}>
           <ResponsiveContainer width="100%" height={300}>
             <LineChart data={eventGrowthData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="date" />
-              <YAxis />
-              <Tooltip />
+              <CartesianGrid strokeDasharray="3 3" stroke={chartGrid} />
+              <XAxis dataKey="date" tick={{ fill: chartTick }} />
+              <YAxis tick={{ fill: chartTick }} />
+              <Tooltip contentStyle={chartTooltip} />
               <Legend />
               <Line type="monotone" dataKey="events" stroke="#10B981" strokeWidth={2} />
             </LineChart>
@@ -169,10 +177,10 @@ export default function AdminAnalyticsPage() {
         <ChartCard title="Booking Growth (Last 7 Days)" icon={CreditCard}>
           <ResponsiveContainer width="100%" height={300}>
             <BarChart data={bookingGrowthData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="date" />
-              <YAxis />
-              <Tooltip />
+              <CartesianGrid strokeDasharray="3 3" stroke={chartGrid} />
+              <XAxis dataKey="date" tick={{ fill: chartTick }} />
+              <YAxis tick={{ fill: chartTick }} />
+              <Tooltip contentStyle={chartTooltip} />
               <Legend />
               <Bar dataKey="bookings" fill="#8B5CF6" />
             </BarChart>
@@ -183,10 +191,10 @@ export default function AdminAnalyticsPage() {
         <ChartCard title="Revenue Trend (Last 30 Days)" icon={DollarSign}>
           <ResponsiveContainer width="100%" height={300}>
             <LineChart data={revenueTrendData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="date" />
-              <YAxis />
-              <Tooltip />
+              <CartesianGrid strokeDasharray="3 3" stroke={chartGrid} />
+              <XAxis dataKey="date" tick={{ fill: chartTick }} />
+              <YAxis tick={{ fill: chartTick }} />
+              <Tooltip contentStyle={chartTooltip} />
               <Legend />
               <Line type="monotone" dataKey="revenue" stroke="#F59E0B" strokeWidth={2} />
             </LineChart>
@@ -378,7 +386,7 @@ export default function AdminAnalyticsPage() {
 // Stat Card Component
 function StatCard({ title, value, subtitle, icon: Icon, color, trend, trendLabel }) {
   return (
-    <div className="bg-white rounded-lg shadow-sm p-6">
+    <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm p-6 border border-transparent dark:border-gray-800">
       <div className="flex items-center justify-between mb-4">
         <div className={`p-3 ${color} rounded-lg`}>
           <Icon className="h-6 w-6 text-white" />
@@ -391,10 +399,10 @@ function StatCard({ title, value, subtitle, icon: Icon, color, trend, trendLabel
         )}
       </div>
       <div>
-        <h3 className="text-2xl font-bold text-gray-900">{value}</h3>
-        <p className="text-sm text-gray-600 mt-1">{subtitle}</p>
+        <h3 className="text-2xl font-bold text-gray-900 dark:text-white">{value}</h3>
+        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{subtitle}</p>
         {trendLabel && trend !== undefined && (
-          <p className="text-xs text-gray-500 mt-1">{trendLabel}</p>
+          <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">{trendLabel}</p>
         )}
       </div>
     </div>
@@ -404,12 +412,12 @@ function StatCard({ title, value, subtitle, icon: Icon, color, trend, trendLabel
 // Chart Card Component
 function ChartCard({ title, icon: Icon, children }) {
   return (
-    <div className="bg-white rounded-lg shadow-sm p-6">
+    <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm p-6 border border-transparent dark:border-gray-800">
       <div className="flex items-center gap-3 mb-4">
-        <div className="p-2 bg-gray-100 rounded-lg">
-          <Icon className="h-5 w-5 text-gray-600" />
+        <div className="p-2 bg-gray-100 dark:bg-gray-800 rounded-lg">
+          <Icon className="h-5 w-5 text-gray-600 dark:text-gray-300" />
         </div>
-        <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{title}</h3>
       </div>
       {children}
     </div>

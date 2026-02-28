@@ -110,6 +110,7 @@ export const MicrositeInventoryManagement = () => {
   const [isLoadingRecommendations, setIsLoadingRecommendations] = useState(false);
   const [populatedHotels, setPopulatedHotels] = useState([]);
   const [expandedGroupRecs, setExpandedGroupRecs] = useState({});
+  const [isPersonalizedRecsCollapsed, setIsPersonalizedRecsCollapsed] = useState(true);
   // Hotel assignment state
   const [groupAssignments, setGroupAssignments] = useState({}); // { [groupId]: { hotelId, hotelName, fullHotel } }
   const [nearbyHotels, setNearbyHotels] = useState({});         // { [groupId]: [{ ...hotel, distanceKm }] }
@@ -1042,9 +1043,9 @@ export const MicrositeInventoryManagement = () => {
                                       </div>
 
                                       {/* Score - Large and Prominent */}
-                                      <div className="mb-4 p-3 bg-gradient-to-r from-green-200 to-green-100 rounded-lg border-2 border-green-400">
+                                      <div className="mb-4 p-3 bg-gradient-to-r from-green-200 to-green-100 dark:from-green-900/40 dark:to-green-900/20 rounded-lg border-2 border-green-400 dark:border-green-700">
                                         <div className="flex justify-between items-center">
-                                          <span className="font-bold text-2xl text-green-900">
+                                          <span className="font-bold text-2xl text-green-900 dark:text-green-300">
                                             {topHotel.groupScore ? (topHotel.groupScore / 10).toFixed(1) : '10'}/10
                                           </span>
                                           <div className="w-32 h-3 bg-green-300 rounded-full overflow-hidden">
@@ -1299,7 +1300,20 @@ export const MicrositeInventoryManagement = () => {
                 {/* Individual Recommendations */}
                 {Object.keys(recommendations.individualRecommendations || {}).length > 0 && (
                   <div className="card">
-                    <h3 className="text-xl font-bold text-gray-900 mb-4">Personalized Recommendations</h3>
+                    <div 
+                      className="flex items-center justify-between cursor-pointer mb-4"
+                      onClick={() => setIsPersonalizedRecsCollapsed(!isPersonalizedRecsCollapsed)}
+                    >
+                      <h3 className="text-xl font-bold text-gray-900">Personalized Recommendations</h3>
+                      <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+                        {isPersonalizedRecsCollapsed ? (
+                          <ChevronDown className="h-5 w-5 text-gray-600" />
+                        ) : (
+                          <ChevronUp className="h-5 w-5 text-gray-600" />
+                        )}
+                      </button>
+                    </div>
+                    {!isPersonalizedRecsCollapsed && (
                     <div className="space-y-4">
                       {Object.entries(recommendations.individualRecommendations).map(
                         ([guestEmail, personalRec]) => (
@@ -1399,6 +1413,7 @@ export const MicrositeInventoryManagement = () => {
                         )
                       )}
                     </div>
+                    )}
                   </div>
                 )}
               </div>
