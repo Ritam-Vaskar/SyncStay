@@ -87,7 +87,29 @@ export const MicrositePlannerBookings = () => {
         hasAutoSelected.current = true;
       }
     }
-  }, [bookingsData?.data?.length, eventData?.data?.isPrivate]);
+  }, [bookingsData?.data?.length, eventData?.data?.isPrivate, bookingsData?.data]);
+
+  // Re-select unpaid bookings when selection is empty and new unpaid bookings exist
+  useEffect(() => {
+    const bookings = bookingsData?.data || [];
+    const currentEvent = eventData?.data;
+    
+    // Only run if selection is empty and there are unpaid bookings
+    if (bookings.length > 0 && currentEvent?.isPrivate && selectedBookingsForPayment.length === 0) {
+      const unpaid = bookings.filter(b => 
+        b.isPaidByPlanner && 
+        b.paymentStatus === 'unpaid' && 
+        b.status !== 'rejected' && 
+        b.status !== 'cancelled'
+      );
+      
+      // Auto-select if there are unpaid bookings
+      if (unpaid.length > 0) {
+        setSelectedBookingsForPayment(unpaid.map(b => b._id));
+        console.log(`Auto-selected ${unpaid.length} unpaid bookings`);
+      }
+    }
+  }, [bookingsData?.data, eventData?.data?.isPrivate, selectedBookingsForPayment.length]);
 
   if (eventLoading || bookingsLoading) return <LoadingPage />;
 
@@ -235,7 +257,8 @@ export const MicrositePlannerBookings = () => {
               body: JSON.stringify({
                 razorpay_order_id: response.razorpay_order_id,
                 razorpay_payment_id: response.razorpay_payment_id,
-                razorpay_signature: response.razorpay_signature
+                razorpay_signature: response.razorpay_signature,
+                bookingIds: selectedBookingsForPayment  // Send booking IDs directly
               })
             });
 
@@ -317,7 +340,7 @@ export const MicrositePlannerBookings = () => {
         </div>
 
         {/* Payment Alert for Unpaid Bookings (Private Events) */}
-        {event?.isPrivate && totalUnpaid > 0 && event?.plannerPaymentStatus !== 'paid' && (
+        {event?.isPrivate && totalUnpaid > 0 && (
           <div className="card bg-gradient-to-br from-amber-50 to-orange-50 border-2 border-amber-400 shadow-lg">
             <div className="space-y-4">
               {/* Header */}
@@ -494,7 +517,7 @@ export const MicrositePlannerBookings = () => {
         )}
 
         {/* Payment Success Message */}
-        {event?.isPrivate && event?.plannerPaymentStatus === 'paid' && (
+        {event?.isPrivate && event?.plannerPaymentStatus === 'paid' && totalUnpaid === 0 && (
           <div className="card bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-400 shadow-lg">
             <div className="flex items-start gap-4">
               <div className="bg-green-500 p-3 rounded-lg shadow-md">
