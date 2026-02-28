@@ -1,21 +1,4 @@
 services:
-  # ── MongoDB ──────────────────────────────────────────
-  mongo:
-    image: mongo:7
-    container_name: syncstay-mongo
-    restart: unless-stopped
-    volumes:
-      - mongo_data:/data/db
-    environment:
-      MONGO_INITDB_DATABASE: syncstay
-    networks:
-      - syncstay-net
-    healthcheck:
-      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
   # ── Backend (Node / Express) ─────────────────────────
   backend:
     build:
@@ -28,11 +11,7 @@ services:
     env_file:
       - .env.docker
     environment:
-      - MONGODB_URI=mongodb://mongo:27017/syncstay
       - PORT=5001
-    depends_on:
-      mongo:
-        condition: service_healthy
     networks:
       - syncstay-net
 
@@ -63,26 +42,8 @@ services:
     restart: unless-stopped
     env_file:
       - ./ml-server/.env.docker
-    environment:
-      - QDRANT_URL=http://qdrant:6333
-    depends_on:
-      - qdrant
     networks:
       - syncstay-net
-
-  # ── Qdrant (Vector DB) ──────────────────────────────
-  qdrant:
-    image: qdrant/qdrant:latest
-    container_name: syncstay-qdrant
-    restart: unless-stopped
-    volumes:
-      - qdrant_storage:/qdrant/storage
-    networks:
-      - syncstay-net
-
-volumes:
-  mongo_data:
-  qdrant_storage:
 
 networks:
   syncstay-net:
