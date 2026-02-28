@@ -7,6 +7,8 @@ import {
   selectFlightsForGroup,
   publishFlightConfiguration,
   getFlightConfiguration,
+  getPlannerFlightBookings,
+  processPlannerFlightPayment,
   // Guest Operations
   getAssignedFlights,
   getFareQuote,
@@ -69,6 +71,22 @@ router.post(
   protect,
   authorize('planner'),
   publishFlightConfiguration
+);
+
+// Get all flight bookings for event (Planner only)
+router.get(
+  '/events/:eventId/planner-bookings',
+  protect,
+  authorize('planner'),
+  getPlannerFlightBookings
+);
+
+// Process planner bulk payment for flight bookings (Private events)
+router.post(
+  '/events/:eventId/planner-payment',
+  protect,
+  authorize('planner'),
+  processPlannerFlightPayment
 );
 
 /**

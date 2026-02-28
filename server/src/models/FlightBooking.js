@@ -167,6 +167,11 @@ const flightBookingSchema = new mongoose.Schema(
         default: 'INR',
       },
     },
+    isPaidByPlanner: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
     paymentStatus: {
       type: String,
       enum: ['unpaid', 'partial', 'paid', 'refunded'],
@@ -179,6 +184,9 @@ const flightBookingSchema = new mongoose.Schema(
       paidAt: Date,
       paymentMethod: String,
     },
+    paidAt: Date,
+    razorpay_payment_id: String,
+    razorpay_order_id: String,
     status: {
       type: String,
       enum: ['pending', 'payment-pending', 'booked', 'ticketed', 'cancelled', 'failed'],

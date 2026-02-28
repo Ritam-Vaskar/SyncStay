@@ -122,9 +122,12 @@ export const GuestListManagementPage = () => {
     const file = e.target.files[0];
     if (!file) return;
 
+    console.log('File selected:', file.name, 'Size:', file.size, 'Type:', file.type);
+
     const reader = new FileReader();
     reader.onload = (event) => {
       const base64 = event.target.result.split(',')[1];
+      console.log('Base64 length:', base64?.length);
       setExcelFile({ name: file.name, data: base64 });
     };
     reader.readAsDataURL(file);
@@ -139,7 +142,7 @@ export const GuestListManagementPage = () => {
   };
 
   const downloadTemplate = () => {
-    const csvContent = "Name,Email,Phone\nJohn Doe,john@example.com,+1234567890\nJane Smith,jane@example.com,+0987654321";
+    const csvContent = "Name,Email,Phone,Group,Location\nJohn Doe,john@example.com,+1234567890,Friends,New York (JFK)\nJane Smith,jane@example.com,+0987654321,Family,Los Angeles (LAX)";
     const blob = new Blob([csvContent], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');

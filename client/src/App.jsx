@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router-
 import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
 import { Toaster } from 'react-hot-toast';
 import { ProtectedRoute } from './components/ProtectedRoute';
+import { ScrollToTop } from './components/ScrollToTop';
 import { DashboardLayout } from './layouts/DashboardLayout';
 import { MicrositeDashboardLayout } from './layouts/MicrositeDashboardLayout';
 import { LandingPage } from './pages/LandingPage';
@@ -100,6 +101,7 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
+        <ScrollToTop />
         <Routes>
           {/* Landing Page */}
           <Route path="/" element={<LandingPage />} />

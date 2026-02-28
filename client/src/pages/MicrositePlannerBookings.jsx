@@ -4,13 +4,15 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { eventService, bookingService } from '@/services/apiServices';
 import { MicrositeDashboardLayout } from '@/layouts/MicrositeDashboardLayout';
 import { LoadingPage } from '@/components/LoadingSpinner';
-import { Calendar, CheckCircle, Clock, XCircle, Search, Filter, IndianRupee, CreditCard } from 'lucide-react';
+import { Calendar, CheckCircle, Clock, XCircle, Search, Filter, IndianRupee, CreditCard, Hotel, Plane } from 'lucide-react';
+import { PlannerBookingsTabs } from '@/components/PlannerBookingsTabs';
 import { formatCurrency, formatDate } from '@/utils/helpers';
 import toast from 'react-hot-toast';
 
 export const MicrositePlannerBookings = () => {
   const { slug } = useParams();
   const queryClient = useQueryClient();
+  const [activeTab, setActiveTab] = useState('hotels'); // 'hotels' or 'flights'
   const [statusFilter, setStatusFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedBooking, setSelectedBooking] = useState(null);
@@ -28,6 +30,21 @@ export const MicrositePlannerBookings = () => {
   const { data: bookingsData, isLoading: bookingsLoading } = useQuery({
     queryKey: ['planner-event-bookings', eventData?.data?._id],
     queryFn: () => bookingService.getAll({ event: eventData.data._id }),
+    enabled: !!eventData?.data?._id,
+  });
+
+  // Flight bookings
+  const { data: flightBookingsData, isLoading: flightBookingsLoading } = useQuery({
+    queryKey: ['planner-flight-bookings', eventData?.data?._id],
+    queryFn: async () => {
+      const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
+      const response = await fetch(`${API_BASE_URL}/flights/events/${eventData.data._id}/planner-bookings`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+      });
+      return response.json();
+    },
     enabled: !!eventData?.data?._id,
   });
 
@@ -87,20 +104,54 @@ export const MicrositePlannerBookings = () => {
         hasAutoSelected.current = true;
       }
     }
-  }, [bookingsData?.data?.length, eventData?.data?.isPrivate]);
+  }, [bookingsData?.data?.length, eventData?.data?.isPrivate, bookingsData?.data]);
 
-  if (eventLoading || bookingsLoading) return <LoadingPage />;
+  // Re-select unpaid bookings when selection is empty and new unpaid bookings exist
+  useEffect(() => {
+    const bookings = bookingsData?.data || [];
+    const currentEvent = eventData?.data;
+    
+    // Only run if selection is empty and there are unpaid bookings
+    if (bookings.length > 0 && currentEvent?.isPrivate && selectedBookingsForPayment.length === 0) {
+      const unpaid = bookings.filter(b => 
+        b.isPaidByPlanner && 
+        b.paymentStatus === 'unpaid' && 
+        b.status !== 'rejected' && 
+        b.status !== 'cancelled'
+      );
+      
+      // Auto-select if there are unpaid bookings
+      if (unpaid.length > 0) {
+        setSelectedBookingsForPayment(unpaid.map(b => b._id));
+        console.log(`Auto-selected ${unpaid.length} unpaid bookings`);
+      }
+    }
+  }, [bookingsData?.data, eventData?.data?.isPrivate, selectedBookingsForPayment.length]);
+
+  if (eventLoading || bookingsLoading || flightBookingsLoading) return <LoadingPage />;
 
   const event = eventData?.data;
   const allBookings = bookingsData?.data || [];
+  const flightBookings = flightBookingsData?.data || [];
 
-  // Filter bookings
+  // Filter hotel bookings
   const filteredBookings = allBookings.filter((booking) => {
     const matchesStatus = statusFilter === 'all' || booking.status === statusFilter;
     const matchesSearch =
       !searchTerm ||
       booking.guestDetails?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       booking.guestDetails?.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      booking.bookingId?.toLowerCase().includes(searchTerm.toLowerCase());
+    return matchesStatus && matchesSearch;
+  });
+
+  // Filter flight bookings
+  const filteredFlightBookings = flightBookings.filter((booking) => {
+    const matchesStatus = statusFilter === 'all' || booking.status === statusFilter;
+    const matchesSearch =
+      !searchTerm ||
+      booking.guest?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      booking.guest?.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       booking.bookingId?.toLowerCase().includes(searchTerm.toLowerCase());
     return matchesStatus && matchesSearch;
   });
@@ -115,8 +166,18 @@ export const MicrositePlannerBookings = () => {
       .reduce((sum, b) => sum + (b.pricing?.totalAmount || 0), 0),
   };
 
+  const flightStats = {
+    pending: flightBookings.filter((b) => b.status === 'pending' || b.status === 'booked').length,
+    ticketed: flightBookings.filter((b) => b.status === 'ticketed').length,
+    cancelled: flightBookings.filter((b) => b.status === 'cancelled').length,
+    total: flightBookings.length,
+    totalRevenue: flightBookings
+      .filter((b) => b.status === 'ticketed')
+      .reduce((sum, b) => sum + (b.pricing?.totalAmount || 0), 0),
+  };
+
   // Get unpaid bookings for private events (exclude rejected and cancelled)
-  const unpaidBookings = event?.isPrivate
+  const unpaidBookings = event?.isPrivate && activeTab === 'hotels'
     ? allBookings.filter((b) => 
         b.isPaidByPlanner && 
         b.paymentStatus === 'unpaid' && 
@@ -125,20 +186,37 @@ export const MicrositePlannerBookings = () => {
       )
     : [];
 
+  // Get unpaid flight bookings for private events
+  const unpaidFlightBookings = event?.isPrivate && activeTab === 'flights'
+    ? flightBookings.filter((b) => 
+        b.isPaidByPlanner && 
+        b.paymentStatus === 'unpaid' && 
+        b.status !== 'cancelled' && 
+        b.status !== 'failed'
+      )
+    : [];
+
   // Calculate total unpaid amount
-  const totalUnpaid = unpaidBookings.reduce((sum, b) => sum + (b.pricing?.totalAmount || 0), 0);
+  const totalUnpaid = activeTab === 'hotels' 
+    ? unpaidBookings.reduce((sum, b) => sum + (b.pricing?.totalAmount || 0), 0)
+    : unpaidFlightBookings.reduce((sum, b) => sum + (b.pricing?.totalAmount || 0), 0);
   
   // Calculate selected bookings amount
-  const selectedPaymentAmount = unpaidBookings
-    .filter(b => selectedBookingsForPayment.includes(b._id))
-    .reduce((sum, b) => sum + (b.pricing?.totalAmount || 0), 0);
+  const selectedPaymentAmount = activeTab === 'hotels'
+    ? unpaidBookings
+        .filter(b => selectedBookingsForPayment.includes(b._id))
+        .reduce((sum, b) => sum + (b.pricing?.totalAmount || 0), 0)
+    : unpaidFlightBookings
+        .filter(b => selectedBookingsForPayment.includes(b._id))
+        .reduce((sum, b) => sum + (b.pricing?.totalAmount || 0), 0);
 
   // Toggle all bookings selection
   const handleSelectAllBookings = () => {
-    if (selectedBookingsForPayment.length === unpaidBookings.length) {
+    const currentUnpaid = activeTab === 'hotels' ? unpaidBookings : unpaidFlightBookings;
+    if (selectedBookingsForPayment.length === currentUnpaid.length) {
       setSelectedBookingsForPayment([]);
     } else {
-      setSelectedBookingsForPayment(unpaidBookings.map(b => b._id));
+      setSelectedBookingsForPayment(currentUnpaid.map(b => b._id));
     }
   };
 
@@ -188,6 +266,7 @@ export const MicrositePlannerBookings = () => {
       setIsProcessingPayment(true);
 
       const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
+      const isFlightPayment = activeTab === 'flights';
 
       // 1. Create Razorpay order
       const orderResponse = await fetch(`${API_BASE_URL}/payments/razorpay/create-order`, {
@@ -202,7 +281,7 @@ export const MicrositePlannerBookings = () => {
           notes: {
             eventId: event._id,
             eventName: event.name,
-            type: 'planner_bulk_payment',
+            type: isFlightPayment ? 'planner_flight_payment' : 'planner_bulk_payment',
             bookingIds: selectedBookingsForPayment,
             bookingCount: selectedBookingsForPayment.length
           }
@@ -222,11 +301,15 @@ export const MicrositePlannerBookings = () => {
         currency: orderData.data.currency,
         order_id: orderData.data.id,
         name: 'SyncStay',
-        description: `Payment for ${event.name} - ${selectedBookingsForPayment.length} Booking(s)`,
+        description: `Payment for ${event.name} - ${selectedBookingsForPayment.length} ${isFlightPayment ? 'Flight' : 'Hotel'} Booking(s)`,
         handler: async function(response) {
           try {
             // 3. Verify and process payment
-            const paymentResponse = await fetch(`${API_BASE_URL}/events/${event._id}/planner-payment`, {
+            const paymentEndpoint = isFlightPayment
+              ? `${API_BASE_URL}/flights/events/${event._id}/planner-payment`
+              : `${API_BASE_URL}/events/${event._id}/planner-payment`;
+              
+            const paymentResponse = await fetch(paymentEndpoint, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
@@ -235,7 +318,8 @@ export const MicrositePlannerBookings = () => {
               body: JSON.stringify({
                 razorpay_order_id: response.razorpay_order_id,
                 razorpay_payment_id: response.razorpay_payment_id,
-                razorpay_signature: response.razorpay_signature
+                razorpay_signature: response.razorpay_signature,
+                bookingIds: selectedBookingsForPayment  // Send booking IDs directly
               })
             });
 
@@ -289,35 +373,36 @@ export const MicrositePlannerBookings = () => {
         {/* Header */}
         <div>
           <h2 className="text-3xl font-bold">All Bookings</h2>
-          <p className="text-gray-600 mt-1">Manage guest booking requests for this event</p>
+          <p className="text-gray-600 mt-1">Manage guest hotel and flight bookings for this event</p>
         </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-          <div className="card">
-            <p className="text-sm text-gray-600">Total Bookings</p>
-            <p className="text-2xl font-bold">{stats.total}</p>
-          </div>
-          <div className="card bg-yellow-50 border-yellow-200">
-            <p className="text-sm text-yellow-700">Pending Approval</p>
-            <p className="text-2xl font-bold text-yellow-900">{stats.pending}</p>
-          </div>
-          <div className="card bg-green-50 border-green-200">
-            <p className="text-sm text-green-700">Confirmed</p>
-            <p className="text-2xl font-bold text-green-900">{stats.confirmed}</p>
-          </div>
-          <div className="card bg-red-50 border-red-200">
-            <p className="text-sm text-red-700">Rejected</p>
-            <p className="text-2xl font-bold text-red-900">{stats.rejected}</p>
-          </div>
-          <div className="card bg-primary-50 border-primary-200">
-            <p className="text-sm text-primary-700">Total Revenue</p>
-            <p className="text-xl font-bold text-primary-900">{formatCurrency(stats.totalRevenue)}</p>
-          </div>
-        </div>
+        {/* Tabs Component */}
+        <PlannerBookingsTabs
+          activeTab={activeTab}
+          setActiveTab={(tab) => {
+            setActiveTab(tab);
+            setSelectedBookingsForPayment([]);
+            setStatusFilter('all');
+            hasAutoSelected.current = false;
+          }}
+          hotelStats={{
+            total: stats.total,
+            pending: stats.pending,
+            confirmed: stats.confirmed,
+            rejected: stats.rejected,
+            revenue: formatCurrency(stats.totalRevenue)
+          }}
+          flightStats={{
+            total: flightStats.total,
+            pending: flightStats.pending,
+            ticketed: flightStats.ticketed,
+            cancelled: flightStats.cancelled,
+            revenue: formatCurrency(flightStats.totalRevenue)
+          }}
+        />
 
         {/* Payment Alert for Unpaid Bookings (Private Events) */}
-        {event?.isPrivate && totalUnpaid > 0 && event?.plannerPaymentStatus !== 'paid' && (
+        {event?.isPrivate && totalUnpaid > 0 && (
           <div className="card bg-gradient-to-br from-amber-50 to-orange-50 border-2 border-amber-400 shadow-lg">
             <div className="space-y-4">
               {/* Header */}
@@ -327,34 +412,43 @@ export const MicrositePlannerBookings = () => {
                 </div>
                 <div className="flex-1">
                   <h3 className="text-xl font-bold text-amber-900 mb-1">
-                    Payment Required
+                    Payment Required - {activeTab === 'hotels' ? 'Hotel' : 'Flight'} Bookings
                   </h3>
                   <p className="text-amber-700 text-sm mb-2">
-                    Select bookings you want to pay for now. You can pay for remaining bookings later.
+                    Select {activeTab === 'hotels' ? 'hotel' : 'flight'} bookings you want to pay for now. You can pay for remaining bookings later.
                   </p>
                 </div>
               </div>
 
               {/* Quick Selection Buttons */}
-              {unpaidBookings.length > 1 && (
+              {(activeTab === 'hotels' ? unpaidBookings : unpaidFlightBookings).length > 1 && (
                 <div className="flex flex-wrap gap-2">
                   <button
-                    onClick={() => setSelectedBookingsForPayment(unpaidBookings.slice(0, Math.ceil(unpaidBookings.length / 2)).map(b => b._id))}
+                    onClick={() => {
+                      const currentUnpaid = activeTab === 'hotels' ? unpaidBookings : unpaidFlightBookings;
+                      setSelectedBookingsForPayment(currentUnpaid.slice(0, Math.ceil(currentUnpaid.length / 2)).map(b => b._id));
+                    }}
                     className="px-3 py-1.5 text-xs font-medium bg-white border border-amber-300 text-amber-700 rounded-lg hover:bg-amber-50 transition-colors"
                   >
-                    Select First Half ({Math.ceil(unpaidBookings.length / 2)})
+                    Select First Half ({Math.ceil((activeTab === 'hotels' ? unpaidBookings : unpaidFlightBookings).length / 2)})
                   </button>
-                  {unpaidBookings.length >= 5 && (
+                  {(activeTab === 'hotels' ? unpaidBookings : unpaidFlightBookings).length >= 5 && (
                     <button
-                      onClick={() => setSelectedBookingsForPayment(unpaidBookings.slice(0, 5).map(b => b._id))}
+                      onClick={() => {
+                        const currentUnpaid = activeTab === 'hotels' ? unpaidBookings : unpaidFlightBookings;
+                        setSelectedBookingsForPayment(currentUnpaid.slice(0, 5).map(b => b._id));
+                      }}
                       className="px-3 py-1.5 text-xs font-medium bg-white border border-amber-300 text-amber-700 rounded-lg hover:bg-amber-50 transition-colors"
                     >
                       Select First 5
                     </button>
                   )}
-                  {unpaidBookings.length >= 10 && (
+                  {(activeTab === 'hotels' ? unpaidBookings : unpaidFlightBookings).length >= 10 && (
                     <button
-                      onClick={() => setSelectedBookingsForPayment(unpaidBookings.slice(0, 10).map(b => b._id))}
+                      onClick={() => {
+                        const currentUnpaid = activeTab === 'hotels' ? unpaidBookings : unpaidFlightBookings;
+                        setSelectedBookingsForPayment(currentUnpaid.slice(0, 10).map(b => b._id));
+                      }}
                       className="px-3 py-1.5 text-xs font-medium bg-white border border-amber-300 text-amber-700 rounded-lg hover:bg-amber-50 transition-colors"
                     >
                       Select First 10
@@ -375,12 +469,12 @@ export const MicrositePlannerBookings = () => {
                   <input
                     type="checkbox"
                     id="select-all-bookings"
-                    checked={selectedBookingsForPayment.length === unpaidBookings.length && unpaidBookings.length > 0}
+                    checked={selectedBookingsForPayment.length === (activeTab === 'hotels' ? unpaidBookings : unpaidFlightBookings).length && (activeTab === 'hotels' ? unpaidBookings : unpaidFlightBookings).length > 0}
                     onChange={handleSelectAllBookings}
                     className="h-5 w-5 rounded border-gray-300 text-amber-600 focus:ring-amber-500"
                   />
                   <label htmlFor="select-all-bookings" className="text-sm font-medium text-gray-900 cursor-pointer">
-                    Select All ({unpaidBookings.length} bookings)
+                    Select All ({(activeTab === 'hotels' ? unpaidBookings : unpaidFlightBookings).length} bookings)
                   </label>
                 </div>
                 <div className="text-right">
@@ -391,40 +485,41 @@ export const MicrositePlannerBookings = () => {
                 </div>
               </div>
 
-              {/* Bookings List */}
-              <div className="max-h-64 overflow-y-auto space-y-2 p-2 bg-white/40 rounded-lg border border-amber-200">
-                {unpaidBookings.map((booking) => (
-                  <div
-                    key={booking._id}
-                    className={`flex items-center gap-3 p-3 rounded-lg border transition-all ${
-                      selectedBookingsForPayment.includes(booking._id)
-                        ? 'bg-amber-100 border-amber-400 shadow-sm'
-                        : 'bg-white border-gray-200 hover:border-amber-300'
-                    }`}
-                  >
-                    <input
-                      type="checkbox"
-                      id={`booking-${booking._id}`}
-                      checked={selectedBookingsForPayment.includes(booking._id)}
-                      onChange={() => handleToggleBooking(booking._id)}
-                      className="h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500"
-                    />
-                    <label htmlFor={`booking-${booking._id}`} className="flex-1 cursor-pointer">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm font-semibold text-gray-900">
-                            {booking.guestDetails?.name || booking.guestName || 'Guest'}
-                          </p>
-                          <p className="text-xs text-gray-600">
-                            {booking.guestDetails?.email || booking.email}
-                          </p>
-                          <p className="text-xs text-gray-500 mt-1">
-                            {booking.roomDetails?.numberOfRooms || 0} room(s) • {booking.hotelProposal?.name || 'Hotel'}
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-sm font-bold text-gray-900">
-                            {formatCurrency(booking.pricing?.totalAmount || 0)}
+              {/* Bookings List - Hotels */}
+              {activeTab === 'hotels' && (
+                <div className="max-h-64 overflow-y-auto space-y-2 p-2 bg-white/40 rounded-lg border border-amber-200">
+                  {unpaidBookings.map((booking) => (
+                    <div
+                      key={booking._id}
+                      className={`flex items-center gap-3 p-3 rounded-lg border transition-all ${
+                        selectedBookingsForPayment.includes(booking._id)
+                          ? 'bg-amber-100 border-amber-400 shadow-sm'
+                          : 'bg-white border-gray-200 hover:border-amber-300'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        id={`booking-${booking._id}`}
+                        checked={selectedBookingsForPayment.includes(booking._id)}
+                        onChange={() => handleToggleBooking(booking._id)}
+                        className="h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500"
+                      />
+                      <label htmlFor={`booking-${booking._id}`} className="flex-1 cursor-pointer">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-sm font-semibold text-gray-900">
+                              {booking.guestDetails?.name || booking.guestName || 'Guest'}
+                            </p>
+                            <p className="text-xs text-gray-600">
+                              {booking.guestDetails?.email || booking.email}
+                            </p>
+                            <p className="text-xs text-gray-500 mt-1">
+                              {booking.roomDetails?.numberOfRooms || 0} room(s) • {booking.hotelProposal?.name || 'Hotel'}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-sm font-bold text-gray-900">
+                              {formatCurrency(booking.pricing?.totalAmount || 0)}
                           </p>
                           <span className="inline-block px-2 py-0.5 rounded-full text-xs bg-yellow-100 text-yellow-800 mt-1">
                             Unpaid
@@ -435,6 +530,55 @@ export const MicrositePlannerBookings = () => {
                   </div>
                 ))}
               </div>
+              )}
+
+              {/* Bookings List - Flights */}
+              {activeTab === 'flights' && (
+                <div className="max-h-64 overflow-y-auto space-y-2 p-2 bg-white/40 rounded-lg border border-amber-200">
+                  {unpaidFlightBookings.map((booking) => (
+                    <div
+                      key={booking._id}
+                      className={`flex items-center gap-3 p-3 rounded-lg border transition-all ${
+                        selectedBookingsForPayment.includes(booking._id)
+                          ? 'bg-amber-100 border-amber-400 shadow-sm'
+                          : 'bg-white border-gray-200 hover:border-amber-300'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        id={`flight-${booking._id}`}
+                        checked={selectedBookingsForPayment.includes(booking._id)}
+                        onChange={() => handleToggleBooking(booking._id)}
+                        className="h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500"
+                      />
+                      <label htmlFor={`flight-${booking._id}`} className="flex-1 cursor-pointer">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-sm font-semibold text-gray-900">
+                              {booking.guest?.name || 'Guest'}
+                            </p>
+                            <p className="text-xs text-gray-600">
+                              {booking.guest?.email}
+                            </p>
+                            <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
+                              <Plane className="h-3 w-3" />
+                              {booking.locationGroup} • {booking.flightSelection?.arrival ? 'Arrival' : ''} {booking.flightSelection?.departure ? 'Departure' : ''}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-sm font-bold text-gray-900">
+                              {formatCurrency(booking.pricing?.totalAmount || 0)}
+                            </p>
+                            <span className="inline-block px-2 py-0.5 rounded-full text-xs bg-yellow-100 text-yellow-800 mt-1">
+                              Unpaid
+                            </span>
+                          </div>
+                        </div>
+                      </label>
+                    </div>
+                  ))}
+                </div>
+              )}
 
               {/* Payment Summary and Button */}
               <div className="flex items-center justify-between p-4 bg-white/60 rounded-lg border border-amber-200">
@@ -443,7 +587,7 @@ export const MicrositePlannerBookings = () => {
                   <div className="space-y-1.5">
                     <p className="text-sm text-gray-700">
                       <span className="font-semibold">{selectedBookingsForPayment.length}</span> of{' '}
-                      <span className="font-semibold">{unpaidBookings.length}</span> bookings selected
+                      <span className="font-semibold">{(activeTab === 'hotels' ? unpaidBookings : unpaidFlightBookings).length}</span> bookings selected
                     </p>
                     <div className="flex items-baseline gap-2">
                       <p className="text-xl font-bold text-amber-900">
@@ -457,7 +601,7 @@ export const MicrositePlannerBookings = () => {
                     </div>
                     {selectedPaymentAmount > 0 && selectedPaymentAmount < totalUnpaid && (
                       <p className="text-xs text-amber-600">
-                        Remaining: {formatCurrency(totalUnpaid - selectedPaymentAmount)} ({unpaidBookings.length - selectedBookingsForPayment.length} bookings)
+                        Remaining: {formatCurrency(totalUnpaid - selectedPaymentAmount)} ({(activeTab === 'hotels' ? unpaidBookings : unpaidFlightBookings).length - selectedBookingsForPayment.length} bookings)
                       </p>
                     )}
                   </div>
@@ -494,7 +638,7 @@ export const MicrositePlannerBookings = () => {
         )}
 
         {/* Payment Success Message */}
-        {event?.isPrivate && event?.plannerPaymentStatus === 'paid' && (
+        {event?.isPrivate && event?.plannerPaymentStatus === 'paid' && totalUnpaid === 0 && (
           <div className="card bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-400 shadow-lg">
             <div className="flex items-start gap-4">
               <div className="bg-green-500 p-3 rounded-lg shadow-md">
@@ -547,25 +691,38 @@ export const MicrositePlannerBookings = () => {
                 className="input"
               >
                 <option value="all">All Status</option>
-                <option value="pending">Pending</option>
-                <option value="confirmed">Confirmed</option>
-                <option value="rejected">Rejected</option>
-                <option value="cancelled">Cancelled</option>
+                {activeTab === 'hotels' ? (
+                  <>
+                    <option value="pending">Pending</option>
+                    <option value="confirmed">Confirmed</option>
+                    <option value="rejected">Rejected</option>
+                    <option value="cancelled">Cancelled</option>
+                  </>
+                ) : (
+                  <>
+                    <option value="pending">Pending</option>
+                    <option value="booked">Booked</option>
+                    <option value="ticketed">Ticketed</option>
+                    <option value="cancelled">Cancelled</option>
+                    <option value="failed">Failed</option>
+                  </>
+                )}
               </select>
             </div>
           </div>
         </div>
 
         {/* Bookings List */}
+        {activeTab === 'hotels' && (
         <div className="card">
           {filteredBookings.length === 0 ? (
             <div className="text-center py-12">
-              <Calendar className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">No Bookings Found</h3>
+              <Hotel className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">No Hotel Bookings Found</h3>
               <p className="text-gray-600">
                 {searchTerm || statusFilter !== 'all'
                   ? 'Try adjusting your filters'
-                  : 'No bookings have been made yet'}
+                  : 'No hotel bookings have been made yet'}
               </p>
             </div>
           ) : (
@@ -681,6 +838,152 @@ export const MicrositePlannerBookings = () => {
             </div>
           )}
         </div>
+        )}
+
+        {/* Flight Bookings Table */}
+        {activeTab === 'flights' && (
+        <div className="card">
+          {filteredFlightBookings.length === 0 ? (
+            <div className="text-center py-12">
+              <Plane className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">No Flight Bookings Found</h3>
+              <p className="text-gray-600">
+                {searchTerm || statusFilter !== 'all'
+                  ? 'Try adjusting your filters'
+                  : 'No flight bookings have been made yet'}
+              </p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-gray-200">
+                    <th className="py-3 px-4 text-left text-sm font-semibold text-gray-700">
+                      Booking ID
+                    </th>
+                    <th className="py-3 px-4 text-left text-sm font-semibold text-gray-700">
+                      Guest
+                    </th>
+                    <th className="py-3 px-4 text-left text-sm font-semibold text-gray-700">
+                      Location Group
+                    </th>
+                    <th className="py-3 px-4 text-left text-sm font-semibold text-gray-700">
+                      Flight Details
+                    </th>
+                    <th className="py-3 px-4 text-left text-sm font-semibold text-gray-700">
+                      Amount
+                    </th>
+                    <th className="py-3 px-4 text-left text-sm font-semibold text-gray-700">
+                      Payment Status
+                    </th>
+                    <th className="py-3 px-4 text-left text-sm font-semibold text-gray-700">
+                      Booking Status
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {filteredFlightBookings.map((booking) => (
+                    <tr key={booking._id} className="hover:bg-gray-50">
+                      <td className="py-3 px-4">
+                        <p className="text-sm font-medium text-gray-900">{booking.bookingId}</p>
+                        <p className="text-xs text-gray-500">{formatDate(booking.createdAt)}</p>
+                      </td>
+                      <td className="py-3 px-4">
+                        <p className="text-sm font-medium text-gray-900">{booking.guest?.name}</p>
+                        <p className="text-xs text-gray-500">{booking.guest?.email}</p>
+                      </td>
+                      <td className="py-3 px-4">
+                        <p className="text-sm text-gray-900">{booking.locationGroup || 'N/A'}</p>
+                      </td>
+                      <td className="py-3 px-4">
+                        <div className="space-y-2">
+                          {/* Departure Flight */}
+                          <div className="text-sm">
+                            <p className="font-medium text-gray-900">
+                              {booking.departureFlight?.airline} {booking.departureFlight?.flightNumber}
+                            </p>
+                            <p className="text-xs text-gray-600">
+                              {booking.departureFlight?.origin} → {booking.departureFlight?.destination}
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              {formatDate(booking.departureFlight?.departureTime)} at{' '}
+                              {new Date(booking.departureFlight?.departureTime).toLocaleTimeString('en-US', {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })}
+                            </p>
+                          </div>
+                          {/* Return Flight */}
+                          {booking.returnFlight && (
+                            <div className="text-sm border-t pt-2">
+                              <p className="font-medium text-gray-900">
+                                {booking.returnFlight?.airline} {booking.returnFlight?.flightNumber}
+                              </p>
+                              <p className="text-xs text-gray-600">
+                                {booking.returnFlight?.origin} → {booking.returnFlight?.destination}
+                              </p>
+                              <p className="text-xs text-gray-500">
+                                {formatDate(booking.returnFlight?.departureTime)} at{' '}
+                                {new Date(booking.returnFlight?.departureTime).toLocaleTimeString('en-US', {
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                })}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                      <td className="py-3 px-4">
+                        <p className="text-sm font-semibold text-gray-900">
+                          ₹{booking.pricing?.totalAmount?.toLocaleString()}
+                        </p>
+                      </td>
+                      <td className="py-3 px-4">
+                        <span
+                          className={`badge ${
+                            booking.isPaidByPlanner
+                              ? 'badge-success'
+                              : 'badge-warning'
+                          }`}
+                        >
+                          {booking.isPaidByPlanner ? 'Paid' : 'Unpaid'}
+                        </span>
+                        {booking.isPaidByPlanner && booking.paidAt && (
+                          <p className="text-xs text-gray-500 mt-1">
+                            Paid: {formatDate(booking.paidAt)}
+                          </p>
+                        )}
+                      </td>
+                      <td className="py-3 px-4">
+                        <span
+                          className={`badge ${
+                            booking.status === 'ticketed'
+                              ? 'badge-success'
+                              : booking.status === 'booked'
+                              ? 'badge-info'
+                              : booking.status === 'pending'
+                              ? 'badge-warning'
+                              : booking.status === 'cancelled'
+                              ? 'badge-error'
+                              : 'badge-secondary'
+                          }`}
+                        >
+                          {booking.status}
+                        </span>
+                        {booking.tboBookingId && (
+                          <p className="text-xs text-gray-500 mt-1">
+                            TBO: {booking.tboBookingId}
+                          </p>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+        )}
       </div>
 
       {/* Reject Modal */}
