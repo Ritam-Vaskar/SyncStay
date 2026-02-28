@@ -790,18 +790,33 @@ export const MicrositePage = () => {
                                     {room.availableRooms} room{room.availableRooms !== 1 ? 's' : ''} left
                                   </span>
                                 </div>
-                                <div className="flex justify-between text-sm">
-                                  <span className="text-gray-600">Per Night:</span>
-                                  <span className="font-medium">
-                                    {formatCurrency(room.pricePerNight)}
-                                  </span>
-                                </div>
-                                <div className="flex justify-between text-sm">
-                                  <span className="text-gray-600">Stay ({nights} nights):</span>
-                                  <span className="font-semibold text-primary-600">
-                                    {formatCurrency(totalPrice)}
-                                  </span>
-                                </div>
+                                
+                                {event.isPrivate ? (
+                                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 my-2">
+                                    <p className="text-sm font-semibold text-blue-900 flex items-center gap-2">
+                                      <CheckCircle className="h-4 w-4 text-blue-600" />
+                                      Amount will be paid by planner
+                                    </p>
+                                    <p className="text-xs text-blue-700 mt-1">
+                                      No payment required from guests
+                                    </p>
+                                  </div>
+                                ) : (
+                                  <>
+                                    <div className="flex justify-between text-sm">
+                                      <span className="text-gray-600">Per Night:</span>
+                                      <span className="font-medium">
+                                        {formatCurrency(room.pricePerNight)}
+                                      </span>
+                                    </div>
+                                    <div className="flex justify-between text-sm">
+                                      <span className="text-gray-600">Stay ({nights} nights):</span>
+                                      <span className="font-semibold text-primary-600">
+                                        {formatCurrency(totalPrice)}
+                                      </span>
+                                    </div>
+                                  </>
+                                )}
                               </div>
 
                               <div className="text-xs text-gray-500 mb-3">
@@ -1088,7 +1103,14 @@ const BookingModal = ({ inventory, event, user, onClose, onSuccess }) => {
           <div className="card bg-blue-50 mb-6">
             <h3 className="font-semibold mb-2">{inventory.hotelName}</h3>
             <p className="text-sm text-gray-600">{inventory.roomType}</p>
-            <p className="text-lg font-bold text-primary-600 mt-2">{formatCurrency(inventory.pricePerNight)} / night</p>
+            {event.isPrivate ? (
+              <div className="mt-2 inline-flex items-center gap-2 px-3 py-1 bg-blue-100 rounded-lg">
+                <CheckCircle className="h-4 w-4 text-blue-600" />
+                <p className="text-sm font-semibold text-blue-900">Paid by planner</p>
+              </div>
+            ) : (
+              <p className="text-lg font-bold text-primary-600 mt-2">{formatCurrency(inventory.pricePerNight)} / night</p>
+            )}
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -1192,9 +1214,13 @@ const BookingModal = ({ inventory, event, user, onClose, onSuccess }) => {
               <div className="flex justify-between items-center">
                 <span className="font-semibold">Total Amount</span>
                 <div className="text-right">
-                  <span className="text-2xl font-bold text-primary-600">{formatCurrency(totalPrice)}</span>
-                  {event.isPrivate && (
-                    <p className="text-xs text-green-600 font-medium">✓ Paid by planner</p>
+                  {event.isPrivate ? (
+                    <div className="text-right">
+                      <p className="text-lg font-bold text-green-600">Paid by planner</p>
+                      <p className="text-xs text-green-600 font-medium">No payment required</p>
+                    </div>
+                  ) : (
+                    <span className="text-2xl font-bold text-primary-600">{formatCurrency(totalPrice)}</span>
                   )}
                 </div>
               </div>
