@@ -1096,11 +1096,11 @@ export const selectHotelsForEvent = asyncHandler(async (req, res) => {
 
 /**
  * @route   POST /api/events/:id/planner-payment
- * @desc    Process planner payment for private event (after Razorpay verification)
+ * @desc    Process planner payment for private event (after Razorpay verification) - supports partial payments
  * @access  Private (Planner only)
  */
 export const processPlannerPayment = asyncHandler(async (req, res) => {
-  const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
+  const { razorpay_order_id, razorpay_payment_id, razorpay_signature, bookingIds } = req.body;
 
   const event = await Event.findById(req.params.id);
 
@@ -1126,16 +1126,53 @@ export const processPlannerPayment = asyncHandler(async (req, res) => {
     });
   }
 
-  if (event.plannerPaymentStatus === 'paid') {
+  // Validate booking IDs (sent directly from frontend)
+  if (!bookingIds || !Array.isArray(bookingIds) || bookingIds.length === 0) {
     return res.status(400).json({
       success: false,
-      message: 'Payment already completed',
+      message: 'No bookings specified in payment',
     });
   }
 
-  // Update event with payment details
-  event.plannerPaymentStatus = 'paid';
-  event.plannerPaidAt = new Date();
+  console.log(`💳 Processing payment for ${bookingIds.length} booking(s)`);
+
+  // Update ONLY the selected bookings to paid
+  const updateResult = await Booking.updateMany(
+    { 
+      _id: { $in: bookingIds },
+      event: event._id, 
+      isPaidByPlanner: true,
+      paymentStatus: 'unpaid'  // Only update unpaid bookings
+    },
+    { 
+      paymentStatus: 'paid',
+      status: 'confirmed',  // Auto-confirm bookings when planner pays
+      razorpay_payment_id,
+      razorpay_order_id,
+      paidAt: new Date()
+    }
+  );
+  
+  console.log(`💳 Updated ${updateResult.modifiedCount} of ${bookingIds.length} bookings to 'paid' status`);
+  
+  // Check if all bookings for this event are now paid
+  const remainingUnpaidCount = await Booking.countDocuments({
+    event: event._id,
+    isPaidByPlanner: true,
+    paymentStatus: 'unpaid',
+    status: { $nin: ['rejected', 'cancelled'] }
+  });
+
+  // Only mark event as fully paid if ALL bookings are paid
+  if (remainingUnpaidCount === 0) {
+    event.plannerPaymentStatus = 'paid';
+    event.plannerPaidAt = new Date();
+    console.log(`✅ All bookings paid - Event payment status set to 'paid'`);
+  } else {
+    event.plannerPaymentStatus = 'partial';
+    console.log(`⚠️ Partial payment - ${remainingUnpaidCount} bookings still unpaid`);
+  }
+
   event.plannerPaymentDetails = {
     transactionId: razorpay_payment_id,
     paymentMethod: 'razorpay',
@@ -1143,26 +1180,14 @@ export const processPlannerPayment = asyncHandler(async (req, res) => {
     razorpay_order_id,
     razorpay_payment_id,
     razorpay_signature,
+    lastPaymentAt: new Date()
   };
-
-  // Mark all associated guest bookings as paid
-  const updateResult = await Booking.updateMany(
-    { 
-      event: event._id, 
-      isPaidByPlanner: true,
-      paymentStatus: 'unpaid'  // Only update unpaid bookings
-    },
-    { 
-      paymentStatus: 'paid',
-      status: 'confirmed'  // Auto-confirm bookings when planner pays
-    }
-  );
-  
-  console.log(`💳 Updated ${updateResult.modifiedCount} bookings to 'paid' status`);
   
   // Change status to active so event shows in "Manage Events"
-  event.status = 'active';
-  console.log(`✅ Event status changed to "active" for: ${event.name}`);
+  if (event.status === 'draft') {
+    event.status = 'active';
+    console.log(`✅ Event status changed to "active" for: ${event.name}`);
+  }
 
   await event.save();
 

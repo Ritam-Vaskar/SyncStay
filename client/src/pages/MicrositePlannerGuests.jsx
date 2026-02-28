@@ -190,9 +190,14 @@ export const MicrositePlannerGuests = () => {
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
+      console.log('File selected:', file.name, 'Size:', file.size, 'Type:', file.type);
+      
       const reader = new FileReader();
       reader.onload = (event) => {
-        setExcelFile(event.target.result);
+        // Extract base64 data without the data URL prefix
+        const base64 = event.target.result.split(',')[1];
+        console.log('Base64 length:', base64?.length);
+        setExcelFile(base64);
       };
       reader.readAsDataURL(file);
     }
@@ -828,11 +833,11 @@ export const MicrositePlannerGuests = () => {
                       <CheckCircle className="h-10 w-10 text-green-600" />
                     </div>
                     <div>
-                      <p className="text-lg font-bold text-green-600">File Selected</p>
-                      <p className="text-sm text-gray-600 mt-2">Ready to upload</p>
+                      <p className="text-xl font-bold text-green-600 mb-1">File Selected</p>
+                      <p className="text-base text-gray-600 font-medium">Ready to upload</p>
                     </div>
-                    <label className="btn btn-outline cursor-pointer border-2 px-6 py-3 font-semibold">
-                      <Upload className="h-5 w-5 mr-2" />
+                    <label className="inline-flex items-center gap-2 cursor-pointer px-6 py-3 bg-white border-2 border-blue-500 text-blue-600 rounded-lg font-semibold hover:bg-blue-50 hover:border-blue-600 transition-all shadow-sm">
+                      <Upload className="h-5 w-5" />
                       Choose Different File
                       <input
                         type="file"
