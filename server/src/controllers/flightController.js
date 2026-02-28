@@ -320,17 +320,8 @@ export const publishFlightConfiguration = async (req, res) => {
       return res.status(403).json({ message: 'Not authorized' });
     }
 
-    // Validate all groups have flights selected
-    const missingGroups = configuration.locationGroups.filter(
-      (group) => !configuration.configuredGroups.includes(group.groupName)
-    );
-
-    if (missingGroups.length > 0) {
-      return res.status(400).json({
-        message: 'Cannot publish: Some groups do not have flights configured',
-        missingGroups: missingGroups.map((g) => g.groupName),
-      });
-    }
+    // Allow publishing even if not all groups have flights configured
+    // Some groups may not need flight arrangements
 
     configuration.isPublished = true;
     configuration.publishedAt = new Date();
@@ -493,6 +484,9 @@ export const bookFlight = async (req, res) => {
       return res.status(403).json({ message: 'Flight bookings not available' });
     }
 
+    // Check if event is private to determine payment responsibility
+    const isPaidByPlanner = event.isPrivate;
+
     // Generate a unique booking ID
     const bookingId = `SYN-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
 
@@ -502,6 +496,7 @@ export const bookFlight = async (req, res) => {
       event: eventId,
       guest: guestDetails,
       locationGroup,
+      isPaidByPlanner,
       flightSelection: {
         arrival: arrivalFlight ? {
           traceId: arrivalFlight.traceId,
@@ -760,6 +755,130 @@ export const cancelBooking = async (req, res) => {
   } catch (error) {
     console.error('Cancel Booking Error:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+/**
+ * HELPER FUNCTIONS
+ */
+
+/**
+ * Get all flight bookings for an event (Planner only)
+ */
+export const getPlannerFlightBookings = async (req, res) => {
+  try {
+    const { eventId } = req.params;
+    const userId = req.user.id;
+
+    // Verify event exists and belongs to planner
+    const event = await Event.findById(eventId);
+    if (!event) {
+      return res.status(404).json({ message: 'Event not found' });
+    }
+
+    if (event.planner.toString() !== userId) {
+      return res.status(403).json({ message: 'Not authorized to view these bookings' });
+    }
+
+    const bookings = await FlightBooking.find({ event: eventId })
+      .populate('event', 'name startDate endDate location isPrivate')
+      .sort({ createdAt: -1 });
+
+    res.json({
+      success: true,
+      message: 'Flight bookings retrieved',
+      data: bookings,
+      count: bookings.length,
+    });
+  } catch (error) {
+    console.error('Get Planner Flight Bookings Error:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Server error', 
+      error: error.message 
+    });
+  }
+};
+
+/**
+ * Process planner bulk payment for flight bookings (Private events)
+ */
+export const processPlannerFlightPayment = async (req, res) => {
+  try {
+    const { eventId } = req.params;
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, bookingIds } = req.body;
+    const userId = req.user.id;
+
+    // Verify event exists and belongs to planner
+    const event = await Event.findById(eventId);
+    if (!event) {
+      return res.status(404).json({ 
+        success: false,
+        message: 'Event not found' 
+      });
+    }
+
+    if (event.planner.toString() !== userId) {
+      return res.status(403).json({ 
+        success: false,
+        message: 'Not authorized' 
+      });
+    }
+
+    if (!event.isPrivate) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'Payment not required for public events' 
+      });
+    }
+
+    // Validate booking IDs
+    if (!bookingIds || !Array.isArray(bookingIds) || bookingIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'No bookings specified in payment',
+      });
+    }
+
+    console.log(`💳 Processing flight payment for ${bookingIds.length} booking(s)`);
+
+    // Update ONLY the selected flight bookings to paid
+    const updateResult = await FlightBooking.updateMany(
+      { 
+        _id: { $in: bookingIds },
+        event: eventId, 
+        isPaidByPlanner: true,
+        paymentStatus: 'unpaid'
+      },
+      { 
+        paymentStatus: 'paid',
+        status: 'ticketed',  // Auto-confirm flight bookings when planner pays
+        razorpay_payment_id,
+        razorpay_order_id,
+        paidAt: new Date(),
+        'paymentDetails.razorpayPaymentId': razorpay_payment_id,
+        'paymentDetails.razorpayOrderId': razorpay_order_id,
+        'paymentDetails.paidAt': new Date()
+      }
+    );
+    
+    console.log(`💳 Updated ${updateResult.modifiedCount} of ${bookingIds.length} flight bookings to 'paid' status`);
+
+    res.status(200).json({
+      success: true,
+      message: `Payment successful! ${updateResult.modifiedCount} flight booking(s) confirmed.`,
+      data: {
+        updatedCount: updateResult.modifiedCount,
+        bookingIds
+      }
+    });
+  } catch (error) {
+    console.error('Process Planner Flight Payment Error:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Server error', 
+      error: error.message 
+    });
   }
 };
 

@@ -84,7 +84,13 @@ export const MicrositeMyBookings = () => {
                     }`}>
                       {booking.status}
                     </span>
-                    <p className="text-2xl font-bold text-gray-900 mt-2">{formatCurrency(booking.totalAmount)}</p>
+                    {event.isPrivate ? (
+                      <div className="mt-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
+                        <p className="text-sm font-semibold text-blue-900">Paid by planner</p>
+                      </div>
+                    ) : (
+                      <p className="text-2xl font-bold text-gray-900 mt-2">{formatCurrency(booking.totalAmount)}</p>
+                    )}
                   </div>
                 </div>
 

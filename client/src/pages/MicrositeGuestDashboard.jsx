@@ -119,7 +119,11 @@ export const MicrositeGuestDashboard = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600">Total Spent</p>
-                <p className="text-2xl font-bold text-primary-600">{formatCurrency(stats.totalAmount)}</p>
+                {event.isPrivate ? (
+                  <p className="text-sm font-semibold text-blue-600">Paid by planner</p>
+                ) : (
+                  <p className="text-2xl font-bold text-primary-600">{formatCurrency(stats.totalAmount)}</p>
+                )}
               </div>
               <div className="bg-primary-100 p-3 rounded-lg">
                 <CreditCard className="h-6 w-6 text-primary-600" />
@@ -227,7 +231,11 @@ export const MicrositeGuestDashboard = () => {
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="font-bold text-gray-900">{formatCurrency(booking.totalFare || 0)}</p>
+                    {event.isPrivate ? (
+                      <p className="text-sm font-semibold text-blue-600">Paid by planner</p>
+                    ) : (
+                      <p className="font-bold text-gray-900">{formatCurrency(booking.totalFare || 0)}</p>
+                    )}
                     <span className={`badge ${
                       booking.status === 'completed' ? 'badge-success' :
                       booking.status === 'pending' ? 'badge-warning' :
@@ -257,7 +265,11 @@ export const MicrositeGuestDashboard = () => {
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="font-bold text-gray-900">{formatCurrency(booking.pricing?.totalAmount || 0)}</p>
+                    {event.isPrivate ? (
+                      <p className="text-sm font-semibold text-blue-600">Paid by planner</p>
+                    ) : (
+                      <p className="font-bold text-gray-900">{formatCurrency(booking.pricing?.totalAmount || 0)}</p>
+                    )}
                     <span className={`badge ${
                       booking.status === 'confirmed' ? 'badge-success' :
                       booking.status === 'pending' ? 'badge-warning' :

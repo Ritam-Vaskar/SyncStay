@@ -655,15 +655,15 @@ export const MicrositeFlightManagement = () => {
                     <div className="flex items-center gap-4">
                       <button
                         onClick={publishConfiguration}
-                        disabled={isPublishing || configuration.stats?.configuredGroups !== configuration.stats?.totalGroups}
+                        disabled={isPublishing}
                         className="px-6 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed font-bold flex items-center gap-2 shadow-lg"
                       >
                         <Globe className="h-5 w-5" />
                         {isPublishing ? 'Publishing...' : 'Publish Configuration Now'}
                       </button>
                       {configuration.stats?.configuredGroups !== configuration.stats?.totalGroups && (
-                        <p className="text-sm text-amber-700 italic">
-                          All groups must have flights configured ({configuration.stats?.configuredGroups || 0}/{configuration.stats?.totalGroups || 0} complete)
+                        <p className="text-sm text-blue-600 italic">
+                          Optional: {configuration.stats?.configuredGroups || 0}/{configuration.stats?.totalGroups || 0} groups have flights configured
                         </p>
                       )}
                     </div>
