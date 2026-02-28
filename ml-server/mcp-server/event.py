@@ -105,21 +105,33 @@ def get_event_hotels(event_slug: str) -> str:
             special_offer = hotel.get("specialOffer", "")
             notes = hotel.get("notes", "")
 
-            # Pricing breakdown
+            # Pricing breakdown per room type
             pricing = hotel.get("pricing", {})
             pricing_lines = []
-            if pricing.get("perNight"):
-                pricing_lines.append(f"Per Night: ₹{pricing['perNight']}")
-            if pricing.get("perGuest"):
-                pricing_lines.append(f"Per Guest: ₹{pricing['perGuest']}")
-            if pricing.get("totalPackage"):
-                pricing_lines.append(f"Total Package: ₹{pricing['totalPackage']}")
-            pricing_str = ", ".join(pricing_lines) if pricing_lines else "Contact hotel"
+            for room_type, label in [("singleRoom", "Single Room"), ("doubleRoom", "Double Room"), ("suite", "Suite")]:
+                room = pricing.get(room_type, {})
+                if room and room.get("availableRooms", 0) > 0:
+                    price = room.get("pricePerNight", "N/A")
+                    avail = room.get("availableRooms", 0)
+                    pricing_lines.append(f"{label}: ₹{price}/night ({avail} rooms)")
+            pricing_str = " | ".join(pricing_lines) if pricing_lines else "Contact hotel"
 
-            # Amenities & Facilities
+            # Facilities (object of booleans)
+            facilities_obj = hotel.get("facilities", {})
+            facility_names = [key.replace("Room", " Room") for key, val in facilities_obj.items() if val]
+
+            # Amenities (array of strings)
             amenities = hotel.get("amenities", [])
-            facilities = hotel.get("facilities", [])
-            additional = hotel.get("additionalServices", [])
+
+            # Additional services (nested object)
+            additional_obj = hotel.get("additionalServices", {})
+            additional_lines = []
+            for svc_key, svc_val in additional_obj.items():
+                if isinstance(svc_val, dict) and svc_val.get("available"):
+                    desc = svc_val.get("description", svc_key)
+                    additional_lines.append(desc)
+                elif isinstance(svc_val, str) and svc_val:
+                    additional_lines.append(svc_val)
 
             lines.append(
                 f"{i}. 🏨 **{name}**\n"
@@ -129,10 +141,10 @@ def get_event_hotels(event_slug: str) -> str:
             )
             if amenities:
                 lines.append(f"   ✨ Amenities: {', '.join(amenities)}\n")
-            if facilities:
-                lines.append(f"   🏢 Facilities: {', '.join(facilities)}\n")
-            if additional:
-                lines.append(f"   🎁 Additional Services: {', '.join(additional)}\n")
+            if facility_names:
+                lines.append(f"   🏢 Facilities: {', '.join(facility_names)}\n")
+            if additional_lines:
+                lines.append(f"   🎁 Additional Services: {', '.join(additional_lines)}\n")
             if special_offer:
                 lines.append(f"   🎉 Special Offer: {special_offer}\n")
             if notes:

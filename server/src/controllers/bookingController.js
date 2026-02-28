@@ -223,19 +223,17 @@ export const createBooking = asyncHandler(async (req, res) => {
     }
   }
 
-  // For private events, ensure planner has paid before guests can book
-  if (eventDoc.isPrivate && eventDoc.plannerPaymentStatus !== 'paid') {
-    return res.status(400).json({
-      success: false,
-      message: 'This private event is not yet active. Planner payment is pending.',
-    });
-  }
+  // For private events, allow guests to book before planner payment
+  // Flow: Guests book first → Bookings accumulated → Planner pays total → Confirmed
+  // Guests' bookings will have paymentStatus: 'unpaid' until planner pays
 
   // Check if Razorpay payment was made
   const hasRazorpayPayment = req.body.razorpay_payment_id && req.body.razorpay_order_id;
-  // For private events, planner already paid — mark as 'paid'
-  // For public events, only mark as 'paid' if Razorpay payment was made
-  const bookingPaymentStatus = isPaidByPlanner ? 'paid' : (hasRazorpayPayment ? 'paid' : 'unpaid');
+  
+  // Payment status logic:
+  // - Private events: bookings are 'unpaid' initially (planner pays later for all bookings)
+  // - Public events: 'paid' if Razorpay payment exists, otherwise 'unpaid'
+  const bookingPaymentStatus = eventDoc.isPrivate ? 'unpaid' : (hasRazorpayPayment ? 'paid' : 'unpaid');
 
   // Create booking
   const booking = await Booking.create({

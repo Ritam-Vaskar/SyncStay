@@ -7,6 +7,9 @@ A comprehensive MERN stack application for managing group inventory for MICE eve
 ### Core Functionality
 - **Multi-Role System**: Admin, Event Planner, Hotel/Supplier, and Guest roles with specific permissions
 - **Event Management**: Create and manage events with custom pricing tiers and booking rules
+- **Instant Microsite Access**: Planners get immediate microsite access after admin approval
+- **AI Hotel Recommendations**: Smart hotel matching based on location, budget, event type, and capacity
+- **Dual Hotel Selection**: Choose from AI-recommended hotels (instant) or RFP proposals (traditional)
 - **Inventory Management**: Lock hotel inventory per event, track real-time availability
 - **RFP & Proposal Flow**: Hotels submit proposals, planners compare and accept
 - **Microsite Engine**: Auto-generated branded microsites for each event
@@ -202,6 +205,10 @@ After running the seeder, use these credentials to login:
 - `GET /api/events/:id` - Get single event
 - `POST /api/events` - Create event (Planner)
 - `PUT /api/events/:id` - Update event (Planner)
+- `PUT /api/events/:id/approve` - Approve event and publish microsite (Admin)
+- `GET /api/events/:id/recommendations` - Get AI hotel recommendations (Planner)
+- `POST /api/events/:id/select-recommended-hotel` - Select recommended hotel (Planner)
+- `GET /api/events/:id/microsite-proposals` - Get recommendations + RFP proposals (Planner)
 - `DELETE /api/events/:id` - Delete event (Planner)
 - `GET /api/events/microsite/:slug` - Get event by slug (Public)
 

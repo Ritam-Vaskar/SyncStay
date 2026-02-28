@@ -11,31 +11,60 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-const sendEmail = async (options) => {
+const sendEmail = async (toOrOptions, subject, html) => {
   if (!email || !password) {
-    console.warn('Email is not configured. Skipping send.');
+    console.warn('⚠️ Email is not configured. EMAIL_USER or EMAIL_PassKey missing in .env');
+    console.warn('EMAIL_USER:', email ? 'SET' : 'NOT SET');
+    console.warn('EMAIL_PassKey:', password ? 'SET' : 'NOT SET');
     return;
   }
 
-  const { to, subject, text, html, attachments = [] } = options;
+  // Support both old signature sendEmail(to, subject, html) and new object-based signature
+  let to, emailSubject, content, isHTML, attachments;
   
-  // Use html if provided, otherwise use text
-  const content = html || text;
-  const isHTML = html ? true : false;
+  if (typeof toOrOptions === 'string') {
+    // Old signature: sendEmail(to, subject, html)
+    to = toOrOptions;
+    emailSubject = subject;
+    content = html;
+    isHTML = true;
+    attachments = [];
+    console.log('📧 Using old sendEmail signature (to, subject, html)');
+  } else {
+    // New signature: sendEmail({ to, subject, text, html, attachments })
+    const options = toOrOptions;
+    to = options.to;
+    emailSubject = options.subject;
+    content = options.html || options.text;
+    isHTML = options.html ? true : false;
+    attachments = options.attachments || [];
+    console.log('📧 Using new sendEmail signature (options object)');
+  }
+  
+  console.log('📤 Preparing to send email:');
+  console.log('  To:', to);
+  console.log('  Subject:', emailSubject);
+  console.log('  Has HTML:', isHTML);
+  console.log('  Attachments:', attachments.length);
   
   const mailOptions = {
     from: email,
     to: to,
-    subject: subject,
+    subject: emailSubject,
     ...(isHTML ? { html: content } : { text: content }),
     attachments: attachments, 
   };
 
   try {
-    await transporter.sendMail(mailOptions);
-    console.log('Email sent successfully');
+    console.log('🚀 Sending email via nodemailer...');
+    const info = await transporter.sendMail(mailOptions);
+    console.log('✅ Email sent successfully');
+    console.log('  Message ID:', info.messageId);
+    console.log('  Response:', info.response);
   } catch (error) {
-    console.error('Error sending email:', error);
+    console.error('❌ Error sending email:', error.message);
+    console.error('  Error code:', error.code);
+    console.error('  Error command:', error.command);
     throw error;
   }
 };

@@ -37,13 +37,8 @@ export const checkPrivateEventAccess = asyncHandler(async (req, res, next) => {
     });
   }
 
-  // For private events, check if planner has paid
-  if (event.isPrivate && event.plannerPaymentStatus !== 'paid') {
-    return res.status(403).json({
-      success: false,
-      message: 'This private event is not yet active. Planner payment is pending.',
-    });
-  }
+  // For private events, allow access even before planner payment
+  // Flow: Microsite published → Guests book → Planner pays → Event confirmed
 
   // If event is public, allow access
   if (!event.isPrivate) {

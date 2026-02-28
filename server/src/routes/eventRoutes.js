@@ -10,8 +10,14 @@ import {
   rejectEvent,
   addAdminComment,
   replyToAdminComment,
+  sendChatMessage,
+  getChatMessages,
   selectHotelsForEvent,
   processPlannerPayment,
+  getHotelRecommendations,
+  selectRecommendedHotel,
+  getMicrositeProposals,
+  activateEvent,
 } from '../controllers/eventController.js';
 import { protect, authorize, optionalAuth } from '../middlewares/auth.js';
 import { validateEvent, validateMongoId } from '../middlewares/validators.js';
@@ -42,9 +48,21 @@ router.put('/:id/reject', authorize('admin'), validateMongoId, auditLogger('even
 router.post('/:id/comment', authorize('admin'), validateMongoId, auditLogger('event_comment', 'Event'), addAdminComment);
 router.post('/:id/comment/:commentId/reply', authorize('planner'), validateMongoId, auditLogger('event_comment_reply', 'Event'), replyToAdminComment);
 
+// Chat routes (continuous conversation)
+router.post('/:id/chat/send', authorize('admin', 'planner'), validateMongoId, auditLogger('chat_message', 'Event'), sendChatMessage);
+router.get('/:id/chat/messages', authorize('admin', 'planner'), validateMongoId, getChatMessages);
+
+// Activate event (utility for fixing stuck events)
+router.put('/:id/activate', authorize('planner', 'admin'), validateMongoId, auditLogger('event_update', 'Event'), activateEvent);
+
 // Private event - Hotel selection and planner payment
 router.post('/:id/select-hotels', authorize('planner'), validateMongoId, selectHotelsForEvent);
 router.post('/:id/planner-payment', authorize('planner'), validateMongoId, processPlannerPayment);
+
+// Hotel recommendations and selection
+router.get('/:id/recommendations', authorize('planner', 'admin'), validateMongoId, getHotelRecommendations);
+router.post('/:id/select-recommended-hotel', authorize('planner'), validateMongoId, selectRecommendedHotel);
+router.get('/:id/microsite-proposals', authorize('planner', 'admin'), validateMongoId, getMicrositeProposals);
 
 router
   .route('/:id')

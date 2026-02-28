@@ -36,10 +36,10 @@ export const DashboardLayout = ({ children }) => {
       return [
         ...baseItems,
         { name: 'Events', href: '/planner/events', icon: Calendar },
-        { name: 'Inventory', href: '/planner/inventory', icon: Package },
         { name: 'Proposals', href: '/planner/proposals', icon: FileText },
         { name: 'Bookings', href: '/planner/bookings', icon: CreditCard },
         { name: 'Analytics', href: '/planner/analytics', icon: BarChart3 },
+        { name: 'Messages', href: '/planner/feedback', icon: MessageSquare },
       ];
     }
 
@@ -64,10 +64,9 @@ export const DashboardLayout = ({ children }) => {
     if (user?.role === 'admin') {
       return [
         ...baseItems,
-        { name: 'Event Approvals', href: '/admin/approvals', icon: FileText },
+        { name: 'All Events', href: '/admin/events', icon: Calendar },
         { name: 'Feedback Conversations', href: '/admin/feedback', icon: MessageSquare },
         { name: 'Users', href: '/admin/users', icon: Users },
-        { name: 'All Events', href: '/admin/events', icon: Calendar },
         { name: 'Analytics', href: '/admin/analytics', icon: BarChart3 },
         { name: 'Audit Logs', href: '/admin/logs', icon: FileText },
       ];

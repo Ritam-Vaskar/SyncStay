@@ -40,6 +40,17 @@ const users = [
     phone: '+1-555-0201',
     isActive: true,
     isVerified: true,
+    location: {
+      city: 'Mumbai',
+      country: 'India',
+      address: '123 Marine Drive, Mumbai 400020'
+    },
+    totalRooms: 250,
+    specialization: ['wedding', 'conference', 'corporate'],
+    priceRange: {
+      min: 8000,
+      max: 25000
+    }
   },
   {
     name: 'Ocean View Resort',
@@ -50,6 +61,185 @@ const users = [
     phone: '+1-555-0202',
     isActive: true,
     isVerified: true,
+    location: {
+      city: 'Goa',
+      country: 'India',
+      address: '456 Beach Road, North Goa 403001'
+    },
+    totalRooms: 180,
+    specialization: ['wedding', 'destination-wedding', 'retreat'],
+    priceRange: {
+      min: 6000,
+      max: 18000
+    }
+  },
+  {
+    name: 'The Imperial Palace',
+    email: 'hotel3@example.com',
+    password: 'password123',
+    role: 'hotel',
+    organization: 'The Imperial Palace',
+    phone: '+1-555-0203',
+    isActive: true,
+    isVerified: true,
+    location: {
+      city: 'Delhi',
+      country: 'India',
+      address: '789 Connaught Place, New Delhi 110001'
+    },
+    totalRooms: 300,
+    specialization: ['conference', 'corporate', 'exhibition'],
+    priceRange: {
+      min: 10000,
+      max: 30000
+    }
+  },
+  {
+    name: 'Lakeside Retreat',
+    email: 'hotel4@example.com',
+    password: 'password123',
+    role: 'hotel',
+    organization: 'Lakeside Retreat',
+    phone: '+1-555-0204',
+    isActive: true,
+    isVerified: true,
+    location: {
+      city: 'Udaipur',
+      country: 'India',
+      address: '321 Lake Palace Road, Udaipur 313001'
+    },
+    totalRooms: 120,
+    specialization: ['wedding', 'destination-wedding', 'luxury'],
+    priceRange: {
+      min: 15000,
+      max: 50000
+    }
+  },
+  {
+    name: 'Tech Hub Convention Center',
+    email: 'hotel5@example.com',
+    password: 'password123',
+    role: 'hotel',
+    organization: 'Tech Hub Convention Center',
+    phone: '+1-555-0205',
+    isActive: true,
+    isVerified: true,
+    location: {
+      city: 'Bangalore',
+      country: 'India',
+      address: '555 MG Road, Bangalore 560001'
+    },
+    totalRooms: 200,
+    specialization: ['conference', 'tech-summit', 'corporate', 'exhibition'],
+    priceRange: {
+      min: 7000,
+      max: 20000
+    }
+  },
+  {
+    name: 'Heritage Haveli',
+    email: 'hotel6@example.com',
+    password: 'password123',
+    role: 'hotel',
+    organization: 'Heritage Haveli',
+    phone: '+1-555-0206',
+    isActive: true,
+    isVerified: true,
+    location: {
+      city: 'Jaipur',
+      country: 'India',
+      address: '888 Heritage Street, Jaipur 302001'
+    },
+    totalRooms: 80,
+    specialization: ['wedding', 'destination-wedding', 'cultural'],
+    priceRange: {
+      min: 12000,
+      max: 35000
+    }
+  },
+  {
+    name: 'Business Park Hotel',
+    email: 'hotel7@example.com',
+    password: 'password123',
+    role: 'hotel',
+    organization: 'Business Park Hotel',
+    phone: '+1-555-0207',
+    isActive: true,
+    isVerified: true,
+    location: {
+      city: 'Mumbai',
+      country: 'India',
+      address: '999 BKC, Mumbai 400051'
+    },
+    totalRooms: 150,
+    specialization: ['corporate', 'conference', 'training'],
+    priceRange: {
+      min: 9000,
+      max: 22000
+    }
+  },
+  {
+    name: 'Mountain View Lodge',
+    email: 'hotel8@example.com',
+    password: 'password123',
+    role: 'hotel',
+    organization: 'Mountain View Lodge',
+    phone: '+1-555-0208',
+    isActive: true,
+    isVerified: true,
+    location: {
+      city: 'Shimla',
+      country: 'India',
+      address: '111 Mall Road, Shimla 171001'
+    },
+    totalRooms: 60,
+    specialization: ['retreat', 'team-building', 'leisure'],
+    priceRange: {
+      min: 5000,
+      max: 15000
+    }
+  },
+  {
+    name: 'Coastal Convention Resort',
+    email: 'hotel9@example.com',
+    password: 'password123',
+    role: 'hotel',
+    organization: 'Coastal Convention Resort',
+    phone: '+1-555-0209',
+    isActive: true,
+    isVerified: true,
+    location: {
+      city: 'Chennai',
+      country: 'India',
+      address: '222 ECR, Chennai 600041'
+    },
+    totalRooms: 220,
+    specialization: ['conference', 'corporate', 'wedding'],
+    priceRange: {
+      min: 8500,
+      max: 24000
+    }
+  },
+  {
+    name: 'Royal Garden Hotel',
+    email: 'hotel10@example.com',
+    password: 'password123',
+    role: 'hotel',
+    organization: 'Royal Garden Hotel',
+    phone: '+1-555-0210',
+    isActive: true,
+    isVerified: true,
+    location: {
+      city: 'Pune',
+      country: 'India',
+      address: '333 Koregaon Park, Pune 411001'
+    },
+    totalRooms: 170,
+    specialization: ['wedding', 'conference', 'social-events'],
+    priceRange: {
+      min: 7500,
+      max: 21000
+    }
   },
   {
     name: 'John Doe',
@@ -96,10 +286,16 @@ const seedDatabase = async () => {
 
     const admin = createdUsers.find((u) => u.role === 'admin');
     const planner = createdUsers.find((u) => u.role === 'planner');
+    const hotels = createdUsers.filter((u) => u.role === 'hotel');
     const hotel1 = createdUsers.find((u) => u.email === 'hotel1@example.com');
     const hotel2 = createdUsers.find((u) => u.email === 'hotel2@example.com');
+    const hotel3 = createdUsers.find((u) => u.email === 'hotel3@example.com');
+    const hotel4 = createdUsers.find((u) => u.email === 'hotel4@example.com');
+    const hotel5 = createdUsers.find((u) => u.email === 'hotel5@example.com');
     const guest1 = createdUsers.find((u) => u.email === 'guest1@example.com');
     const guest2 = createdUsers.find((u) => u.email === 'guest2@example.com');
+
+    console.log(`✅ Created ${hotels.length} hotels with complete profiles`);
 
     // Create events
     console.log('📅 Creating events...');
@@ -241,7 +437,7 @@ const seedDatabase = async () => {
         totalRooms: 50,
         availableRooms: 35,
         pricePerNight: 250,
-        currency: 'USD',
+        currency: 'INR',
         checkInDate: new Date('2026-06-14'),
         checkOutDate: new Date('2026-06-19'),
         inclusions: ['Breakfast', 'WiFi', 'Gym Access', 'Airport Transfer'],
@@ -259,7 +455,7 @@ const seedDatabase = async () => {
         totalRooms: 30,
         availableRooms: 20,
         pricePerNight: 400,
-        currency: 'USD',
+        currency: 'INR',
         checkInDate: new Date('2026-06-14'),
         checkOutDate: new Date('2026-06-19'),
         inclusions: ['Breakfast', 'WiFi', 'Spa Access', 'Concierge Service'],
@@ -276,7 +472,7 @@ const seedDatabase = async () => {
         totalRooms: 40,
         availableRooms: 38,
         pricePerNight: 350,
-        currency: 'USD',
+        currency: 'INR',
         checkInDate: new Date('2026-08-19'),
         checkOutDate: new Date('2026-08-24'),
         inclusions: ['All Meals', 'WiFi', 'Beach Access', 'Welcome Cocktail'],
@@ -382,7 +578,7 @@ const seedDatabase = async () => {
           tax: 250,
           discount: 0,
           totalAmount: 2750,
-          currency: 'USD',
+          currency: 'INR',
         },
         status: 'confirmed',
         paymentStatus: 'paid',
@@ -412,7 +608,7 @@ const seedDatabase = async () => {
           tax: 200,
           discount: 100,
           totalAmount: 2100,
-          currency: 'USD',
+          currency: 'INR',
         },
         status: 'confirmed',
         paymentStatus: 'partial',
@@ -431,7 +627,7 @@ const seedDatabase = async () => {
         event: techSummit._id,
         payer: guest1._id,
         amount: 2750,
-        currency: 'USD',
+        currency: 'INR',
         paymentMethod: 'card',
         paymentType: 'full',
         status: 'completed',
@@ -446,7 +642,7 @@ const seedDatabase = async () => {
         event: techSummit._id,
         payer: guest2._id,
         amount: 1050,
-        currency: 'USD',
+        currency: 'INR',
         paymentMethod: 'card',
         paymentType: 'partial',
         status: 'completed',

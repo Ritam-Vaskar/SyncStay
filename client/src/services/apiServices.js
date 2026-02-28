@@ -18,6 +18,13 @@ export const eventService = {
   reject: (id, reason) => api.put(`/events/${id}/reject`, { reason }),
   addComment: (id, comment) => api.post(`/events/${id}/comment`, { comment }),
   replyToComment: (id, commentId, reply) => api.post(`/events/${id}/comment/${commentId}/reply`, { reply }),
+  // Chat messages
+  sendChatMessage: (id, message) => api.post(`/events/${id}/chat/send`, { message }),
+  getChatMessages: (id) => api.get(`/events/${id}/chat/messages`),
+  // Hotel recommendations and selections
+  getHotelRecommendations: (id) => api.get(`/events/${id}/recommendations`),
+  selectRecommendedHotel: (id, hotelId) => api.post(`/events/${id}/select-recommended-hotel`, { hotelId }),
+  getMicrositeProposals: (id) => api.get(`/events/${id}/microsite-proposals`),
 };
 
 export const inventoryService = {
@@ -62,4 +69,27 @@ export const analyticsService = {
   getEventAnalytics: (eventId) => api.get(`/analytics/event/${eventId}`),
   getRevenueAnalytics: (params) => api.get('/analytics/revenue', { params }),
   getAuditLogs: (params) => api.get('/analytics/audit-logs', { params }),
+  getEventActivityLogs: (eventId, params) => api.get(`/analytics/events/${eventId}/activity-logs`, { params }),
+};
+
+export const flightService = {
+  // Planner Operations
+  initializeConfiguration: (eventId) => api.post(`/flights/events/${eventId}/configuration/initialize`),
+  getConfiguration: (eventId) => api.get(`/flights/events/${eventId}/configuration`),
+  updateConfiguration: (eventId, data) => api.put(`/flights/events/${eventId}/configuration`, data),
+  searchFlights: (eventId, groupName, data) => api.post(`/flights/events/${eventId}/groups/${groupName}/search`, data),
+  selectFlights: (eventId, groupName, data) => api.post(`/flights/events/${eventId}/groups/${groupName}/select`, data),
+  publishConfiguration: (eventId) => api.post(`/flights/events/${eventId}/configuration/publish`),
+  
+  // Guest Operations
+  getAssignedFlights: (eventId, guestEmail) => api.get(`/flights/events/${eventId}/assigned`, { params: { guestEmail } }),
+  getFareQuote: (data) => api.post('/flights/fare-quote', data),
+  bookFlight: (data) => api.post('/flights/book', data),
+  ticketFlight: (bookingId, data) => api.post(`/flights/bookings/${bookingId}/ticket`, data),
+  getGuestBookings: (eventId, guestEmail) => api.get(`/flights/events/${eventId}/bookings`, { params: { guestEmail } }),
+  getBookingDetails: (bookingId) => api.get(`/flights/bookings/${bookingId}`),
+  cancelBooking: (bookingId, reason) => api.post(`/flights/bookings/${bookingId}/cancel`, { reason }),
+  
+  // Admin/Planner - View all bookings for event
+  getAllEventBookings: (eventId) => api.get(`/flights/events/${eventId}/all-bookings`),
 };

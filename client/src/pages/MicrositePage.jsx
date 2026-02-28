@@ -6,9 +6,10 @@ import { guestInvitationService } from '@/services/guestInvitationService';
 import { hotelProposalService } from '@/services/hotelProposalService';
 import { LoadingPage } from '@/components/LoadingSpinner';
 import { formatCurrency, formatDate } from '@/utils/helpers';
-import { Calendar, MapPin, Users, Hotel, Check, X, LogIn, UserPlus, LogOut, LayoutDashboard, Lock, Mail, CheckCircle, CreditCard, Loader2 } from 'lucide-react';
+import { Calendar, MapPin, Users, Hotel, Check, X, LogIn, UserPlus, LogOut, LayoutDashboard, Lock, Mail, CheckCircle, CreditCard, Loader2, Plane, ChevronRight, ArrowRight, User, Clock } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '@/store/authStore';
+import api from '@/services/api';
 
 export const MicrositePage = () => {
   const { slug } = useParams();
@@ -48,6 +49,32 @@ export const MicrositePage = () => {
     queryFn: () => hotelProposalService.getSelectedForMicrosite(slug),
     enabled: !!slug,
     refetchInterval: 30000, // Refetch every 30 seconds to show updated availability
+  });
+
+  // Fetch assigned flights
+  const { data: flightData, isLoading: flightLoading } = useQuery({
+    queryKey: ['assigned-flights-home', eventData?.data?._id, user?.email],
+    queryFn: async () => {
+      const response = await api.get(
+        `/flights/events/${eventData.data._id}/assigned?guestEmail=${user.email}`
+      );
+      return response;
+    },
+    enabled: !!eventData?.data?._id && !!user?.email,
+    retry: false,
+  });
+
+  // Fetch guest's flight bookings
+  const { data: flightBookingsData } = useQuery({
+    queryKey: ['my-flight-bookings-home', eventData?.data?._id, user?.email],
+    queryFn: async () => {
+      const response = await api.get(
+        `/flights/events/${eventData.data._id}/bookings?guestEmail=${user.email}`
+      );
+      return response;
+    },
+    enabled: !!eventData?.data?._id && !!user?.email,
+    retry: false,
   });
 
   // Check access for private events - simplified to allow viewing for everyone
@@ -215,6 +242,22 @@ export const MicrositePage = () => {
   const handleLogout = () => {
     clearAuth();
     toast.success('Logged out successfully');
+  };
+
+  // Helper functions for flight display
+  const formatTime = (dateTimeString) => {
+    if (!dateTimeString) return '';
+    return new Date(dateTimeString).toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
+  const formatDuration = (minutes) => {
+    if (!minutes) return '';
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    return `${hours}h ${mins}m`;
   };
 
   return (
@@ -388,6 +431,253 @@ export const MicrositePage = () => {
           </div>
         </div>
 
+        {/* Flight Booking Section */}
+        {isAuthenticated && user?.email && flightData && (() => {
+          const myFlightBookings = flightBookingsData?.bookings || [];
+          const hasBookedFlights = myFlightBookings.length > 0;
+
+          if (hasBookedFlights) {
+            // Show booked flight details
+            const latestBooking = myFlightBookings[0];
+            const arrival = latestBooking.flightSelection?.arrival;
+            const departure = latestBooking.flightSelection?.departure;
+            const hasArrival = arrival?.flightDetails?.airline;
+            const hasDeparture = departure?.flightDetails?.airline;
+
+            return (
+              <div className="rounded-2xl bg-gradient-to-br from-emerald-700 via-green-700 to-teal-800 text-white shadow-2xl p-8 ms-reveal border-2 border-emerald-500">
+                <div className="mb-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-3">
+                      <div className="bg-white p-3 rounded-xl shadow-lg">
+                        <CheckCircle className="h-8 w-8 text-green-600" />
+                      </div>
+                      <div>
+                        <h3 className="text-3xl font-bold text-white drop-shadow-lg">Your Flight Booking</h3>
+                        <p className="text-white text-base font-bold mt-1">Booking ID: <span className="font-mono bg-emerald-900/50 px-3 py-1 rounded-md">{latestBooking.bookingId}</span></p>
+                      </div>
+                    </div>
+                    <span className={`px-4 py-2 rounded-full text-sm font-bold shadow-md ${
+                      latestBooking.status === 'ticketed' ? 'bg-white text-green-700' :
+                      latestBooking.status === 'booked' ? 'bg-white text-blue-700' :
+                      latestBooking.status === 'pending' ? 'bg-yellow-300 text-yellow-900' :
+                      'bg-gray-100 text-gray-800'
+                    }`}>
+                      {latestBooking.status === 'ticketed' ? '✓ Ticketed' : 
+                       latestBooking.status === 'booked' ? '✓ Booked' :
+                       latestBooking.status === 'pending' ? '⏳ Pending' : latestBooking.status}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Flight Details */}
+                <div className="space-y-4">
+                  {hasArrival && (
+                    <div className="bg-white rounded-xl p-6 shadow-xl border-2 border-gray-200">
+                      <div className="flex items-center gap-2 mb-4 pb-3 border-b-2 border-gray-200">
+                        <div className="bg-blue-600 p-2 rounded-lg">
+                          <Plane className="h-5 w-5 text-white" />
+                        </div>
+                        <div className="flex-1">
+                          <p className="font-bold text-xl text-gray-900">Arrival Flight</p>
+                          <p className="text-sm text-gray-600 font-medium">To Event Location</p>
+                        </div>
+                        {arrival.flightDetails.stops === 0 && (
+                          <span className="px-4 py-1.5 bg-green-600 text-white text-sm font-bold rounded-full shadow-md">
+                            Non-stop
+                          </span>
+                        )}
+                      </div>
+                      <div className="mb-4">
+                        <p className="font-bold text-2xl text-gray-900">{arrival.flightDetails.airline}</p>
+                        <p className="text-base text-gray-700 font-semibold">
+                          {arrival.flightDetails.airlineCode} {arrival.flightDetails.flightNumber}
+                        </p>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <p className="text-xs font-bold text-gray-600 uppercase mb-2">From</p>
+                          <p className="font-bold text-xl text-gray-900">{arrival.flightDetails.origin}</p>
+                          <p className="text-lg font-bold text-blue-600 mt-1">{formatTime(arrival.flightDetails.departureTime)}</p>
+                          <p className="text-sm text-gray-600 font-medium">{formatDate(arrival.flightDetails.departureTime)}</p>
+                        </div>
+                        <div className="flex flex-col items-center px-4">
+                          <ArrowRight className="h-7 w-7 text-gray-500 mb-2" />
+                          <div className="flex items-center gap-1 text-sm text-gray-700 bg-gray-200 px-3 py-1.5 rounded-full font-semibold">
+                            <Clock className="h-4 w-4" />
+                            <span>{formatDuration(arrival.flightDetails.duration)}</span>
+                          </div>
+                        </div>
+                        <div className="flex-1 text-right">
+                          <p className="text-xs font-bold text-gray-600 uppercase mb-2">To</p>
+                          <p className="font-bold text-xl text-gray-900">{arrival.flightDetails.destination}</p>
+                          <p className="text-lg font-bold text-green-600 mt-1">{formatTime(arrival.flightDetails.arrivalTime)}</p>
+                          <p className="text-sm text-gray-600 font-medium">{formatDate(arrival.flightDetails.arrivalTime)}</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {hasDeparture && (
+                    <div className="bg-white rounded-xl p-6 shadow-xl border-2 border-gray-200">
+                      <div className="flex items-center gap-2 mb-4 pb-3 border-b-2 border-gray-200">
+                        <div className="bg-orange-600 p-2 rounded-lg">
+                          <Plane className="h-5 w-5 text-white rotate-180" />
+                        </div>
+                        <div className="flex-1">
+                          <p className="font-bold text-xl text-gray-900">Departure Flight</p>
+                          <p className="text-sm text-gray-600 font-medium">Return Journey</p>
+                        </div>
+                        {departure.flightDetails.stops === 0 && (
+                          <span className="px-4 py-1.5 bg-green-600 text-white text-sm font-bold rounded-full shadow-md">
+                            Non-stop
+                          </span>
+                        )}
+                      </div>
+                      <div className="mb-4">
+                        <p className="font-bold text-2xl text-gray-900">{departure.flightDetails.airline}</p>
+                        <p className="text-base text-gray-700 font-semibold">
+                          {departure.flightDetails.airlineCode} {departure.flightDetails.flightNumber}
+                        </p>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <p className="text-xs font-bold text-gray-600 uppercase mb-2">From</p>
+                          <p className="font-bold text-xl text-gray-900">{departure.flightDetails.origin}</p>
+                          <p className="text-lg font-bold text-orange-600 mt-1">{formatTime(departure.flightDetails.departureTime)}</p>
+                          <p className="text-sm text-gray-600 font-medium">{formatDate(departure.flightDetails.departureTime)}</p>
+                        </div>
+                        <div className="flex flex-col items-center px-4">
+                          <ArrowRight className="h-7 w-7 text-gray-500 mb-2" />
+                          <div className="flex items-center gap-1 text-sm text-gray-700 bg-gray-200 px-3 py-1.5 rounded-full font-semibold">
+                            <Clock className="h-4 w-4" />
+                            <span>{formatDuration(departure.flightDetails.duration)}</span>
+                          </div>
+                        </div>
+                        <div className="flex-1 text-right">
+                          <p className="text-xs font-bold text-gray-600 uppercase mb-2">To</p>
+                          <p className="font-bold text-xl text-gray-900">{departure.flightDetails.destination}</p>
+                          <p className="text-lg font-bold text-green-600 mt-1">{formatTime(departure.flightDetails.arrivalTime)}</p>
+                          <p className="text-sm text-gray-600 font-medium">{formatDate(departure.flightDetails.arrivalTime)}</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Booking Summary */}
+                  <div className="bg-white rounded-xl p-6 shadow-xl border-2 border-gray-200">
+                    <div className="grid grid-cols-2 gap-6">
+                      <div className="flex items-center gap-4">
+                        <div className="bg-purple-600 p-3 rounded-xl">
+                          <Users className="h-6 w-6 text-white" />
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-600 font-bold uppercase">Passengers</p>
+                          <p className="text-3xl font-bold text-gray-900">{latestBooking.passengers?.length || 0}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <div className="bg-green-600 p-3 rounded-xl">
+                          <CreditCard className="h-6 w-6 text-white" />
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-600 font-bold uppercase">Total Amount</p>
+                          <p className="text-3xl font-bold text-green-600">{formatCurrency(latestBooking.pricing?.totalAmount || 0)}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Payment Note */}
+                  <div className="bg-blue-100 border-2 border-blue-400 rounded-xl p-5">
+                    <div className="flex items-start gap-3">
+                      <div className="bg-blue-600 p-2 rounded-lg flex-shrink-0">
+                        <CheckCircle className="h-6 w-6 text-white" />
+                      </div>
+                      <p className="text-base text-gray-900 leading-relaxed font-medium">
+                        <strong className="font-bold text-blue-900">Payment Confirmation:</strong> The event planner will handle all payment processing for your flight booking. Your booking is secured and confirmed.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* View Details Link */}
+                  <Link
+                    to={`/microsite/${slug}/book-flights`}
+                    className="w-full flex items-center justify-center gap-3 px-8 py-5 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-xl hover:from-green-700 hover:to-emerald-700 hover:shadow-2xl font-bold text-xl shadow-xl transition-all transform hover:scale-[1.02]"
+                  >
+                    View Complete Flight Details
+                    <ChevronRight className="h-7 w-7" />
+                  </Link>
+                </div>
+              </div>
+            );
+          } else {
+            // Show booking CTA
+            return (
+              <div className="card bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-700 text-white shadow-2xl ms-reveal border-2 border-blue-400/30 relative overflow-hidden">
+                {/* Decorative elements */}
+                <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -mr-32 -mt-32"></div>
+                <div className="absolute bottom-0 left-0 w-48 h-48 bg-white/5 rounded-full -ml-24 -mb-24"></div>
+                
+                <div className="relative z-10">
+                  <div className="flex items-start gap-4 mb-6">
+                    <div className="bg-white p-4 rounded-2xl shadow-xl">
+                      <Plane className="h-10 w-10 text-blue-600" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="text-3xl font-bold mb-2 drop-shadow-sm">Flights Available for You!</h3>
+                      <p className="text-white text-lg font-semibold">We've configured flight options for your location group</p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                    <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20">
+                      <div className="flex items-center gap-2 mb-3">
+                        <MapPin className="h-5 w-5 text-white" />
+                        <p className="text-sm font-bold text-white uppercase tracking-wide">Your Location</p>
+                      </div>
+                      <p className="text-2xl font-bold mb-1">{flightData.locationGroup}</p>
+                      <p className="text-base text-white font-semibold">Airport: {flightData.origin}</p>
+                    </div>
+                    <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20">
+                      <div className="flex items-center gap-2 mb-3">
+                        <MapPin className="h-5 w-5 text-white" />
+                        <p className="text-sm font-bold text-white uppercase tracking-wide">Event Location</p>
+                      </div>
+                      <p className="text-2xl font-bold mb-1">{event.location?.city}</p>
+                      <p className="text-base text-white font-semibold">Airport: {flightData.destination}</p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4 mb-6">
+                    <div className="bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl p-5 shadow-lg">
+                      <Plane className="h-6 w-6 mb-2 text-white/80" />
+                      <p className="text-sm font-medium text-white/90 mb-1">Arrival Options</p>
+                      <p className="text-4xl font-bold">{flightData.arrivalFlights?.length || 0}</p>
+                      <p className="text-xs text-white/80 mt-1">flights available</p>
+                    </div>
+                    <div className="bg-gradient-to-br from-orange-500 to-red-600 rounded-xl p-5 shadow-lg">
+                      <Plane className="h-6 w-6 mb-2 text-white/80 rotate-180" />
+                      <p className="text-sm font-medium text-white/90 mb-1">Departure Options</p>
+                      <p className="text-4xl font-bold">{flightData.departureFlights?.length || 0}</p>
+                      <p className="text-xs text-white/80 mt-1">flights available</p>
+                    </div>
+                  </div>
+
+                  <Link
+                    to={`/microsite/${slug}/book-flights`}
+                    className="w-full flex items-center justify-center gap-3 px-8 py-5 bg-white text-blue-600 rounded-xl hover:bg-blue-50 hover:shadow-2xl font-bold text-xl shadow-xl transition-all transform hover:scale-[1.02] border-2 border-white"
+                  >
+                    <Plane className="h-6 w-6" />
+                    Book Your Flights Now
+                    <ChevronRight className="h-6 w-6" />
+                  </Link>
+                </div>
+              </div>
+            );
+          }
+        })()}
+
         {/* Available Hotels/Inventory */}
         <div>
           <h2 className="ms-section-title mb-6">Available Hotels and Rooms</h2>
@@ -500,18 +790,33 @@ export const MicrositePage = () => {
                                     {room.availableRooms} room{room.availableRooms !== 1 ? 's' : ''} left
                                   </span>
                                 </div>
-                                <div className="flex justify-between text-sm">
-                                  <span className="text-gray-600">Per Night:</span>
-                                  <span className="font-medium">
-                                    {formatCurrency(room.pricePerNight)}
-                                  </span>
-                                </div>
-                                <div className="flex justify-between text-sm">
-                                  <span className="text-gray-600">Stay ({nights} nights):</span>
-                                  <span className="font-semibold text-primary-600">
-                                    {formatCurrency(totalPrice)}
-                                  </span>
-                                </div>
+                                
+                                {event.isPrivate ? (
+                                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 my-2">
+                                    <p className="text-sm font-semibold text-blue-900 flex items-center gap-2">
+                                      <CheckCircle className="h-4 w-4 text-blue-600" />
+                                      Amount will be paid by planner
+                                    </p>
+                                    <p className="text-xs text-blue-700 mt-1">
+                                      No payment required from guests
+                                    </p>
+                                  </div>
+                                ) : (
+                                  <>
+                                    <div className="flex justify-between text-sm">
+                                      <span className="text-gray-600">Per Night:</span>
+                                      <span className="font-medium">
+                                        {formatCurrency(room.pricePerNight)}
+                                      </span>
+                                    </div>
+                                    <div className="flex justify-between text-sm">
+                                      <span className="text-gray-600">Stay ({nights} nights):</span>
+                                      <span className="font-semibold text-primary-600">
+                                        {formatCurrency(totalPrice)}
+                                      </span>
+                                    </div>
+                                  </>
+                                )}
                               </div>
 
                               <div className="text-xs text-gray-500 mb-3">
@@ -798,7 +1103,14 @@ const BookingModal = ({ inventory, event, user, onClose, onSuccess }) => {
           <div className="card bg-blue-50 mb-6">
             <h3 className="font-semibold mb-2">{inventory.hotelName}</h3>
             <p className="text-sm text-gray-600">{inventory.roomType}</p>
-            <p className="text-lg font-bold text-primary-600 mt-2">{formatCurrency(inventory.pricePerNight)} / night</p>
+            {event.isPrivate ? (
+              <div className="mt-2 inline-flex items-center gap-2 px-3 py-1 bg-blue-100 rounded-lg">
+                <CheckCircle className="h-4 w-4 text-blue-600" />
+                <p className="text-sm font-semibold text-blue-900">Paid by planner</p>
+              </div>
+            ) : (
+              <p className="text-lg font-bold text-primary-600 mt-2">{formatCurrency(inventory.pricePerNight)} / night</p>
+            )}
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -902,9 +1214,13 @@ const BookingModal = ({ inventory, event, user, onClose, onSuccess }) => {
               <div className="flex justify-between items-center">
                 <span className="font-semibold">Total Amount</span>
                 <div className="text-right">
-                  <span className="text-2xl font-bold text-primary-600">{formatCurrency(totalPrice)}</span>
-                  {event.isPrivate && (
-                    <p className="text-xs text-green-600 font-medium">✓ Paid by planner</p>
+                  {event.isPrivate ? (
+                    <div className="text-right">
+                      <p className="text-lg font-bold text-green-600">Paid by planner</p>
+                      <p className="text-xs text-green-600 font-medium">No payment required</p>
+                    </div>
+                  ) : (
+                    <span className="text-2xl font-bold text-primary-600">{formatCurrency(totalPrice)}</span>
                   )}
                 </div>
               </div>

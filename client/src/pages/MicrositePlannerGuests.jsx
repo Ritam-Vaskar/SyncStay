@@ -17,7 +17,30 @@ export const MicrositePlannerGuests = () => {
   const queryClient = useQueryClient();
   const [showAddModal, setShowAddModal] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
-  const [newGuests, setNewGuests] = useState([{ name: '', email: '', phone: '' }]);
+  const [newGuests, setNewGuests] = useState([{ name: '', email: '', phone: '', group: '', location: '' }]);
+
+  const INDIAN_CITIES = [
+    'Mumbai (BOM)',
+    'Delhi (DEL)',
+    'Kolkata (CCU)',
+    'Chennai (MAA)',
+    'Bengaluru (BLR)',
+    'Hyderabad (HYD)',
+    'Ahmedabad (AMD)',
+    'Pune (PNQ)',
+    'Jaipur (JAI)',
+    'Lucknow (LKO)',
+    'Goa (GOI)',
+    'Kochi (COK)',
+    'Chandigarh (IXC)',
+    'Guwahati (GAU)',
+    'Bhubaneswar (BBI)',
+    'Patna (PAT)',
+    'Indore (IDR)',
+    'Nagpur (NAG)',
+    'Varanasi (VNS)',
+    'Coimbatore (CJB)',
+  ];
   const [excelFile, setExcelFile] = useState(null);
   const [activeTab, setActiveTab] = useState('invited'); // 'invited' or 'registered'
 
@@ -59,8 +82,9 @@ export const MicrositePlannerGuests = () => {
     mutationFn: (guests) => guestInvitationService.addGuests(eventData.data._id, guests),
     onSuccess: () => {
       queryClient.invalidateQueries(['guests']);
+      queryClient.invalidateQueries(['inventory-groups', eventData.data._id]);
       setShowAddModal(false);
-      setNewGuests([{ name: '', email: '', phone: '' }]);
+      setNewGuests([{ name: '', email: '', phone: '', group: '', location: '' }]);
       toast.success('Guests added successfully!');
     },
     onError: (error) => {
@@ -73,6 +97,7 @@ export const MicrositePlannerGuests = () => {
     mutationFn: (fileData) => guestInvitationService.uploadGuestList(eventData.data._id, fileData),
     onSuccess: (data) => {
       queryClient.invalidateQueries(['guests']);
+      queryClient.invalidateQueries(['inventory-groups', eventData.data._id]);
       setShowUploadModal(false);
       setExcelFile(null);
       toast.success(`Successfully uploaded ${data.data.added} guests!`);
@@ -140,7 +165,7 @@ export const MicrositePlannerGuests = () => {
   };
 
   const handleAddGuest = () => {
-    setNewGuests([...newGuests, { name: '', email: '', phone: '' }]);
+    setNewGuests([...newGuests, { name: '', email: '', phone: '', group: '', location: '' }]);
   };
 
   const handleRemoveNewGuest = (index) => {
@@ -165,9 +190,14 @@ export const MicrositePlannerGuests = () => {
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
+      console.log('File selected:', file.name, 'Size:', file.size, 'Type:', file.type);
+      
       const reader = new FileReader();
       reader.onload = (event) => {
-        setExcelFile(event.target.result);
+        // Extract base64 data without the data URL prefix
+        const base64 = event.target.result.split(',')[1];
+        console.log('Base64 length:', base64?.length);
+        setExcelFile(base64);
       };
       reader.readAsDataURL(file);
     }
@@ -188,7 +218,7 @@ export const MicrositePlannerGuests = () => {
   };
 
   const downloadTemplate = () => {
-    const template = 'Name,Email,Phone\nJohn Doe,john@example.com,+1234567890\nJane Smith,jane@example.com,+0987654321';
+    const template = 'Name,Email,Phone,Group,Location\nJohn Doe,john@example.com,+1234567890,VIP,Mumbai (BOM)\nJane Smith,jane@example.com,+0987654321,Family,Kolkata (CCU)';
     const blob = new Blob([template], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -202,17 +232,17 @@ export const MicrositePlannerGuests = () => {
 
   return (
     <MicrositeDashboardLayout event={event}>
-      <div className="space-y-6">
+      <div className="space-y-8 max-w-7xl mx-auto">
         {/* Header with Privacy Toggle */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-gray-200">
           <div>
-            <h2 className="text-3xl font-bold">Guest Management</h2>
-            <p className="text-gray-600 mt-1">Manage invitations and view registered guests</p>
+            <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Guest Management</h1>
+            <p className="text-sm text-gray-600 mt-2">Manage event invitations and track registered attendees</p>
           </div>
           <button
             onClick={handleTogglePrivacy}
             disabled={togglePrivacyMutation.isPending}
-            className={`btn ${isPrivate ? 'btn-error' : 'btn-success'}`}
+            className={`btn ${isPrivate ? 'btn-error' : 'btn-success'} min-w-[140px] shadow-md`}
           >
             {isPrivate ? <Unlock className="h-5 w-5 mr-2" /> : <Lock className="h-5 w-5 mr-2" />}
             {isPrivate ? 'Make Public' : 'Make Private'}
@@ -220,52 +250,64 @@ export const MicrositePlannerGuests = () => {
         </div>
 
         {/* Privacy Status Banner */}
-        <div className={`card ${isPrivate ? 'bg-yellow-50 border-yellow-200' : 'bg-green-50 border-green-200'}`}>
-          <div className="flex items-start gap-3">
-            {isPrivate ? (
-              <Lock className="h-5 w-5 text-yellow-600 mt-0.5" />
-            ) : (
-              <Unlock className="h-5 w-5 text-green-600 mt-0.5" />
-            )}
-            <div>
-              <h3 className={`font-semibold ${isPrivate ? 'text-yellow-900' : 'text-green-900'}`}>
-                {isPrivate ? 'PRIVATE EVENT' : 'PUBLIC EVENT'}
+        <div className={`rounded-xl border-2 p-5 ${isPrivate ? 'bg-yellow-50 border-yellow-300' : 'bg-green-50 border-green-300'} shadow-sm`}>
+          <div className="flex items-start gap-4">
+            <div className={`p-3 rounded-lg ${isPrivate ? 'bg-yellow-100' : 'bg-green-100'}`}>
+              {isPrivate ? (
+                <Lock className="h-6 w-6 text-yellow-700" />
+              ) : (
+                <Unlock className="h-6 w-6 text-green-700" />
+              )}
+            </div>
+            <div className="flex-1">
+              <h3 className={`text-base font-bold uppercase tracking-wide ${isPrivate ? 'text-yellow-900' : 'text-green-900'}`}>
+                {isPrivate ? 'Private Event' : 'Public Event'}
               </h3>
-              <p className={`text-sm ${isPrivate ? 'text-yellow-700' : 'text-green-700'}`}>
+              <p className={`text-xs mt-1 leading-relaxed ${isPrivate ? 'text-yellow-800' : 'text-green-800'}`}>
                 {isPrivate 
-                  ? 'This event is PRIVATE - only invited guests can access the microsite' 
-                  : 'This event is PUBLIC - anyone can access the microsite and book accommodations'}
+                  ? 'Access restricted to invited guests only. Only pre-approved attendees can view the event microsite.' 
+                  : 'Open to all attendees. Anyone with the link can access the microsite and book accommodations.'}
               </p>
             </div>
           </div>
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-4 border-b border-gray-200">
+        <div className="flex gap-1 border-b-2 border-gray-200 bg-white rounded-t-lg">
           <button
             onClick={() => setActiveTab('invited')}
-            className={`pb-3 px-4 font-medium transition-colors ${
+            className={`pb-4 pt-3 px-6 font-semibold transition-all relative ${
               activeTab === 'invited'
-                ? 'border-b-2 border-primary-600 text-primary-600'
-                : 'text-gray-600 hover:text-gray-900'
+                ? 'text-primary-600 border-b-4 border-primary-600 -mb-[2px]'
+                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
             }`}
           >
             <div className="flex items-center gap-2">
               <UserPlus className="h-5 w-5" />
-              Invited Guests ({invitedGuests.length})
+              <span>Invited Guests</span>
+              <span className={`ml-1 px-2.5 py-0.5 rounded-full text-xs font-bold ${
+                activeTab === 'invited' ? 'bg-primary-100 text-primary-700' : 'bg-gray-200 text-gray-700'
+              }`}>
+                {invitedGuests.length}
+              </span>
             </div>
           </button>
           <button
             onClick={() => setActiveTab('registered')}
-            className={`pb-3 px-4 font-medium transition-colors ${
+            className={`pb-4 pt-3 px-6 font-semibold transition-all relative ${
               activeTab === 'registered'
-                ? 'border-b-2 border-primary-600 text-primary-600'
-                : 'text-gray-600 hover:text-gray-900'
+                ? 'text-primary-600 border-b-4 border-primary-600 -mb-[2px]'
+                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
             }`}
           >
             <div className="flex items-center gap-2">
               <Users className="h-5 w-5" />
-              Registered Guests ({registeredGuests.length})
+              <span>Registered Guests</span>
+              <span className={`ml-1 px-2.5 py-0.5 rounded-full text-xs font-bold ${
+                activeTab === 'registered' ? 'bg-primary-100 text-primary-700' : 'bg-gray-200 text-gray-700'
+              }`}>
+                {registeredGuests.length}
+              </span>
             </div>
           </button>
         </div>
@@ -273,98 +315,156 @@ export const MicrositePlannerGuests = () => {
         {/* Invited Guests Tab */}
         {activeTab === 'invited' && (
           <div className="space-y-6">
-            {/* Stats */}
-            {isPrivate && (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="card">
-                  <p className="text-sm text-gray-600">Total Invited</p>
-                  <p className="text-3xl font-bold">{invitedGuests.length}</p>
-                </div>
-                <div className="card bg-green-50 border-green-200">
-                  <p className="text-sm text-green-700">Accessed Microsite</p>
-                  <p className="text-3xl font-bold text-green-900">
-                    {invitedGuests.filter((g) => g.hasAccessed).length}
-                  </p>
-                </div>
-                <div className="card bg-gray-50 border-gray-200">
-                  <p className="text-sm text-gray-600">Not Accessed</p>
-                  <p className="text-3xl font-bold">
-                    {invitedGuests.filter((g) => !g.hasAccessed).length}
-                  </p>
+            {/* Helper text for public events */}
+            {/* {!isPrivate && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div className="flex items-start gap-3">
+                  <Unlock className="h-5 w-5 text-blue-600 mt-0.5" />
+                  <div>
+                    <h4 className="font-semibold text-blue-900">Public Event - Pre-Invited Guests</h4>
+                    <p className="text-sm text-blue-700 mt-1">
+                      These are VIP/special guests you've pre-invited. Public events allow anyone to book, but invited guests can be assigned to specific groups for better accommodation management.
+                    </p>
+                  </div>
                 </div>
               </div>
-            )}
+            )} */}
+
+            {/* Stats */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm hover:shadow-md transition-shadow">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs font-medium text-gray-600 uppercase tracking-wide">Total Invited</p>
+                      <p className="text-2xl font-bold text-gray-900 mt-2">{invitedGuests.length}</p>
+                    </div>
+                    <div className="bg-blue-100 p-4 rounded-xl">
+                      <UserPlus className="h-8 w-8 text-blue-600" />
+                    </div>
+                  </div>
+                </div>
+                <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl border-2 border-green-200 p-6 shadow-sm hover:shadow-md transition-shadow">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs font-medium text-green-700 uppercase tracking-wide">Accessed</p>
+                      <p className="text-2xl font-bold text-green-900 mt-2">
+                        {invitedGuests.filter((g) => g.hasAccessed).length}
+                      </p>
+                    </div>
+                    <div className="bg-green-100 p-4 rounded-xl">
+                      <CheckCircle className="h-8 w-8 text-green-600" />
+                    </div>
+                  </div>
+                </div>
+                <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm hover:shadow-md transition-shadow">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs font-medium text-gray-600 uppercase tracking-wide">Not Accessed</p>
+                      <p className="text-2xl font-bold text-gray-900 mt-2">
+                        {invitedGuests.filter((g) => !g.hasAccessed).length}
+                      </p>
+                    </div>
+                    <div className="bg-gray-100 p-4 rounded-xl">
+                      <XCircle className="h-8 w-8 text-gray-600" />
+                    </div>
+                  </div>
+                </div>
+              </div>
 
             {/* Actions */}
-            {isPrivate && (
-              <div className="flex gap-4">
+            <div className="flex flex-wrap gap-3">
                 <button
                   onClick={() => setShowAddModal(true)}
-                  className="btn btn-primary"
+                  className="btn btn-primary shadow-md hover:shadow-lg transition-all px-6 py-3 font-semibold"
                 >
                   <Plus className="h-5 w-5 mr-2" />
                   Add Guests
                 </button>
                 <button
                   onClick={() => setShowUploadModal(true)}
-                  className="btn btn-outline"
+                  className="btn btn-outline border-2 hover:border-primary-600 hover:bg-primary-50 px-6 py-3 font-semibold transition-all"
                 >
                   <Upload className="h-5 w-5 mr-2" />
                   Upload Excel
                 </button>
                 <button
                   onClick={downloadTemplate}
-                  className="btn btn-outline"
+                  className="btn btn-outline border-2 hover:border-gray-400 hover:bg-gray-50 px-6 py-3 font-semibold transition-all"
                 >
                   <Download className="h-5 w-5 mr-2" />
                   Download Template
                 </button>
               </div>
-            )}
 
             {/* Guest List */}
-            {isPrivate ? (
-              invitedGuests.length > 0 ? (
-                <div className="card overflow-hidden">
+            {invitedGuests.length > 0 ? (
+                <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+                  <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
+                    <h3 className="text-base font-bold text-gray-900">Guest List</h3>
+                    <p className="text-xs text-gray-600 mt-1">All invited guests for this event</p>
+                  </div>
                   <div className="overflow-x-auto">
-                    <table className="table">
+                    <table className="w-full">
                       <thead>
-                        <tr>
-                          <th>Name</th>
-                          <th>Email</th>
-                          <th>Phone</th>
-                          <th>Status</th>
-                          <th>Added</th>
-                          <th>Actions</th>
+                        <tr className="bg-gray-50 border-b-2 border-gray-200">
+                          <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Name</th>
+                          <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Email</th>
+                          <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Phone</th>
+                          <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Group</th>
+                          <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Location</th>
+                          <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Status</th>
+                          <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Date Added</th>
+                          <th className="px-6 py-4 text-center text-xs font-bold text-gray-700 uppercase tracking-wider">Actions</th>
                         </tr>
                       </thead>
-                      <tbody>
+                      <tbody className="divide-y divide-gray-200 bg-white">
                         {invitedGuests.map((guest) => (
-                          <tr key={guest._id}>
-                            <td>{guest.name}</td>
-                            <td className="text-gray-600">{guest.email}</td>
-                            <td className="text-gray-600">{guest.phone || '-'}</td>
-                            <td>
+                          <tr key={guest._id} className="hover:bg-gray-50 transition-colors">
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="font-semibold text-gray-900">{guest.name}</div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{guest.email}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{guest.phone || '—'}</td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              {guest.group ? (
+                                <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-primary-100 text-primary-800">
+                                  {guest.group}
+                                </span>
+                              ) : (
+                                <span className="text-gray-400 text-sm">—</span>
+                              )}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              {guest.location ? (
+                                <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-800">
+                                  ✈️ {guest.location}
+                                </span>
+                              ) : (
+                                <span className="text-gray-400 text-sm">—</span>
+                              )}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
                               {guest.hasAccessed ? (
-                                <span className="badge badge-success">
-                                  <CheckCircle className="h-4 w-4 mr-1" />
+                                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-green-100 text-green-800">
+                                  <CheckCircle className="h-3.5 w-3.5" />
                                   Accessed
                                 </span>
                               ) : (
-                                <span className="badge badge-secondary">
-                                  <XCircle className="h-4 w-4 mr-1" />
-                                  Not Accessed
+                                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-700">
+                                  <XCircle className="h-3.5 w-3.5" />
+                                  Pending
                                 </span>
                               )}
                             </td>
-                            <td className="text-gray-600 text-sm">
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                               {formatDate(guest.addedAt)}
                             </td>
-                            <td>
+                            <td className="px-6 py-4 whitespace-nowrap text-center">
                               <button
                                 onClick={() => handleRemoveGuest(guest._id)}
-                                className="text-red-600 hover:text-red-700"
+                                className="inline-flex items-center justify-center p-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
                                 disabled={removeGuestMutation.isPending}
+                                title="Remove guest"
                               >
                                 <Trash2 className="h-4 w-4" />
                               </button>
@@ -378,8 +478,8 @@ export const MicrositePlannerGuests = () => {
               ) : (
                 <div className="card text-center py-12">
                   <Users className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-                  <h3 className="text-xl font-semibold mb-2">No Guests Added Yet</h3>
-                  <p className="text-gray-600 mb-6">
+                  <h3 className="text-lg font-semibold mb-2">No Guests Added Yet</h3>
+                  <p className="text-sm text-gray-600 mb-6">
                     Start by adding guests manually or uploading an Excel file
                   </p>
                   <div className="flex gap-4 justify-center">
@@ -400,15 +500,7 @@ export const MicrositePlannerGuests = () => {
                   </div>
                 </div>
               )
-            ) : (
-              <div className="card text-center py-12">
-                <Unlock className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-                <h3 className="text-xl font-semibold mb-2">Public Event</h3>
-                <p className="text-gray-600">
-                  This event is public. Anyone can access the microsite and book accommodations.
-                </p>
-              </div>
-            )}
+            }
           </div>
         )}
 
@@ -416,41 +508,41 @@ export const MicrositePlannerGuests = () => {
         {activeTab === 'registered' && (
           <div className="space-y-6">
             {/* Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="card">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm hover:shadow-md transition-shadow">
                 <div className="flex items-center gap-4">
-                  <div className="bg-primary-100 p-3 rounded-lg">
-                    <Users className="h-6 w-6 text-primary-600" />
+                  <div className="bg-primary-100 p-4 rounded-xl">
+                    <Users className="h-8 w-8 text-primary-600" />
                   </div>
                   <div>
-                    <p className="text-sm text-gray-600">Total Registered</p>
-                    <p className="text-2xl font-bold">{registeredGuests.length}</p>
+                    <p className="text-xs font-medium text-gray-600 uppercase tracking-wide">Total Registered</p>
+                    <p className="text-2xl font-bold text-gray-900 mt-1">{registeredGuests.length}</p>
                   </div>
                 </div>
               </div>
 
-              <div className="card">
+              <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl border-2 border-green-200 p-6 shadow-sm hover:shadow-md transition-shadow">
                 <div className="flex items-center gap-4">
-                  <div className="bg-green-100 p-3 rounded-lg">
-                    <CheckCircle className="h-6 w-6 text-green-600" />
+                  <div className="bg-green-100 p-4 rounded-xl">
+                    <CheckCircle className="h-8 w-8 text-green-600" />
                   </div>
                   <div>
-                    <p className="text-sm text-gray-600">Confirmed Bookings</p>
-                    <p className="text-2xl font-bold">
+                    <p className="text-xs font-medium text-green-700 uppercase tracking-wide">Confirmed</p>
+                    <p className="text-2xl font-bold text-green-900 mt-1">
                       {registeredGuests.filter((g) => g.status === 'confirmed').length}
                     </p>
                   </div>
                 </div>
               </div>
 
-              <div className="card">
+              <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border-2 border-blue-200 p-6 shadow-sm hover:shadow-md transition-shadow">
                 <div className="flex items-center gap-4">
-                  <div className="bg-blue-100 p-3 rounded-lg">
-                    <Hotel className="h-6 w-6 text-blue-600" />
+                  <div className="bg-blue-100 p-4 rounded-xl">
+                    <Hotel className="h-8 w-8 text-blue-600" />
                   </div>
                   <div>
-                    <p className="text-sm text-gray-600">Total Rooms</p>
-                    <p className="text-2xl font-bold">
+                    <p className="text-xs font-medium text-blue-700 uppercase tracking-wide">Total Rooms</p>
+                    <p className="text-2xl font-bold text-blue-900 mt-1">
                       {registeredGuests.reduce((sum, g) => sum + g.totalRooms, 0)}
                     </p>
                   </div>
@@ -460,22 +552,23 @@ export const MicrositePlannerGuests = () => {
 
             {/* Registered Guests List */}
             {registeredGuests.length > 0 ? (
-              <div className="card overflow-hidden">
-                <div className="px-6 py-4 border-b border-gray-200">
-                  <h3 className="text-lg font-semibold flex items-center gap-2">
+              <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+                <div className="px-6 py-5 bg-gray-50 border-b border-gray-200">
+                  <h3 className="text-base font-bold text-gray-900 flex items-center gap-2">
                     <Users className="h-5 w-5" /> Registered Guests ({registeredGuests.length})
                   </h3>
+                  <p className="text-xs text-gray-600 mt-1">Guests who have completed bookings</p>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead>
                       <tr className="bg-gradient-to-r from-gray-50 to-gray-100 border-b-2 border-gray-200">
-                        <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Name</th>
-                        <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Email</th>
-                        <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Phone</th>
-                        <th className="px-6 py-4 text-center text-sm font-semibold text-gray-700">Bookings</th>
-                        <th className="px-6 py-4 text-center text-sm font-semibold text-gray-700">Total Rooms</th>
-                        <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Status</th>
+                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700">Name</th>
+                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700">Email</th>
+                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700">Phone</th>
+                        <th className="px-6 py-4 text-center text-xs font-semibold text-gray-700">Bookings</th>
+                        <th className="px-6 py-4 text-center text-xs font-semibold text-gray-700">Total Rooms</th>
+                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700">Status</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200">
@@ -527,11 +620,11 @@ export const MicrositePlannerGuests = () => {
                 </div>
               </div>
             ) : (
-              <div className="card text-center py-12">
-                <Users className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-                <h3 className="text-xl font-semibold mb-2">No Registered Guests Yet</h3>
-                <p className="text-gray-600">
-                  Guests who book rooms will appear here
+              <div className="bg-white text-center py-20 border-2 border-dashed border-gray-300 rounded-xl">
+                <Users className="h-20 w-20 text-gray-300 mx-auto mb-5" />
+                <h3 className="text-xl font-bold text-gray-800 mb-2">No Registered Guests Yet</h3>
+                <p className="text-sm text-gray-600">
+                  Guests who complete their bookings will appear here
                 </p>
               </div>
             )}
@@ -542,74 +635,150 @@ export const MicrositePlannerGuests = () => {
       {/* Add Guests Modal */}
       {showAddModal && (
         <div className="modal-overlay" onClick={() => setShowAddModal(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-2xl font-bold">Add Guests Manually</h3>
+          <div className="modal-content max-w-5xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <h3 className="text-2xl font-bold text-gray-900">Add Guests Manually</h3>
+                <p className="text-sm text-gray-600 mt-2">Add one or multiple guests to your event invitation list</p>
+              </div>
               <button
                 onClick={() => setShowAddModal(false)}
-                className="text-gray-400 hover:text-gray-600"
+                className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full p-2 transition-colors"
               >
                 ✕
               </button>
             </div>
 
-            <div className="space-y-4 max-h-96 overflow-y-auto mb-6">
+            <hr className="my-5 border-gray-200" />
+
+            <div className="space-y-5 max-h-[550px] overflow-y-auto mb-6 pr-2">
               {newGuests.map((guest, index) => (
-                <div key={index} className="flex gap-3 items-start">
-                  <input
-                    type="text"
-                    placeholder="Name *"
-                    value={guest.name}
-                    onChange={(e) => handleGuestChange(index, 'name', e.target.value)}
-                    className="input flex-1"
-                  />
-                  <input
-                    type="email"
-                    placeholder="Email *"
-                    value={guest.email}
-                    onChange={(e) => handleGuestChange(index, 'email', e.target.value)}
-                    className="input flex-1"
-                  />
-                  <input
-                    type="tel"
-                    placeholder="Phone (optional)"
-                    value={guest.phone}
-                    onChange={(e) => handleGuestChange(index, 'phone', e.target.value)}
-                    className="input flex-1"
-                  />
-                  {newGuests.length > 1 && (
-                    <button
-                      onClick={() => handleRemoveNewGuest(index)}
-                      className="text-red-600 hover:text-red-700"
-                    >
-                      <Trash2 className="h-5 w-5" />
-                    </button>
-                  )}
+                <div key={index} className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-5 border-2 border-gray-200 relative hover:border-gray-300 transition-colors">
+                  <div className="flex items-center justify-between mb-4">
+                    <span className="text-sm font-bold text-gray-800 uppercase tracking-wide">
+                      Guest {index + 1}
+                    </span>
+                    {newGuests.length > 1 && (
+                      <button
+                        onClick={() => handleRemoveNewGuest(index)}
+                        className="text-red-600 hover:text-red-700 hover:bg-red-50 rounded p-1 transition-colors"
+                        title="Remove guest"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-800 mb-2">
+                        Full Name <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g., John Doe"
+                        value={guest.name}
+                        onChange={(e) => handleGuestChange(index, 'name', e.target.value)}
+                        className="input w-full"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-800 mb-2">
+                        Email Address <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="email"
+                        placeholder="e.g., john@example.com"
+                        value={guest.email}
+                        onChange={(e) => handleGuestChange(index, 'email', e.target.value)}
+                        className="input w-full"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-800 mb-2">
+                        Phone Number
+                      </label>
+                      <input
+                        type="tel"
+                        placeholder="e.g., +1234567890"
+                        value={guest.phone}
+                        onChange={(e) => handleGuestChange(index, 'phone', e.target.value)}
+                        className="input w-full"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-800 mb-2">
+                        Group Assignment
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g., VIP, Family, Friends"
+                        value={guest.group}
+                        onChange={(e) => handleGuestChange(index, 'group', e.target.value)}
+                        className="input w-full"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-800 mb-2">
+                        Departure City ✈️
+                      </label>
+                      <select
+                        value={guest.location}
+                        onChange={(e) => handleGuestChange(index, 'location', e.target.value)}
+                        className="input w-full"
+                      >
+                        <option value="">Select departure city</option>
+                        {INDIAN_CITIES.map((city) => (
+                          <option key={city} value={city}>{city}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
                 </div>
               ))}
             </div>
 
             <button
               onClick={handleAddGuest}
-              className="btn btn-outline w-full mb-6"
+              className="btn btn-outline w-full mb-6 flex items-center justify-center gap-2 hover:bg-primary-50 border-2 py-3 font-semibold transition-all"
             >
-              <Plus className="h-5 w-5 mr-2" />
+              <Plus className="h-5 w-5" />
               Add Another Guest
             </button>
+
+            <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-4 mb-6">
+              <p className="text-sm text-blue-900 leading-relaxed">
+                <span className="font-bold">💡 Pro Tip:</span> Group names help organize guests for accommodation assignments. Use common categories like VIP, Family, Friends, or Colleagues for better organization.
+              </p>
+            </div>
 
             <div className="flex gap-4">
               <button
                 onClick={() => setShowAddModal(false)}
-                className="btn btn-outline flex-1"
+                className="btn btn-outline flex-1 hover:bg-gray-50 border-2 py-3 font-semibold"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSubmitGuests}
                 disabled={addGuestsMutation.isPending}
-                className="btn btn-primary flex-1"
+                className="btn btn-primary flex-1 shadow-lg hover:shadow-xl transition-all py-3 font-bold"
               >
-                {addGuestsMutation.isPending ? 'Adding...' : 'Add Guests'}
+                {addGuestsMutation.isPending ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    Adding...
+                  </>
+                ) : (
+                  <>
+                    <UserPlus className="h-5 w-5 mr-2" />
+                    Add {newGuests.filter(g => g.name && g.email).length || ''} Guest{newGuests.filter(g => g.name && g.email).length !== 1 ? 's' : ''}
+                  </>
+                )}
               </button>
             </div>
           </div>
@@ -619,63 +788,109 @@ export const MicrositePlannerGuests = () => {
       {/* Upload Modal */}
       {showUploadModal && (
         <div className="modal-overlay" onClick={() => setShowUploadModal(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-2xl font-bold">Upload Guest List</h3>
+          <div className="modal-content max-w-3xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <h3 className="text-2xl font-bold text-gray-900">Upload Guest List</h3>
+                <p className="text-sm text-gray-600 mt-2">Import multiple guests from a CSV or Excel file</p>
+              </div>
               <button
                 onClick={() => setShowUploadModal(false)}
-                className="text-gray-400 hover:text-gray-600"
+                className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full p-2 transition-colors"
               >
                 ✕
               </button>
             </div>
 
+            <hr className="my-5 border-gray-200" />
+
             <div className="space-y-6">
-              <div>
-                <p className="text-sm text-gray-600 mb-2">
-                  Upload an Excel (.xlsx) or CSV file with columns: Name, Email, Phone
-                </p>
-                <button
-                  onClick={downloadTemplate}
-                  className="text-primary-600 hover:text-primary-700 text-sm font-medium"
-                >
-                  <Download className="h-4 w-4 inline mr-1" />
-                  Download Template
-                </button>
+              <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-300 rounded-xl p-5 shadow-sm">
+                <div className="flex items-start gap-4">
+                  <div className="bg-blue-200 rounded-xl p-3">
+                    <FileUp className="h-6 w-6 text-blue-700" />
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="font-bold text-blue-900 mb-2 text-base">File Requirements</h4>
+                    <p className="text-xs text-blue-800 mb-3 leading-relaxed">
+                      Upload a CSV or Excel file with columns: <strong>Name, Email, Phone, Group</strong>
+                    </p>
+                    <button
+                      onClick={downloadTemplate}
+                      className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold transition-colors shadow-sm"
+                    >
+                      <Download className="h-4 w-4" />
+                      Download Template File
+                    </button>
+                  </div>
+                </div>
               </div>
 
-              <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
-                <FileUp className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <label className="btn btn-primary cursor-pointer">
-                  <Upload className="h-5 w-5 mr-2" />
-                  Choose File
-                  <input
-                    type="file"
-                    accept=".xlsx,.xls,.csv"
-                    onChange={handleFileChange}
-                    className="hidden"
-                  />
-                </label>
-                {excelFile && (
-                  <p className="text-sm text-green-600 mt-2">
-                    ✓ File selected
-                  </p>
+              <div className="border-2 border-dashed border-gray-300 hover:border-primary-500 rounded-xl p-10 text-center transition-all bg-gradient-to-b from-gray-50 to-white">
+                {excelFile ? (
+                  <div className="space-y-5">
+                    <div className="inline-flex items-center justify-center w-20 h-20 bg-green-100 rounded-full">
+                      <CheckCircle className="h-10 w-10 text-green-600" />
+                    </div>
+                    <div>
+                      <p className="text-xl font-bold text-green-600 mb-1">File Selected</p>
+                      <p className="text-base text-gray-600 font-medium">Ready to upload</p>
+                    </div>
+                    <label className="inline-flex items-center gap-2 cursor-pointer px-6 py-3 bg-white border-2 border-blue-500 text-blue-600 rounded-lg font-semibold hover:bg-blue-50 hover:border-blue-600 transition-all shadow-sm">
+                      <Upload className="h-5 w-5" />
+                      Choose Different File
+                      <input
+                        type="file"
+                        accept=".xlsx,.xls,.csv"
+                        onChange={handleFileChange}
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
+                ) : (
+                  <div className="space-y-5">
+                    <FileUp className="h-20 w-20 text-gray-400 mx-auto" />
+                    <div>
+                      <p className="text-lg font-bold text-gray-800 mb-2">Upload Your Guest List</p>
+                      <p className="text-sm text-gray-500 whitespace-nowrap">CSV or Excel file (max 10MB)</p>
+                    </div>
+                    <label className="btn btn-primary cursor-pointer shadow-lg px-6 py-3 font-bold inline-flex items-center whitespace-nowrap">
+                      <Upload className="h-5 w-5 mr-2" />
+                      Choose File
+                      <input
+                        type="file"
+                        accept=".xlsx,.xls,.csv"
+                        onChange={handleFileChange}
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
                 )}
               </div>
 
               <div className="flex gap-4">
                 <button
                   onClick={() => setShowUploadModal(false)}
-                  className="btn btn-outline flex-1"
+                  className="btn btn-outline flex-1 hover:bg-gray-50 border-2 py-3 font-semibold"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleUploadSubmit}
                   disabled={!excelFile || uploadGuestsMutation.isPending}
-                  className="btn btn-primary flex-1"
+                  className="btn btn-primary flex-1 shadow-lg hover:shadow-xl transition-all py-3 font-bold disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {uploadGuestsMutation.isPending ? 'Uploading...' : 'Upload'}
+                  {uploadGuestsMutation.isPending ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      Uploading...
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="h-5 w-5 mr-2" />
+                      Upload Guest List
+                    </>
+                  )}
                 </button>
               </div>
             </div>

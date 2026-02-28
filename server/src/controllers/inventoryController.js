@@ -1,7 +1,11 @@
 import Inventory from '../models/Inventory.js';
 import Event from '../models/Event.js';
+import InventoryGroup from '../models/InventoryGroup.js';
+import User from '../models/User.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import { createAuditLog } from '../middlewares/auditLogger.js';
+import * as groupingService from '../services/groupingService.js';
+import * as recommendationService from '../services/groupHotelRecommendationService.js';
 
 /**
  * @route   GET /api/inventory
@@ -262,5 +266,291 @@ export const deleteInventory = asyncHandler(async (req, res) => {
   res.status(200).json({
     success: true,
     message: 'Inventory deleted successfully',
+  });
+});
+
+/**
+ * @route   POST /api/inventory/:eventId/groups/auto-generate
+ * @desc    Auto-generate groups for public event
+ * @access  Private (Planner)
+ */
+export const autoGenerateGroups = asyncHandler(async (req, res) => {
+  const { eventId } = req.params;
+
+  const groups = await groupingService.autoGroupGuestsByRelationship(eventId);
+
+  res.status(201).json({
+    success: true,
+    data: groups,
+    message: 'Groups auto-generated successfully',
+  });
+});
+
+/**
+ * @route   POST /api/inventory/:eventId/groups
+ * @desc    Create manual group (for private events)
+ * @access  Private (Planner)
+ */
+export const createGroup = asyncHandler(async (req, res) => {
+  const { eventId } = req.params;
+  const { name, number, description, members, priority } = req.body;
+
+  // Validate required fields
+  if (!name || name.trim() === '') {
+    return res.status(400).json({
+      success: false,
+      message: 'Group name is required',
+    });
+  }
+
+  if (number === undefined || number === null || number === '' || isNaN(number)) {
+    return res.status(400).json({
+      success: false,
+      message: 'Number of people is required and must be a valid number',
+    });
+  }
+
+  if (parseInt(number) < 1) {
+    return res.status(400).json({
+      success: false,
+      message: 'Number of people must be at least 1',
+    });
+  }
+
+  const group = await groupingService.createManualGroup(eventId, {
+    name: name.trim(),
+    number: parseInt(number),
+    description: description && description.trim() ? description.trim() : undefined,
+    members: members || [],
+    priority: priority || 0,
+  });
+
+  res.status(201).json({
+    success: true,
+    data: group,
+    message: 'Group created successfully',
+  });
+});
+
+/**
+ * @route   GET /api/inventory/:eventId/groups
+ * @desc    Get all groups for an event
+ * @access  Private (Planner)
+ */
+export const getEventGroups = asyncHandler(async (req, res) => {
+  const { eventId } = req.params;
+
+  const groups = await groupingService.getGroupsByEvent(eventId);
+
+  res.status(200).json({
+    success: true,
+    data: groups,
+    message: 'Groups fetched successfully',
+  });
+});
+
+/**
+ * @route   PUT /api/inventory/:groupId/guests/assign
+ * @desc    Assign guests to a group
+ * @access  Private (Planner)
+ */
+export const assignGuestsToGroup = asyncHandler(async (req, res) => {
+  const { groupId } = req.params;
+  const { guestEmails } = req.body;
+
+  if (!guestEmails || !Array.isArray(guestEmails)) {
+    return res.status(400).json({
+      success: false,
+      message: 'Guest emails array is required',
+    });
+  }
+
+  const group = await groupingService.assignGuestsToGroup(groupId, guestEmails);
+
+  res.status(200).json({
+    success: true,
+    data: group,
+    message: `${guestEmails.length} guests assigned to group`,
+  });
+});
+
+/**
+ * @route   DELETE /api/inventory/:groupId/guests/remove
+ * @desc    Remove guest from group
+ * @access  Private (Planner)
+ */
+export const removeGuestFromGroup = asyncHandler(async (req, res) => {
+  const { groupId } = req.params;
+  const { guestEmail } = req.body;
+
+  const group = await groupingService.removeGuestFromGroup(groupId, guestEmail);
+
+  res.status(200).json({
+    success: true,
+    data: group,
+    message: 'Guest removed from group',
+  });
+});
+
+/**
+ * @route   DELETE /api/inventory/:groupId
+ * @desc    Delete a group
+ * @access  Private (Planner)
+ */
+export const deleteGroup = asyncHandler(async (req, res) => {
+  const { groupId } = req.params;
+
+  const group = await groupingService.deleteGroup(groupId);
+
+  res.status(200).json({
+    success: true,
+    data: group,
+    message: 'Group deleted successfully',
+  });
+});
+
+/**
+ * @route   GET /api/inventory/:eventId/recommendations
+ * @desc    Get hotel recommendations for event (both group and individual)
+ * @access  Private (Planner)
+ */
+export const getEventRecommendations = asyncHandler(async (req, res) => {
+  const { eventId } = req.params;
+
+  const recommendations = await recommendationService.rankHotelsForEvent(eventId);
+
+  res.status(200).json({
+    success: true,
+    data: recommendations,
+    message: 'Recommendations computed successfully',
+  });
+});
+
+/**
+ * @route   GET /api/inventory/guest/:guestEmail/history
+ * @desc    Get guest booking history
+ * @access  Private (Planner)
+ */
+export const getGuestHistory = asyncHandler(async (req, res) => {
+  const { guestEmail } = req.params;
+
+  const history = await recommendationService.getGuestBookingHistory(guestEmail);
+
+  res.status(200).json({
+    success: true,
+    data: history,
+    message: 'Guest booking history fetched',
+  });
+});
+
+/**
+ * @route   PUT /api/inventory/:groupId/metadata
+ * @desc    Update group metadata
+ * @access  Private (Planner)
+ */
+export const updateGroupMetadata = asyncHandler(async (req, res) => {
+  const { groupId } = req.params;
+  const { metadata } = req.body;
+
+  const group = await groupingService.updateGroupMetadata(groupId, metadata);
+
+  res.status(200).json({
+    success: true,
+    data: group,
+    message: 'Group metadata updated',
+  });
+});
+
+/**
+ * @route   PUT /api/inventory/:groupId/assign-hotel
+ * @desc    Assign (or reassign) a hotel to a group. One hotel can serve multiple groups.
+ * @access  Private (Planner)
+ */
+export const assignHotelToGroup = asyncHandler(async (req, res) => {
+  const { groupId } = req.params;
+  const { hotelId } = req.body;
+
+  if (!hotelId) {
+    return res.status(400).json({ success: false, message: 'hotelId is required' });
+  }
+
+  const group = await InventoryGroup.findById(groupId);
+  if (!group) {
+    return res.status(404).json({ success: false, message: 'Group not found' });
+  }
+
+  // Replace — clear any previous assignment and set this hotel as the sole primary
+  group.assignedHotels = [{
+    hotel: hotelId,
+    priority: 1,
+    assignedAt: new Date(),
+  }];
+  await group.save();
+
+  await group.populate('assignedHotels.hotel', 'name organization location tboData priceRange totalRooms averageRating facilities');
+
+  res.status(200).json({
+    success: true,
+    data: group,
+    message: 'Hotel assigned to group successfully',
+  });
+});
+
+/**
+ * @route   GET /api/inventory/:eventId/nearby-hotels
+ * @desc    Find hotels within a radius (km) of a lat/lng point using Haversine distance.
+ *          Returns hotels sorted by ascending distance.
+ * @access  Private (Planner)
+ * @query   lat, lng, radiusKm (default 15)
+ */
+export const getNearbyHotels = asyncHandler(async (req, res) => {
+  const { lat, lng, radiusKm = 15, excludeId } = req.query;
+
+  if (!lat || !lng) {
+    return res.status(400).json({ success: false, message: 'lat and lng query params are required' });
+  }
+
+  const refLat = parseFloat(lat);
+  const refLng = parseFloat(lng);
+  const radius = parseFloat(radiusKm);
+
+  // Haversine distance in km
+  const toRad = (v) => (v * Math.PI) / 180;
+  const haversine = (lat1, lng1, lat2, lng2) => {
+    const R = 6371;
+    const dLat = toRad(lat2 - lat1);
+    const dLng = toRad(lng2 - lng1);
+    const a =
+      Math.sin(dLat / 2) ** 2 +
+      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  };
+
+  const hotels = await User.find({
+    role: 'hotel',
+    isActive: true,
+    'tboData.latitude': { $exists: true, $ne: null },
+    'tboData.longitude': { $exists: true, $ne: null },
+  })
+    .select('name organization location tboData priceRange totalRooms averageRating facilities')
+    .lean();
+
+  const nearby = hotels
+    .map((h) => ({
+      ...h,
+      distanceKm: haversine(refLat, refLng, h.tboData.latitude, h.tboData.longitude),
+    }))
+    .filter((h) => {
+      // Exclude the reference hotel itself and hotels beyond radius
+      if (excludeId && h._id?.toString() === excludeId) return false;
+      return h.distanceKm <= radius && h.distanceKm > 0.05;
+    })
+    .sort((a, b) => a.distanceKm - b.distanceKm)
+    .slice(0, 8);
+
+  res.status(200).json({
+    success: true,
+    data: nearby,
+    count: nearby.length,
   });
 });

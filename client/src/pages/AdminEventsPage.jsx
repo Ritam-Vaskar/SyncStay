@@ -7,7 +7,7 @@ import {
   Calendar,
   MapPin,
   Users,
-  DollarSign,
+  IndianRupee,
   Clock,
   CheckCircle,
   AlertCircle,
@@ -46,7 +46,6 @@ export const AdminEventsPage = () => {
 
   const stats = {
     total: allEvents.length,
-    pending: allEvents.filter(p => p.status === 'pending-approval').length,
     rfpPublished: allEvents.filter(p => p.status === 'rfp-published').length,
     reviewing: allEvents.filter(p => p.status === 'reviewing-proposals').length,
     active: allEvents.filter(p => p.status === 'active').length,
@@ -56,15 +55,14 @@ export const AdminEventsPage = () => {
 
   const getStatusBadge = (status) => {
     const badges = {
-      'pending-approval': { bg: 'bg-yellow-100', text: 'text-yellow-800', icon: Clock, label: 'Pending Approval' },
-      'rfp-published': { bg: 'bg-blue-100', text: 'text-blue-800', icon: AlertCircle, label: 'RFP Published' },
+      'rfp-published': { bg: 'bg-blue-100', text: 'text-blue-800', icon: AlertCircle, label: 'Active' },
       'reviewing-proposals': { bg: 'bg-purple-100', text: 'text-purple-800', icon: Eye, label: 'Reviewing Proposals' },
       'active': { bg: 'bg-green-100', text: 'text-green-800', icon: CheckCircle, label: 'Active' },
       'completed': { bg: 'bg-gray-100', text: 'text-gray-800', icon: CheckCircle, label: 'Completed' },
       'rejected': { bg: 'bg-red-100', text: 'text-red-800', icon: XCircle, label: 'Rejected' },
       'cancelled': { bg: 'bg-gray-200', text: 'text-gray-900', icon: XCircle, label: 'Cancelled' },
     };
-    return badges[status] || badges['pending-approval'];
+    return badges[status] || badges['rfp-published'];
   };
 
   const handleViewDetails = (event) => {
@@ -99,17 +97,17 @@ export const AdminEventsPage = () => {
           <p className="text-gray-600 text-sm">Total Events</p>
           <p className="text-3xl font-bold text-blue-600">{stats.total}</p>
         </div>
-        <div className="card">
-          <p className="text-gray-600 text-sm">Pending Approval</p>
-          <p className="text-3xl font-bold text-yellow-600">{stats.pending}</p>
-        </div>
+        {/* <div className="card">
+          <p className="text-gray-600 text-sm">RFP Published</p>
+          <p className="text-3xl font-bold text-blue-600">{stats.rfpPublished}</p>
+        </div> */}
         <div className="card">
           <p className="text-gray-600 text-sm">Active</p>
           <p className="text-3xl font-bold text-green-600">{stats.active}</p>
         </div>
         <div className="card">
-          <p className="text-gray-600 text-sm">Rejected</p>
-          <p className="text-3xl font-bold text-red-600">{stats.rejected}</p>
+          <p className="text-gray-600 text-sm">Completed</p>
+          <p className="text-3xl font-bold text-gray-600">{stats.completed}</p>
         </div>
       </div>
 
@@ -139,7 +137,6 @@ export const AdminEventsPage = () => {
               className="input"
             >
               <option value="all">All Status</option>
-              <option value="pending-approval">Pending Approval</option>
               <option value="rfp-published">RFP Published</option>
               <option value="reviewing-proposals">Reviewing Proposals</option>
               <option value="active">Active</option>
@@ -214,10 +211,10 @@ export const AdminEventsPage = () => {
                       </div>
 
                       <div className="flex items-center gap-2">
-                        <DollarSign className="h-4 w-4 text-gray-500" />
+                        <IndianRupee className="h-4 w-4 text-gray-500" />
                         <div>
                           <p className="text-gray-600">Budget</p>
-                          <p className="font-medium">${formatValue(event.budget)}</p>
+                          <p className="font-medium">₹{formatValue(event.budget)}</p>
                         </div>
                       </div>
                     </div>
@@ -319,7 +316,7 @@ export const AdminEventsPage = () => {
 
               <div className="card bg-gray-50">
                 <p className="text-xs text-gray-500">Budget</p>
-                <p className="text-lg font-semibold">${formatValue(selectedEvent.budget)}</p>
+                <p className="text-lg font-semibold">₹{formatValue(selectedEvent.budget)}</p>
               </div>
 
               <div className="card bg-gray-50">

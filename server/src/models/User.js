@@ -34,6 +34,21 @@ const userSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
+    // Hotel-specific fields
+    location: {
+      city: String,
+      country: String,
+      address: String,
+    },
+    totalRooms: {
+      type: Number,
+      min: 0,
+    },
+    specialization: [String], // ['conference', 'wedding', 'corporate', etc.]
+    priceRange: {
+      min: Number,
+      max: Number,
+    },
     avatar: {
       type: String,
       default: null,
@@ -54,6 +69,57 @@ const userSchema = new mongoose.Schema(
       type: String,
       select: false,
     },
+    // Vector database fields for recommendations
+    vectorId: {
+      type: String,
+      index: true,
+    },
+    embeddingHash: {
+      type: String,
+    },
+    preferredByPlanners: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+    }],
+    averageRating: {
+      type: Number,
+      min: 0,
+      max: 5,
+      default: 0,
+    },
+    facilities: [String],
+    description: String,
+    // TBO-specific fields
+    hotelSource: {
+      type: String,
+      enum: ['tbo', 'manual', 'seeded'],
+      default: 'manual',
+    },
+    tboData: {
+      hotelCode: String,
+      cityCode: String,
+      countryCode: String,
+      starRating: Number,
+      latitude: Number,
+      longitude: Number,
+      map: String,
+    },
+    hasAccessed: {
+      type: Boolean,
+      default: false,
+    },
+    address: {
+      street: String,
+      city: String,
+      state: String,
+      country: String,
+      postalCode: String,
+    },
+    availableRooms: {
+      type: Number,
+      default: 0,
+    },
+    images: [String],
   },
   {
     timestamps: true,

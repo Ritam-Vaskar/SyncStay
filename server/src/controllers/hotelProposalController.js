@@ -1,9 +1,14 @@
 import HotelProposal from '../models/HotelProposal.js';
 import Event from '../models/Event.js';
+import HotelActivity from '../models/HotelActivity.js';
+import User from '../models/User.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import { createAuditLog } from '../middlewares/auditLogger.js';
 import sendEmail from '../utils/mail.js';
+import { clientEventReviewTemplate } from '../utils/emailTemplates.js';
+import { generateClientEventPDF } from '../utils/pdfGenerator.js';
 import config from '../config/index.js';
+import { updateHotelActivityEmbedding } from '../services/embeddingService.js';
 
 /**
  * @route   GET /api/hotel-proposals/rfps
@@ -238,7 +243,136 @@ export const selectProposal = asyncHandler(async (req, res) => {
     hotel: p.hotel,
     proposal: p._id,
   }));
+  
+  // For public events, auto-activate when at least one hotel is selected
+  if (!event.isPrivate && !wasSelected && allSelected.length > 0) {
+    if (event.status === 'reviewing-proposals' || event.status === 'pending-approval') {
+      event.status = 'active';
+      // Also auto-publish microsite
+      if (!event.micrositeConfig || !event.micrositeConfig.isPublished) {
+        const slug = event.micrositeConfig?.customSlug || event.name
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/(^-|-$)/g, '');
+        
+        event.micrositeConfig = {
+          ...event.micrositeConfig,
+          isPublished: true,
+          customSlug: event.micrositeConfig?.customSlug || `${slug}-${Date.now().toString().slice(-4)}`,
+          theme: event.micrositeConfig?.theme || { primaryColor: '#3b82f6' },
+        };
+      }
+    }
+  }
+  
   await event.save();
+
+  // Send email notification to client if clientEmail is provided (only when selecting, not deselecting)
+  console.log('📧 [selectProposal] Checking if client email should be sent...');
+  console.log('wasSelected:', wasSelected);
+  console.log('Event clientEmail:', event.clientEmail);
+  
+  if (!wasSelected && event.clientEmail) {
+    console.log('✅ Client email found, preparing to send email to:', event.clientEmail);
+    try {
+      console.log('📦 Fetching all selected proposals...');
+      // Fetch all selected hotels with details
+      const allSelectedProposals = await HotelProposal.find({ 
+        event: event._id, 
+        selectedByPlanner: true 
+      }).populate('hotel');
+      console.log('Selected proposals found:', allSelectedProposals.length);
+
+      const selectedHotelsWithDetails = await Promise.all(
+        allSelectedProposals.map(async (prop) => {
+          const hotelUser = await User.findById(prop.hotel);
+          return {
+            name: hotelUser?.name || hotelUser?.organization || 'Hotel',
+            roomType: prop.roomTypes?.[0] || 'Standard',
+            numberOfRooms: prop.numberOfRooms || event.accommodationNeeds?.totalRooms || 0,
+            pricePerNight: prop.pricing?.doubleRoom?.pricePerNight || 0,
+            totalPrice: prop.totalEstimatedCost || 0,
+          };
+        })
+      );
+
+      const eventDates = `${new Date(event.startDate).toLocaleDateString('en-IN')} - ${new Date(event.endDate).toLocaleDateString('en-IN')}`;
+      const micrositeLink = event.micrositeConfig?.isPublished 
+        ? `${config.clientUrl}/microsite/${event.micrositeConfig.customSlug}`
+        : `${config.clientUrl}/events/${event._id}`;
+
+      const emailData = {
+        clientName: 'Valued Client',
+        eventName: event.name,
+        eventDates,
+        location: event.location?.city || event.location,
+        expectedGuests: event.expectedGuests,
+        totalBudget: event.budget || 0,
+        selectedHotels: selectedHotelsWithDetails,
+        micrositeLink,
+      };
+
+      console.log('📝 Generating email template...');
+      const emailHtml = clientEventReviewTemplate(emailData);
+      
+      console.log('📄 Generating PDF...');
+      // Generate PDF
+      const pdfBuffer = await generateClientEventPDF(emailData);
+      console.log('PDF generated, size:', pdfBuffer.length, 'bytes');
+
+      console.log('📨 Sending email to:', event.clientEmail);
+      await sendEmail({
+        to: event.clientEmail,
+        subject: `Hotel Selection Update: ${event.name}`,
+        html: emailHtml,
+        attachments: [
+          {
+            filename: `Event_Plan_${event.name.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`,
+            content: pdfBuffer,
+            contentType: 'application/pdf'
+          }
+        ]
+      });
+
+      console.log(`✅ Client notification email with PDF sent successfully to ${event.clientEmail}`);
+    } catch (emailError) {
+      console.error('❌ Failed to send client notification email:', emailError);
+      console.error('Error stack:', emailError.stack);
+      // Don't fail the request if email fails
+    }
+  } else {
+    if (wasSelected) {
+      console.log('⚠️ Hotel was deselected - skipping email notification');
+    } else {
+      console.log('⚠️ No client email configured for this event - skipping email notification');
+    }
+  }
+
+  // ── Hotel Activity hook ──────────────────────────────────────────────────────
+  // Record the selection so the hotel's activity-history embedding stays current.
+  // Fire-and-forget (never block the HTTP response).
+  if (!wasSelected) {
+    HotelActivity.findOneAndUpdate(
+      { hotel: proposal.hotel, event: event._id },
+      {
+        $setOnInsert: {
+          hotel: proposal.hotel,
+          event: event._id,
+          eventType: event.type || 'other',
+          eventName: event.name,
+          eventScale: event.expectedGuests > 500 ? 'large' : event.expectedGuests > 100 ? 'medium' : 'small',
+          eventLocation: event.location?.city || '',
+          eventDate: event.startDate,
+          source: 'proposal_selected',
+        },
+        $set: { outcome: 'selected' },
+      },
+      { upsert: true, new: true }
+    )
+      .then(() => updateHotelActivityEmbedding(proposal.hotel))
+      .catch(err => console.error('[HotelActivity] update failed:', err.message));
+  }
+  // ────────────────────────────────────────────────────────────────────────────
 
   // Log action
   await createAuditLog({
@@ -321,9 +455,99 @@ export const confirmHotelSelection = asyncHandler(async (req, res) => {
   if (event.isPrivate) {
     event.plannerPaymentAmount = totalCost;
     event.plannerPaymentStatus = 'pending';
+  } else {
+    // For public events, automatically activate when hotels are selected
+    if (event.status === 'reviewing-proposals' || event.status === 'pending-approval') {
+      event.status = 'active';
+      // Also publish the microsite automatically for public events
+      if (!event.micrositeConfig || !event.micrositeConfig.isPublished) {
+        const slug = event.micrositeConfig?.customSlug || event.name
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/(^-|-$)/g, '');
+        
+        event.micrositeConfig = {
+          ...event.micrositeConfig,
+          isPublished: true,
+          customSlug: event.micrositeConfig?.customSlug || `${slug}-${Date.now().toString().slice(-4)}`,
+          theme: event.micrositeConfig?.theme || { primaryColor: '#3b82f6' },
+        };
+      }
+    }
   }
 
   await event.save();
+
+  // Send email notification to client if clientEmail is provided
+  console.log('📧 [confirmHotelSelection] Checking if client email should be sent...');
+  console.log('Event clientEmail:', event.clientEmail);
+  console.log('Event name:', event.name);
+  
+  if (event.clientEmail) {
+    console.log('✅ Client email found, preparing to send email to:', event.clientEmail);
+    try {
+      console.log('📦 Fetching selected hotels details...');
+      // Fetch selected hotels with details
+      const selectedHotelsWithDetails = await Promise.all(
+        proposals.map(async (prop) => {
+          const hotelUser = await User.findById(prop.hotel);
+          return {
+            name: hotelUser?.name || hotelUser?.organization || 'Hotel',
+            roomType: prop.roomTypes?.[0] || 'Standard',
+            numberOfRooms: prop.numberOfRooms || event.accommodationNeeds?.totalRooms || 0,
+            pricePerNight: prop.pricing?.doubleRoom?.pricePerNight || 0,
+            totalPrice: prop.totalEstimatedCost || 0,
+          };
+        })
+      );
+      console.log('Hotel details fetched:', selectedHotelsWithDetails.length, 'hotels');
+
+      const eventDates = `${new Date(event.startDate).toLocaleDateString('en-IN')} - ${new Date(event.endDate).toLocaleDateString('en-IN')}`;
+      const micrositeLink = event.micrositeConfig?.isPublished 
+        ? `${config.clientUrl}/microsite/${event.micrositeConfig.customSlug}`
+        : `${config.clientUrl}/events/${event._id}`;
+
+      const emailData = {
+        clientName: 'Valued Client',
+        eventName: event.name,
+        eventDates,
+        location: event.location?.city || event.location,
+        expectedGuests: event.expectedGuests,
+        totalBudget: event.budget || 0,
+        selectedHotels: selectedHotelsWithDetails,
+        micrositeLink,
+      };
+
+      const emailHtml = clientEventReviewTemplate(emailData);
+      
+      console.log('📄 Generating PDF...');
+      // Generate PDF
+      const pdfBuffer = await generateClientEventPDF(emailData);
+      console.log('PDF generated, size:', pdfBuffer.length, 'bytes');
+
+      console.log('📨 Sending email to:', event.clientEmail);
+      await sendEmail({
+        to: event.clientEmail,
+        subject: `Hotel Selection Update: ${event.name}`,
+        html: emailHtml,
+        attachments: [
+          {
+            filename: `Event_Plan_${event.name.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`,
+            content: pdfBuffer,
+            contentType: 'application/pdf'
+          }
+        ]
+      });
+
+      console.log(`✅ Client notification email with PDF sent successfully to ${event.clientEmail}`);
+    } catch (emailError) {
+      console.error('❌ Failed to send client notification email:', emailError);
+      console.error('Error stack:', emailError.stack);
+      // Don't fail the request if email fails
+    }
+  } else {
+    console.log('⚠️ No client email configured for this event - skipping email notification');
+  }
 
   await createAuditLog({
     user: req.user.id,
@@ -525,8 +749,8 @@ export const updateProposal = asyncHandler(async (req, res) => {
 
 /**
  * @route   GET /api/hotel-proposals/microsite/:slug/selected
- * @desc    Get selected hotel proposals for a microsite (Public)
- * @access  Public
+ * @desc    Get selected hotel proposals for a microsite (filtered by guest group if authenticated)
+ * @access  Public (with optional auth for group filtering)
  */
 export const getSelectedProposalsForMicrosite = asyncHandler(async (req, res) => {
   const { slug } = req.params;
@@ -547,17 +771,6 @@ export const getSelectedProposalsForMicrosite = asyncHandler(async (req, res) =>
     });
   }
 
-  // Check if event is active
-  if (event.status !== 'active') {
-    console.warn(`⚠️ Event not active: ${event.status}`);
-    return res.status(200).json({
-      success: true,
-      count: 0,
-      data: [],
-      message: 'Event is not active yet. Selected hotels will be available soon.',
-    });
-  }
-
   // Get selected hotel proposals
   if (!event.selectedHotels || event.selectedHotels.length === 0) {
     console.log('ℹ️ No hotels selected yet');
@@ -571,14 +784,52 @@ export const getSelectedProposalsForMicrosite = asyncHandler(async (req, res) =>
 
   // Fetch full proposal details for selected hotels
   const proposalIds = event.selectedHotels.map(sh => sh.proposal);
-  const selectedProposals = await HotelProposal.find({
+  let selectedProposals = await HotelProposal.find({
     _id: { $in: proposalIds },
-    selectedByPlanner: true,
+    // Don't filter by selectedByPlanner - the fact that it's in event.selectedHotels means it's selected
   })
     .populate('hotel', 'name email phone organization')
     .sort({ hotelName: 1 });
 
-  console.log(`✅ Found ${selectedProposals.length} selected proposals`);
+  console.log(`✅ Found ${selectedProposals.length} total selected proposals`);
+
+  // Filter by guest group if user is authenticated and has group assignment
+  if (req.user && req.user.email) {
+    try {
+      // Import InventoryGroup model
+      const InventoryGroup = (await import('../models/InventoryGroup.js')).default;
+      
+      // Find guest's group by email in members array
+      const guestGroup = await InventoryGroup.findOne({
+        event: event._id,
+        'members.guestEmail': req.user.email,
+      }).populate('assignedHotels.hotel', '_id');
+
+      if (guestGroup && guestGroup.assignedHotels && guestGroup.assignedHotels.length > 0) {
+        // Extract hotel IDs from the group's assigned hotels
+        const assignedHotelIds = guestGroup.assignedHotels
+          .map(ah => ah.hotel?._id?.toString() || ah.hotel?.toString())
+          .filter(Boolean);
+
+        console.log(`🎯 Guest ${req.user.email} belongs to group "${guestGroup.name}" with ${assignedHotelIds.length} assigned hotels`);
+
+        // Filter proposals to only show hotels assigned to this guest's group
+        selectedProposals = selectedProposals.filter(proposal => {
+          const hotelId = proposal.hotel?._id?.toString();
+          return assignedHotelIds.includes(hotelId);
+        });
+
+        console.log(`✅ Filtered to ${selectedProposals.length} proposals for guest's group`);
+      } else {
+        console.log(`ℹ️ Guest ${req.user.email} has no group assignment or no hotels assigned to group - showing all hotels`);
+      }
+    } catch (error) {
+      console.error('Error filtering hotels by group:', error);
+      // If filtering fails, show all hotels (fail open for better UX)
+    }
+  } else {
+    console.log('ℹ️ No authenticated user - showing all hotels');
+  }
 
   res.status(200).json({
     success: true,

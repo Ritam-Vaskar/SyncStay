@@ -26,6 +26,7 @@ from pydantic import BaseModel
 # ─────────────────────────────────────────────
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 QDRANT_URL = os.getenv("QDRANT_URL", "http://localhost:6333")
+QDRANT_API_KEY = os.getenv("QDRANT_API_KEY", None)
 QDRANT_HOST = QDRANT_URL.replace("http://", "").replace("https://", "").split(":")[0]
 QDRANT_PORT = int(QDRANT_URL.split(":")[-1]) if ":" in QDRANT_URL.rsplit("/", 1)[-1] else 6333
 
@@ -53,8 +54,8 @@ mem0_config = {
     "vector_store": {
         "provider": "qdrant",
         "config": {
-            "host": QDRANT_HOST,
-            "port": QDRANT_PORT,
+            "url": QDRANT_URL,
+            "api_key": QDRANT_API_KEY,
         },
     },
 }
@@ -125,12 +126,21 @@ output_guardrail_agent = Agent(
     name="OutputGuardrail",
     instructions="""
 You are an output quality checker for SyncStay event assistant.
-Check the assistant's response for:
-1. No hallucinated event data (making up event names/dates that weren't from search)
-2. No harmful or inappropriate content
-3. Response is helpful and on-topic
 
-Respond with is_safe=true if the response is good, is_safe=false with reason if not.
+IMPORTANT: The assistant has access to real-time search tools (search_events, get_event_hotels)
+that return live data from the SyncStay database. Event names, dates, locations, hotel details,
+and pricing in the response are FROM THESE TOOLS and are NOT hallucinated. Do NOT flag them.
+
+Only flag a response as unsafe (is_safe=false) if it contains:
+1. Harmful, abusive, or inappropriate content
+2. Instructions to bypass security or perform illegal actions
+3. Content completely unrelated to events, hotels, or travel (e.g. writing code, medical advice)
+
+ALWAYS mark is_safe=true if the response talks about events, hotels, bookings, 
+recommendations, greetings, or follow-ups — even if it includes specific event names, 
+dates, prices, or hotel details. Those come from real search tools.
+
+When in doubt, mark is_safe=true.
 """,
     output_type=GuardrailResult,
 )

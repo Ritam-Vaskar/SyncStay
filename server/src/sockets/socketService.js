@@ -81,3 +81,12 @@ export const emitUserNotification = (userId, notification) => {
     io.to(`user-${userId}`).emit('notification', notification);
   }
 };
+
+/**
+ * Emit new chat message
+ */
+export const emitChatMessage = (eventId, message) => {
+  if (io) {
+    io.to(`event-${eventId}`).emit('new-chat-message', message);
+  }
+};

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { 
   Calendar, 
   MapPin, 
@@ -20,6 +20,7 @@ import toast from 'react-hot-toast';
 
 export const PlannerEventsPage = () => {
   const [statusFilter, setStatusFilter] = useState('all');
+  const navigate = useNavigate();
 
   const { data: eventsData, isLoading } = useQuery({
     queryKey: ['planner-events'],
@@ -41,17 +42,11 @@ export const PlannerEventsPage = () => {
         icon: Clock,
         iconColor: 'text-gray-600'
       },
-      'pending-approval': { 
-        label: 'Pending Approval', 
-        color: 'bg-yellow-100 text-yellow-800',
-        icon: AlertCircle,
-        iconColor: 'text-yellow-600'
-      },
       'rfp-published': {
-        label: 'RFP Published - Awaiting Hotels',
-        color: 'bg-blue-100 text-blue-800',
-        icon: Clock,
-        iconColor: 'text-blue-600'
+        label: 'Active',
+        color: 'bg-green-100 text-green-800',
+        icon: CheckCircle,
+        iconColor: 'text-green-600'
       },
       'reviewing-proposals': {
         label: 'Review Hotel Proposals',
@@ -84,7 +79,7 @@ export const PlannerEventsPage = () => {
         iconColor: 'text-red-600'
       },
     };
-    return configs[status] || configs['pending-approval'];
+    return configs[status] || configs['rfp-published'];
   };
 
   const copyMicrositeUrl = (slug) => {
@@ -95,7 +90,6 @@ export const PlannerEventsPage = () => {
 
   const stats = {
     total: events.length,
-    pending: events.filter(e => e.status === 'pending-approval').length,
     rfpPublished: events.filter(e => e.status === 'rfp-published').length,
     reviewing: events.filter(e => e.status === 'reviewing-proposals').length,
     active: events.filter(e => e.status === 'active').length,
@@ -136,7 +130,7 @@ export const PlannerEventsPage = () => {
           </div>
         </div>
 
-        <div className="card">
+        {/* <div className="card">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs font-medium text-gray-600">Pending</p>
@@ -144,15 +138,15 @@ export const PlannerEventsPage = () => {
             </div>
             <AlertCircle className="h-10 w-10 text-yellow-600 opacity-20" />
           </div>
-        </div>
+        </div> */}
 
         <div className="card">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-xs font-medium text-gray-600">RFP Sent</p>
-              <p className="text-2xl font-bold text-blue-600 mt-1">{stats.rfpPublished}</p>
+              <p className="text-xs font-medium text-gray-600">Active</p>
+              <p className="text-2xl font-bold text-green-600 mt-1">{stats.rfpPublished}</p>
             </div>
-            <Clock className="h-10 w-10 text-blue-600 opacity-20" />
+            <CheckCircle className="h-10 w-10 text-green-600 opacity-20" />
           </div>
         </div>
 
@@ -166,7 +160,7 @@ export const PlannerEventsPage = () => {
           </div>
         </div>
 
-        <div className="card">
+        {/* <div className="card">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs font-medium text-gray-600">Active</p>
@@ -174,7 +168,7 @@ export const PlannerEventsPage = () => {
             </div>
             <CheckCircle className="h-10 w-10 text-green-600 opacity-20" />
           </div>
-        </div>
+        </div> */}
 
         <div className="card">
           <div className="flex items-center justify-between">
@@ -192,7 +186,7 @@ export const PlannerEventsPage = () => {
         <div className="flex items-center gap-4 overflow-x-auto">
           <span className="text-sm font-medium text-gray-700 whitespace-nowrap">Filter:</span>
           <div className="flex gap-2 flex-wrap">
-            {['all', 'pending-approval', 'rfp-published', 'reviewing-proposals', 'active', 'rejected', 'completed'].map((status) => (
+            {['all', 'rfp-published', 'reviewing-proposals', 'rejected', 'completed'].map((status) => (
               <button
                 key={status}
                 onClick={() => setStatusFilter(status)}
@@ -203,7 +197,7 @@ export const PlannerEventsPage = () => {
                 }`}
               >
                 {status === 'all' ? 'All' : 
-                 status === 'rfp-published' ? 'RFP Sent' :
+                 status === 'rfp-published' ? 'Active' :
                  status === 'reviewing-proposals' ? 'Reviewing' :
                  status.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
               </button>
@@ -235,7 +229,11 @@ export const PlannerEventsPage = () => {
             const StatusIcon = statusConfig.icon;
 
             return (
-              <div key={event._id} className="card hover:shadow-lg transition-shadow">
+              <div
+                key={event._id}
+                className="card hover:shadow-lg transition-shadow cursor-pointer"
+                onClick={() => { const slug = event.micrositeConfig?.customSlug; if (slug) navigate(`/microsite/${slug}/dashboard`); }}
+              >
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-2">
@@ -300,40 +298,35 @@ export const PlannerEventsPage = () => {
                 )}
 
                 {/* Action Buttons */}
-                <div className="flex items-center gap-3 pt-4 border-t border-gray-200">
-                  {event.status === 'active' && event.micrositeUrl && (
+                <div className="flex items-center gap-3 pt-4 border-t border-gray-200" onClick={(e) => e.stopPropagation()}>
+                  {event.micrositeConfig?.customSlug && (
                     <>
                       <Link
-                        to={`/microsite/${event.micrositeUrl}`}
+                        to={`/microsite/${event.micrositeConfig.customSlug}`}
                         target="_blank"
                         className="btn btn-sm bg-primary-600 text-white hover:bg-primary-700 flex items-center gap-2"
+                        onClick={(e) => e.stopPropagation()}
                       >
                         <ExternalLink className="h-4 w-4" />
                         View Microsite
                       </Link>
                       <button
-                        onClick={() => copyMicrositeUrl(event.micrositeUrl)}
+                        onClick={(e) => { e.stopPropagation(); copyMicrositeUrl(event.micrositeConfig.customSlug); }}
                         className="btn btn-sm bg-gray-100 text-gray-700 hover:bg-gray-200 flex items-center gap-2"
                       >
                         <Copy className="h-4 w-4" />
                         Copy URL
                       </button>
                       <Link
-                        to={`/microsite/${event.micrositeUrl}/dashboard`}
+                        to={`/microsite/${event.micrositeConfig.customSlug}/dashboard`}
                         className="btn btn-sm bg-indigo-600 text-white hover:bg-indigo-700"
+                        onClick={(e) => e.stopPropagation()}
                       >
                         Event Dashboard
                       </Link>
                     </>
                   )}
                   
-                  {event.status === 'pending-approval' && (
-                    <div className="flex items-center gap-2 text-sm text-yellow-700 bg-yellow-50 px-4 py-2 rounded-lg">
-                      <AlertCircle className="h-5 w-5" />
-                      <span>Waiting for admin approval</span>
-                    </div>
-                  )}
-
                   {event.status === 'rejected' && event.rejectionReason && (
                     <div className="flex items-center gap-2 text-sm text-red-700 bg-red-50 px-4 py-2 rounded-lg">
                       <XCircle className="h-5 w-5" />

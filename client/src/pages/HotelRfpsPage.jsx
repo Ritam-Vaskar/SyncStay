@@ -7,7 +7,7 @@ import {
   Users, 
   Hotel,
   CheckCircle,
-  DollarSign,
+  IndianRupee,
   Clock,
   Send,
   X
@@ -302,7 +302,7 @@ export const HotelRfpsPage = () => {
                   </div>
 
                   <div className="flex items-center gap-2">
-                    <DollarSign className="h-5 w-5 text-primary-600" />
+                      <IndianRupee className="h-5 w-5 text-primary-600" />
                     <div>
                       <p className="text-xs text-gray-500">Budget</p>
                       <p className="text-sm font-medium">${rfp.budget?.toLocaleString() || 'N/A'}</p>
@@ -414,7 +414,7 @@ export const HotelRfpsPage = () => {
                       </h4>
                       <div className="space-y-3">
                         <div>
-                          <label className="block text-xs text-gray-600 mb-1">Price per Night ($)</label>
+                          <label className="block text-xs text-gray-600 mb-1">Price per Night (₹)</label>
                           <input
                             type="number"
                             value={proposalData.pricing[roomType].pricePerNight}
