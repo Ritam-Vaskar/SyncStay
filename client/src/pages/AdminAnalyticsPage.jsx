@@ -316,7 +316,7 @@ export default function AdminAnalyticsPage() {
       {/* Top Performers */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Top Events */}
-        <div className="bg-white rounded-lg shadow-sm p-6">
+        <div className="bg-white rounded-lg shadow-sm p-6 border border-transparent">
           <div className="flex items-center gap-3 mb-4">
             <div className="p-2 bg-green-100 rounded-lg">
               <Award className="h-5 w-5 text-green-600" />
@@ -348,7 +348,7 @@ export default function AdminAnalyticsPage() {
         </div>
 
         {/* Top Planners */}
-        <div className="bg-white rounded-lg shadow-sm p-6">
+        <div className="bg-white rounded-lg shadow-sm p-6 border border-transparent">
           <div className="flex items-center gap-3 mb-4">
             <div className="p-2 bg-blue-100 rounded-lg">
               <Award className="h-5 w-5 text-blue-600" />
@@ -386,7 +386,7 @@ export default function AdminAnalyticsPage() {
 // Stat Card Component
 function StatCard({ title, value, subtitle, icon: Icon, color, trend, trendLabel }) {
   return (
-    <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm p-6 border border-transparent dark:border-gray-800">
+    <div className="bg-white rounded-lg shadow-sm p-6 border border-transparent">
       <div className="flex items-center justify-between mb-4">
         <div className={`p-3 ${color} rounded-lg`}>
           <Icon className="h-6 w-6 text-white" />
@@ -399,10 +399,10 @@ function StatCard({ title, value, subtitle, icon: Icon, color, trend, trendLabel
         )}
       </div>
       <div>
-        <h3 className="text-2xl font-bold text-gray-900 dark:text-white">{value}</h3>
-        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{subtitle}</p>
+        <h3 className="text-2xl font-bold text-gray-900">{value}</h3>
+        <p className="text-sm text-gray-600 mt-1">{subtitle}</p>
         {trendLabel && trend !== undefined && (
-          <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">{trendLabel}</p>
+          <p className="text-xs text-gray-500 mt-1">{trendLabel}</p>
         )}
       </div>
     </div>
@@ -412,12 +412,12 @@ function StatCard({ title, value, subtitle, icon: Icon, color, trend, trendLabel
 // Chart Card Component
 function ChartCard({ title, icon: Icon, children }) {
   return (
-    <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm p-6 border border-transparent dark:border-gray-800">
+    <div className="bg-white rounded-lg shadow-sm p-6 border border-transparent">
       <div className="flex items-center gap-3 mb-4">
-        <div className="p-2 bg-gray-100 dark:bg-gray-800 rounded-lg">
-          <Icon className="h-5 w-5 text-gray-600 dark:text-gray-300" />
+        <div className="p-2 bg-gray-100 rounded-lg">
+          <Icon className="h-5 w-5 text-gray-600" />
         </div>
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{title}</h3>
+        <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
       </div>
       {children}
     </div>

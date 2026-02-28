@@ -11,16 +11,12 @@ import {
   Sparkles,
   TrendingUp,
   Eye,
-  Sun,
-  Moon,
 } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
-import { useThemeStore } from '../store/themeStore';
 import api from '../services/api';
 
 export const BrowseEventsPage = () => {
   const { isAuthenticated } = useAuthStore();
-  const { isDark, toggleTheme } = useThemeStore();
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -160,27 +156,20 @@ export const BrowseEventsPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-white dark:bg-gray-950 text-gray-900 dark:text-gray-100 transition-colors duration-300">
+    <div className="min-h-screen bg-white text-gray-900 transition-colors duration-300">
       {/* Navigation */}
-      <nav className="fixed top-0 w-full bg-white/90 dark:bg-gray-950/90 backdrop-blur-md border-b border-gray-100 dark:border-gray-800 z-50">
+      <nav className="fixed top-0 w-full bg-white/90 backdrop-blur-md border-b border-gray-100 z-50">
         <div className="max-w-7xl mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <Link to="/" className="flex items-center gap-2.5">
               <div className="bg-indigo-600 p-2 rounded-lg">
                 <Calendar className="h-5 w-5 text-white" />
               </div>
-              <span className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">StaySync</span>
+              <span className="text-xl font-bold tracking-tight text-gray-900">StaySync</span>
             </Link>
 
             <div className="flex items-center gap-3">
-              <button
-                onClick={toggleTheme}
-                className="p-2 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-                aria-label="Toggle theme"
-              >
-                {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-              </button>
-              <Link to="/" className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors px-3 py-2">
+              <Link to="/" className="text-sm text-gray-500 hover:text-gray-900 transition-colors px-3 py-2">
                 Home
               </Link>
               {isAuthenticated ? (
@@ -199,16 +188,16 @@ export const BrowseEventsPage = () => {
       </nav>
 
       {/* Header */}
-      <div className="bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800 pt-24 pb-8">
+      <div className="bg-white border-b border-gray-100 pt-24 pb-8">
         <div className="max-w-7xl mx-auto px-6">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-1">Browse Events</h1>
-          <p className="text-gray-500 dark:text-gray-400 text-sm">Discover and book amazing events</p>
+          <h1 className="text-3xl font-bold text-gray-900 mb-1">Browse Events</h1>
+          <p className="text-gray-500 text-sm">Discover and book amazing events</p>
         </div>
       </div>
 
       <div className="max-w-7xl mx-auto px-6 py-8">
         {/* Search and Filters */}
-        <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 p-5 mb-7 shadow-sm">
+        <div className="bg-white rounded-xl border border-gray-100 p-5 mb-7 shadow-sm">
           <form onSubmit={handleSearch} className="flex gap-3 mb-4">
             <div className="flex-1 relative">
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -217,7 +206,7 @@ export const BrowseEventsPage = () => {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search events by name, location, or type..."
-                className="w-full pl-10 pr-10 py-2.5 text-sm border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-gray-50 dark:bg-gray-800 dark:text-gray-100 dark:placeholder-gray-500"
+                className="w-full pl-10 pr-10 py-2.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-gray-50"
               />
               {searchQuery && (
                 <button
@@ -235,7 +224,7 @@ export const BrowseEventsPage = () => {
             <button
               type="button"
               onClick={() => setShowFilters(!showFilters)}
-              className="px-4 py-2.5 text-sm font-medium bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg flex items-center gap-2 transition-colors"
+              className="px-4 py-2.5 text-sm font-medium bg-white border border-gray-200 text-gray-600 hover:bg-gray-50 rounded-lg flex items-center gap-2 transition-colors"
             >
               <Filter className="h-4 w-4" />
               Filters
@@ -244,13 +233,13 @@ export const BrowseEventsPage = () => {
 
           {/* Filters Panel */}
           {showFilters && (
-            <div className="grid md:grid-cols-3 gap-4 pt-4 border-t border-gray-100 dark:border-gray-700">
+            <div className="grid md:grid-cols-3 gap-4 pt-4 border-t border-gray-100">
               <div>
-                <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1.5">Event Type</label>
+                <label className="block text-xs font-semibold text-gray-600 mb-1.5">Event Type</label>
                 <select
                   value={filters.type}
                   onChange={(e) => setFilters({ ...filters, type: e.target.value })}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-gray-50 dark:bg-gray-800 dark:text-gray-100"
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-gray-50"
                 >
                   <option value="all">All Types</option>
                   <option value="conference">Conference</option>
@@ -260,11 +249,11 @@ export const BrowseEventsPage = () => {
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1.5">Status</label>
+                <label className="block text-xs font-semibold text-gray-600 mb-1.5">Status</label>
                 <select
                   value={filters.status}
                   onChange={(e) => setFilters({ ...filters, status: e.target.value })}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-gray-50 dark:bg-gray-800 dark:text-gray-100"
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-gray-50"
                 >
                   <option value="active">Active</option>
                   <option value="rfp-published">Published</option>
@@ -318,7 +307,7 @@ export const BrowseEventsPage = () => {
                 key={event._id}
                 to={`/microsite/${event.micrositeConfig?.customSlug || event._id}`}
                 onClick={() => trackView(event._id)}
-                className="group bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 hover:border-indigo-100 dark:hover:border-indigo-900 hover:shadow-md transition-all duration-200 p-6 flex flex-col"
+                className="group bg-white rounded-xl border border-gray-100 hover:border-indigo-100 hover:shadow-md transition-all duration-200 p-6 flex flex-col"
               >
                 {/* Header row */}
                 <div className="flex items-start justify-between mb-4">
@@ -350,15 +339,15 @@ export const BrowseEventsPage = () => {
                 </div>
 
                 {/* Title & description */}
-                <h3 className="text-base font-bold text-gray-900 dark:text-white mb-1.5 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors line-clamp-2">
+                <h3 className="text-base font-bold text-gray-900 mb-1.5 group-hover:text-indigo-600 transition-colors line-clamp-2">
                   {event.name}
                 </h3>
-                <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed line-clamp-2 mb-5 flex-1">
+                <p className="text-sm text-gray-500 leading-relaxed line-clamp-2 mb-5 flex-1">
                   {event.description || 'No description available.'}
                 </p>
 
                 {/* Meta info */}
-                <div className="border-t border-gray-100 dark:border-gray-800 pt-4 space-y-2">
+                <div className="border-t border-gray-100 pt-4 space-y-2">
                   <div className="flex items-center gap-2 text-gray-500">
                     <MapPin className="h-3.5 w-3.5 text-indigo-400 flex-shrink-0" />
                     <span className="text-xs truncate">

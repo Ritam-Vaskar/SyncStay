@@ -182,7 +182,7 @@ export default function AdminAuditLogsPage() {
       </div>
 
       {/* Filters */}
-      <div className="bg-white rounded-lg shadow-sm p-4">
+      <div className="bg-white rounded-lg shadow-sm p-4 border border-transparent">
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
           {/* Action Filter */}
           <div>
@@ -277,7 +277,7 @@ export default function AdminAuditLogsPage() {
       </div>
 
       {/* Logs Table */}
-      <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+      <div className="bg-white rounded-lg shadow-sm overflow-hidden border border-transparent">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
@@ -417,7 +417,7 @@ export default function AdminAuditLogsPage() {
 // Stat Card Component
 function StatCard({ title, value, icon: Icon, color }) {
   return (
-    <div className="bg-white rounded-lg shadow-sm p-6">
+    <div className="bg-white rounded-lg shadow-sm p-6 border border-transparent">
       <div className="flex items-center justify-between">
         <div>
           <p className="text-sm font-medium text-gray-600">{title}</p>

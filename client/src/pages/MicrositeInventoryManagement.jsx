@@ -1043,9 +1043,9 @@ export const MicrositeInventoryManagement = () => {
                                       </div>
 
                                       {/* Score - Large and Prominent */}
-                                      <div className="mb-4 p-3 bg-gradient-to-r from-green-200 to-green-100 dark:from-green-900/40 dark:to-green-900/20 rounded-lg border-2 border-green-400 dark:border-green-700">
+                                      <div className="mb-4 p-3 bg-gradient-to-r from-green-200 to-green-100 rounded-lg border-2 border-green-400">
                                         <div className="flex justify-between items-center">
-                                          <span className="font-bold text-2xl text-green-900 dark:text-green-300">
+                                          <span className="font-bold text-2xl text-green-900">
                                             {topHotel.groupScore ? (topHotel.groupScore / 10).toFixed(1) : '10'}/10
                                           </span>
                                           <div className="w-32 h-3 bg-green-300 rounded-full overflow-hidden">

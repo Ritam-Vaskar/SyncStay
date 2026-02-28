@@ -187,7 +187,7 @@ export const GuestListManagementPage = () => {
       </div>
 
       {/* Privacy Toggle Card */}
-      <div className="card bg-gradient-to-r from-primary-50 to-purple-50 dark:from-primary-950/20 dark:to-purple-950/20 border-2 border-primary-200 dark:border-primary-900">
+      <div className="card bg-gradient-to-r from-primary-50 to-purple-50 border-2 border-primary-200">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <div className={`p-3 rounded-lg ${isPrivate ? 'bg-primary-600' : 'bg-gray-400'}`}>

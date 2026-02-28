@@ -179,7 +179,7 @@ export const PlannerAnalyticsPage = () => {
         </div>
         
         {/* Time Range Filter */}
-        <div className="flex items-center gap-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-1">
+        <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-lg p-1">
           {[
             { value: '7', label: '7 Days' },
             { value: '30', label: '30 Days' },
@@ -191,7 +191,7 @@ export const PlannerAnalyticsPage = () => {
               className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
                 timeRange === range.value
                   ? 'bg-primary-600 text-white'
-                  : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                  : 'text-gray-600 hover:bg-gray-100'
               }`}
             >
               {range.label}
@@ -215,7 +215,7 @@ export const PlannerAnalyticsPage = () => {
                 <span>From confirmed bookings</span>
               </div>
             </div>
-            <div className="bg-gradient-to-br from-green-100 to-green-200 dark:from-green-900/40 dark:to-green-800/40 p-3 rounded-lg">
+            <div className="bg-gradient-to-br from-green-100 to-green-200 p-3 rounded-lg">
               <IndianRupee className="h-6 w-6 text-green-600" />
             </div>
           </div>
@@ -231,7 +231,7 @@ export const PlannerAnalyticsPage = () => {
                 <span>{trendPercentage}% in selected period</span>
               </div>
             </div>
-            <div className="bg-gradient-to-br from-blue-100 to-blue-200 dark:from-blue-900/40 dark:to-blue-800/40 p-3 rounded-lg">
+            <div className="bg-gradient-to-br from-blue-100 to-blue-200 p-3 rounded-lg">
               <Calendar className="h-6 w-6 text-blue-600" />
             </div>
           </div>
@@ -247,7 +247,7 @@ export const PlannerAnalyticsPage = () => {
                 <span>Across {activeEvents} active events</span>
               </div>
             </div>
-            <div className="bg-gradient-to-br from-purple-100 to-purple-200 dark:from-purple-900/40 dark:to-purple-800/40 p-3 rounded-lg">
+            <div className="bg-gradient-to-br from-purple-100 to-purple-200 p-3 rounded-lg">
               <Users className="h-6 w-6 text-purple-600" />
             </div>
           </div>
@@ -263,7 +263,7 @@ export const PlannerAnalyticsPage = () => {
                 <span>{bookedRooms}/{effectiveTotalRooms} rooms booked</span>
               </div>
             </div>
-            <div className="bg-gradient-to-br from-orange-100 to-orange-200 dark:from-orange-900/40 dark:to-orange-800/40 p-3 rounded-lg">
+            <div className="bg-gradient-to-br from-orange-100 to-orange-200 p-3 rounded-lg">
               <Hotel className="h-6 w-6 text-orange-600" />
             </div>
           </div>
@@ -409,7 +409,7 @@ export const PlannerAnalyticsPage = () => {
           {revenueByEvent.slice(0, 10).map((event, index) => {
             const percentage = totalRevenue > 0 ? ((event.revenue / totalRevenue) * 100).toFixed(1) : 0;
             return (
-              <div key={index} className="flex items-center gap-4 p-4 bg-gradient-to-r from-gray-50 to-white dark:from-gray-800 dark:to-gray-900 rounded-lg border border-gray-100 dark:border-gray-700 hover:border-primary-300 dark:hover:border-primary-700 transition-all">
+              <div key={index} className="flex items-center gap-4 p-4 bg-gradient-to-r from-gray-50 to-white rounded-lg border border-gray-100 hover:border-primary-300 transition-all">
                 <div className="flex-shrink-0 w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center">
                   <span className="text-sm font-bold text-primary-600">#{index + 1}</span>
                 </div>

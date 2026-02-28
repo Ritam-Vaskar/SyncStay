@@ -18,17 +18,13 @@ import {
   ChevronRight,
   Building2,
   Sparkles,
-  Sun,
-  Moon,
 } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
-import { useThemeStore } from '../store/themeStore';
 import { EventRecommendations } from '../components/EventRecommendations';
 
 export const LandingPage = () => {
   const navigate = useNavigate();
   const { isAuthenticated, user } = useAuthStore();
-  const { isDark, toggleTheme } = useThemeStore();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [demoForm, setDemoForm] = useState({ name: '', email: '', company: '', phone: '' });
 
@@ -112,10 +108,10 @@ export const LandingPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-white dark:bg-gray-950 text-gray-900 dark:text-gray-100 transition-colors duration-300">
+    <div className="min-h-screen bg-white text-gray-900 transition-colors duration-300">
 
       {/* â”€â”€ Navigation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
-      <nav className="fixed top-0 w-full bg-white/90 dark:bg-gray-950/90 backdrop-blur-md border-b border-gray-100 dark:border-gray-800 z-50">
+      <nav className="fixed top-0 w-full bg-white/90 backdrop-blur-md border-b border-gray-100 z-50">
         <div className="max-w-7xl mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             {/* Logo */}
@@ -123,27 +119,19 @@ export const LandingPage = () => {
               <div className="bg-indigo-600 p-2 rounded-lg">
                 <Building2 className="h-5 w-5 text-white" />
               </div>
-              <span className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">StaySync</span>
+              <span className="text-xl font-bold tracking-tight text-gray-900">StaySync</span>
             </div>
 
             {/* Desktop links */}
             <div className="hidden md:flex items-center gap-8">
-              <a href="#features" className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors">Features</a>
-              <a href="#how-it-works" className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors">How It Works</a>
-              <a href="#testimonials" className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors">Testimonials</a>
-              <Link to="/events" className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors">Browse Events</Link>
+              <a href="#features" className="text-sm text-gray-500 hover:text-gray-900 transition-colors">Features</a>
+              <a href="#how-it-works" className="text-sm text-gray-500 hover:text-gray-900 transition-colors">How It Works</a>
+              <a href="#testimonials" className="text-sm text-gray-500 hover:text-gray-900 transition-colors">Testimonials</a>
+              <Link to="/events" className="text-sm text-gray-500 hover:text-gray-900 transition-colors">Browse Events</Link>
             </div>
 
             {/* Auth CTA */}
             <div className="hidden md:flex items-center gap-3">
-              {/* Theme toggle */}
-              <button
-                onClick={toggleTheme}
-                className="p-2 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-                aria-label="Toggle theme"
-              >
-                {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-              </button>
               {isAuthenticated ? (
                 <Link to={user?.role === 'hotel' ? '/hotel/dashboard' : '/dashboard'}
                   className="px-4 py-2 text-sm font-medium bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors">
@@ -151,7 +139,7 @@ export const LandingPage = () => {
                 </Link>
               ) : (
                 <>
-                  <Link to="/login" className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors px-3 py-2">Log in</Link>
+                  <Link to="/login" className="text-sm text-gray-500 hover:text-gray-900 transition-colors px-3 py-2">Log in</Link>
                   <Link to="/register" className="px-4 py-2 text-sm font-semibold bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors">
                     Get Started
                   </Link>
@@ -161,14 +149,7 @@ export const LandingPage = () => {
 
             {/* Mobile toggle */}
             <div className="flex md:hidden items-center gap-2">
-              <button
-                onClick={toggleTheme}
-                className="p-2 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-                aria-label="Toggle theme"
-              >
-                {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-              </button>
-              <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="p-2 text-gray-600 dark:text-gray-400">
+              <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="p-2 text-gray-600">
                 {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
               </button>
             </div>
@@ -177,10 +158,10 @@ export const LandingPage = () => {
           {/* Mobile menu */}
           {mobileMenuOpen && (
             <div className="md:hidden mt-4 pb-4 border-t border-gray-100 pt-4 space-y-3">
-              <a href="#features" className="block text-sm text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white py-1">Features</a>
-              <a href="#how-it-works" className="block text-sm text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white py-1">How It Works</a>
-              <a href="#testimonials" className="block text-sm text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white py-1">Testimonials</a>
-              <Link to="/events" className="block text-sm text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white py-1">Browse Events</Link>
+              <a href="#features" className="block text-sm text-gray-600 hover:text-gray-900 py-1">Features</a>
+              <a href="#how-it-works" className="block text-sm text-gray-600 hover:text-gray-900 py-1">How It Works</a>
+              <a href="#testimonials" className="block text-sm text-gray-600 hover:text-gray-900 py-1">Testimonials</a>
+              <Link to="/events" className="block text-sm text-gray-600 hover:text-gray-900 py-1">Browse Events</Link>
               <div className="pt-2 space-y-2">
                 <Link to="/login" className="block text-center py-2 text-sm text-gray-700 border border-gray-200 rounded-lg">Log in</Link>
                 <Link to="/register" className="block text-center py-2 text-sm font-semibold bg-indigo-600 text-white rounded-lg">Get Started</Link>
@@ -191,24 +172,24 @@ export const LandingPage = () => {
       </nav>
 
       {/* â”€â”€ Hero â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
-      <section className="pt-28 pb-24 bg-white dark:bg-gray-950">
+      <section className="pt-28 pb-24 bg-white">
         <div className="max-w-7xl mx-auto px-6">
           <div className="grid lg:grid-cols-2 gap-16 items-center">
 
             {/* Left: Copy */}
             <div>
-              <div className="inline-flex items-center gap-2 bg-indigo-50 dark:bg-indigo-950 border border-indigo-100 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 text-xs font-semibold px-3 py-1.5 rounded-full mb-8">
+              <div className="inline-flex items-center gap-2 bg-indigo-50 border border-indigo-100 text-indigo-700 text-xs font-semibold px-3 py-1.5 rounded-full mb-8">
                 <Sparkles className="h-3.5 w-3.5" />
                 Trusted by 2,500+ Event Planners
               </div>
 
-              <h1 className="text-5xl lg:text-[3.4rem] font-bold text-gray-900 dark:text-white leading-[1.08] tracking-tight mb-6">
+              <h1 className="text-5xl lg:text-[3.4rem] font-bold text-gray-900 leading-[1.08] tracking-tight mb-6">
                 Simplify Event<br />
                 <span className="text-indigo-600">Accommodation</span><br />
                 Management
               </h1>
 
-              <p className="text-lg text-gray-500 dark:text-gray-400 leading-relaxed max-w-lg mb-10">
+              <p className="text-lg text-gray-500 leading-relaxed max-w-lg mb-10">
                 Create branded microsites, manage hotel inventory, and let guests book
                 their own rooms. All while you maintain full control with smart approval
                 workflows.
@@ -221,27 +202,27 @@ export const LandingPage = () => {
                   <ArrowRight className="h-4 w-4" />
                 </Link>
                 <a href="#demo"
-                  className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-200 text-sm font-semibold rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                  className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-white text-gray-700 text-sm font-semibold rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors">
                   Book a Demo
                 </a>
               </div>
-              <p className="text-xs text-gray-400 dark:text-gray-500">No credit card required · 14-day free trial</p>
+              <p className="text-xs text-gray-400">No credit card required · 14-day free trial</p>
             </div>
 
             {/* Right: Image with floating stat cards */}
             <div className="relative">
 
               {/* Floating top-right card */}
-              <div className="absolute -top-6 right-0 z-10 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl px-4 py-3 min-w-[190px]">
+              <div className="absolute -top-6 right-0 z-10 bg-white border border-gray-200 rounded-xl shadow-xl px-4 py-3 min-w-[190px]">
                 <div className="flex items-center gap-2 mb-0.5">
                   <TrendingUp className="h-4 w-4 text-indigo-600 flex-shrink-0" />
-                  <span className="text-sm font-bold text-gray-900 dark:text-white">+45% Efficiency</span>
+                  <span className="text-sm font-bold text-gray-900">+45% Efficiency</span>
                 </div>
-                <p className="text-xs text-gray-500 dark:text-gray-400">vs traditional methods</p>
+                <p className="text-xs text-gray-500">vs traditional methods</p>
               </div>
 
               {/* Main image */}
-              <div className="rounded-2xl overflow-hidden border border-gray-200 dark:border-gray-700 shadow-2xl shadow-gray-200/60 dark:shadow-gray-900/60">
+              <div className="rounded-2xl overflow-hidden border border-gray-200 shadow-2xl shadow-gray-200/60">
                 <img
                   src="https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=900&h=640&fit=crop&crop=center"
                   alt="Event accommodation management"
@@ -250,13 +231,13 @@ export const LandingPage = () => {
               </div>
 
               {/* Floating bottom-left card */}
-              <div className="absolute -bottom-6 left-4 z-10 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl px-4 py-3 flex items-center gap-3">
-                <div className="bg-emerald-100 dark:bg-emerald-900/40 p-2 rounded-lg flex-shrink-0">
+              <div className="absolute -bottom-6 left-4 z-10 bg-white border border-gray-200 rounded-xl shadow-xl px-4 py-3 flex items-center gap-3">
+                <div className="bg-emerald-100 p-2 rounded-lg flex-shrink-0">
                   <CheckCircle className="h-5 w-5 text-emerald-600" />
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">Booking Approved</p>
-                  <p className="text-sm font-bold text-gray-900 dark:text-white">in 2 seconds</p>
+                  <p className="text-xs text-gray-500">Booking Approved</p>
+                  <p className="text-sm font-bold text-gray-900">in 2 seconds</p>
                 </div>
               </div>
             </div>
@@ -266,7 +247,7 @@ export const LandingPage = () => {
       </section>
 
       {/* â”€â”€ Stats â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
-      <section className="py-16 border-y border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900">
+      <section className="py-16 border-y border-gray-100 bg-gray-50">
         <div className="max-w-7xl mx-auto px-6">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
             {stats.map((stat, i) => (
@@ -283,26 +264,26 @@ export const LandingPage = () => {
       <EventRecommendations />
 
       {/* â”€â”€ Features â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
-      <section id="features" className="py-24 bg-white dark:bg-gray-950">
+      <section id="features" className="py-24 bg-white">
         <div className="max-w-7xl mx-auto px-6">
           <div className="max-w-2xl mx-auto text-center mb-16">
             <p className="text-xs font-bold text-indigo-600 uppercase tracking-widest mb-3">Features</p>
-            <h2 className="text-4xl font-bold text-gray-900 dark:text-white mb-4 leading-tight">
+            <h2 className="text-4xl font-bold text-gray-900 mb-4 leading-tight">
               Everything you need to run flawless events
             </h2>
-            <p className="text-gray-500 dark:text-gray-400 text-lg">
+            <p className="text-gray-500 text-lg">
               Powerful tools that save you time and delight your guests.
             </p>
           </div>
 
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {features.map((f, i) => (
-              <div key={i} className="p-6 rounded-xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 hover:border-indigo-100 dark:hover:border-indigo-900 hover:shadow-md transition-all duration-200">
+              <div key={i} className="p-6 rounded-xl border border-gray-100 bg-white hover:border-indigo-100 hover:shadow-md transition-all duration-200">
                 <div className={`w-11 h-11 rounded-lg ${f.bg} flex items-center justify-center mb-5`}>
                   <f.icon className={`h-5 w-5 ${f.color}`} />
                 </div>
-                <h3 className="text-base font-bold text-gray-900 dark:text-white mb-2">{f.title}</h3>
-                <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">{f.description}</p>
+                <h3 className="text-base font-bold text-gray-900 mb-2">{f.title}</h3>
+                <p className="text-sm text-gray-500 leading-relaxed">{f.description}</p>
               </div>
             ))}
           </div>
@@ -310,14 +291,14 @@ export const LandingPage = () => {
       </section>
 
       {/* â”€â”€ How It Works â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
-      <section id="how-it-works" className="py-24 bg-gray-50 dark:bg-gray-900">
+      <section id="how-it-works" className="py-24 bg-gray-50">
         <div className="max-w-7xl mx-auto px-6">
           <div className="max-w-2xl mx-auto text-center mb-16">
             <p className="text-xs font-bold text-indigo-600 uppercase tracking-widest mb-3">Process</p>
-            <h2 className="text-4xl font-bold text-gray-900 dark:text-white mb-4 leading-tight">
+            <h2 className="text-4xl font-bold text-gray-900 mb-4 leading-tight">
               Up and running in 4 simple steps
             </h2>
-            <p className="text-gray-500 dark:text-gray-400 text-lg">
+            <p className="text-gray-500 text-lg">
               From event creation to guest check-in, it's effortless.
             </p>
           </div>
@@ -330,10 +311,10 @@ export const LandingPage = () => {
               { step: '04', title: 'Approve Bookings', desc: 'Review and confirm guest bookings with a single click.' },
             ].map((item, i) => (
               <div key={i} className="relative">
-                <div className="bg-white dark:bg-gray-950 rounded-xl border border-gray-100 dark:border-gray-800 p-6 h-full">
+                <div className="bg-white rounded-xl border border-gray-100 p-6 h-full">
                   <span className="text-4xl font-black text-indigo-100 select-none">{item.step}</span>
-                  <h3 className="text-base font-bold text-gray-900 dark:text-white mt-3 mb-2">{item.title}</h3>
-                  <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">{item.desc}</p>
+                  <h3 className="text-base font-bold text-gray-900 mt-3 mb-2">{item.title}</h3>
+                  <p className="text-sm text-gray-500 leading-relaxed">{item.desc}</p>
                 </div>
                 {i < 3 && (
                   <div className="hidden md:flex absolute top-8 -right-3.5 z-10">
@@ -347,31 +328,31 @@ export const LandingPage = () => {
       </section>
 
       {/* â”€â”€ Testimonials â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
-      <section id="testimonials" className="py-24 bg-white dark:bg-gray-950">
+      <section id="testimonials" className="py-24 bg-white">
         <div className="max-w-7xl mx-auto px-6">
           <div className="max-w-2xl mx-auto text-center mb-16">
             <p className="text-xs font-bold text-indigo-600 uppercase tracking-widest mb-3">Testimonials</p>
-            <h2 className="text-4xl font-bold text-gray-900 dark:text-white mb-4 leading-tight">
+            <h2 className="text-4xl font-bold text-gray-900 mb-4 leading-tight">
               Loved by event professionals
             </h2>
-            <p className="text-gray-500 dark:text-gray-400 text-lg">
+            <p className="text-gray-500 text-lg">
               Don't take our word for it â€” here's what our customers say.
             </p>
           </div>
 
           <div className="grid md:grid-cols-3 gap-6">
             {testimonials.map((t, i) => (
-              <div key={i} className="bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-xl p-6 flex flex-col">
+              <div key={i} className="bg-gray-50 border border-gray-100 rounded-xl p-6 flex flex-col">
                 <div className="flex gap-0.5 mb-4">
                   {[...Array(5)].map((_, j) => (
                     <Star key={j} className="h-4 w-4 fill-amber-400 text-amber-400" />
                   ))}
                 </div>
-                <p className="text-gray-600 dark:text-gray-300 text-sm leading-relaxed flex-1 mb-6">"{t.content}"</p>
-                <div className="flex items-center gap-3 border-t border-gray-200 dark:border-gray-700 pt-4">
+                <p className="text-gray-600 text-sm leading-relaxed flex-1 mb-6">"{t.content}"</p>
+                <div className="flex items-center gap-3 border-t border-gray-200 pt-4">
                   <img src={t.image} alt={t.name} className="w-10 h-10 rounded-full" />
                   <div>
-                    <p className="text-sm font-bold text-gray-900 dark:text-white">{t.name}</p>
+                    <p className="text-sm font-bold text-gray-900">{t.name}</p>
                     <p className="text-xs text-gray-400">{t.role}</p>
                   </div>
                 </div>
@@ -405,15 +386,15 @@ export const LandingPage = () => {
       </section>
 
       {/* â”€â”€ Demo Form â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
-      <section id="demo" className="py-24 bg-white dark:bg-gray-950">
+      <section id="demo" className="py-24 bg-white">
         <div className="max-w-4xl mx-auto px-6">
           <div className="grid md:grid-cols-2 gap-12 items-start">
             <div>
               <p className="text-xs font-bold text-indigo-600 uppercase tracking-widest mb-3">Book a Demo</p>
-                <h2 className="text-4xl font-bold text-gray-900 dark:text-white mb-4 leading-tight">
+                <h2 className="text-4xl font-bold text-gray-900 mb-4 leading-tight">
                 See StaySync in action
               </h2>
-              <p className="text-gray-500 dark:text-gray-400 mb-8 leading-relaxed">
+              <p className="text-gray-500 mb-8 leading-relaxed">
                 Get a personalized walkthrough tailored to your event management needs.
               </p>
               <ul className="space-y-3">
@@ -431,7 +412,7 @@ export const LandingPage = () => {
               </ul>
             </div>
 
-            <div className="bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-xl p-7">
+            <div className="bg-gray-50 border border-gray-100 rounded-xl p-7">
               <form onSubmit={handleBookDemo} className="space-y-4">
                 {[
                   { label: 'Full Name', key: 'name', type: 'text', placeholder: 'John Doe', required: true },
@@ -448,7 +429,7 @@ export const LandingPage = () => {
                       required={field.required}
                       value={demoForm[field.key]}
                       onChange={(e) => setDemoForm({ ...demoForm, [field.key]: e.target.value })}
-                      className="w-full px-3 py-2.5 text-sm border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                      className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
                       placeholder={field.placeholder}
                     />
                   </div>
@@ -464,7 +445,7 @@ export const LandingPage = () => {
       </section>
 
       {/* â”€â”€ Contact â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
-      <section id="contact" className="py-20 bg-gray-50 dark:bg-gray-900 border-t border-gray-100 dark:border-gray-800">
+      <section id="contact" className="py-20 bg-gray-50 border-t border-gray-100">
         <div className="max-w-7xl mx-auto px-6">
           <div className="max-w-2xl mx-auto text-center mb-12">
             <h2 className="text-3xl font-bold text-gray-900 mb-3">Get in touch</h2>
@@ -477,7 +458,7 @@ export const LandingPage = () => {
               { icon: Phone, label: 'Call Us', lines: ['+1 (555) 123-4567', 'Monâ€“Fri 9AMâ€“6PM EST'] },
               { icon: MapPin, label: 'Visit Us', lines: ['123 Event Street', 'San Francisco, CA 94102'] },
             ].map((c, i) => (
-              <div key={i} className="bg-white dark:bg-gray-950 border border-gray-100 dark:border-gray-800 rounded-xl p-6 text-center">
+              <div key={i} className="bg-white border border-gray-100 rounded-xl p-6 text-center">
                 <div className="w-11 h-11 bg-indigo-50 rounded-lg flex items-center justify-center mx-auto mb-4">
                   <c.icon className="h-5 w-5 text-indigo-600" />
                 </div>
