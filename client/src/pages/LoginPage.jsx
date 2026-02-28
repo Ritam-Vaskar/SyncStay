@@ -99,10 +99,8 @@ export const LoginPage = () => {
           <div className="mt-8 border-t border-gray-200 dark:border-gray-700 pt-6">
             <p className="text-xs text-gray-500 dark:text-gray-500 mb-2 font-semibold">Demo Credentials:</p>
             <div className="space-y-1 text-xs text-gray-600 dark:text-gray-400">
-              <p>Admin: admin@example.com / password123</p>
-              <p>Planner: planner@example.com / password123</p>
-              <p>Hotel: hotel1@example.com / password123</p>
-              <p>Guest: guest1@example.com / password123</p>
+              <p>Planner: Planner2@example.com / 123456</p>
+              <p>Guest: ritamvaskar0@gmail.com / 123456</p>
             </div>
           </div>
         </div>
