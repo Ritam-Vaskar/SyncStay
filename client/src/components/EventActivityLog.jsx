@@ -473,7 +473,7 @@ export const EventActivityLog = ({ eventId, initialCollapsed = true }) => {
                                       </div>
                                       <div className="space-y-2">
                                         {log.enrichedData.group.assignedHotels.map((hotel, idx) => (
-                                          <div key={idx} className="bg-gray-50 rounded p-2 text-xs">
+                                          <div className="bg-gray-50 rounded p-2 text-xs">
                                             <div className="font-medium text-gray-900">{hotel.hotelName}</div>
                                             <div className="text-gray-600">{hotel.hotelEmail}</div>
                                             <div className="flex gap-3 mt-1 text-xs">
@@ -499,7 +499,7 @@ export const EventActivityLog = ({ eventId, initialCollapsed = true }) => {
                                       </div>
                                       <div className="space-y-1 max-h-40 overflow-y-auto">
                                         {log.enrichedData.group.members.map((member, idx) => (
-                                          <div key={idx} className="bg-gray-50 rounded px-2 py-1 text-xs flex justify-between">
+                                          <div className="bg-gray-50 rounded px-2 py-1 text-xs flex justify-between">
                                             <span className="font-medium text-gray-900">{member.guestName}</span>
                                             <span className="text-gray-600">{member.guestEmail}</span>
                                           </div>

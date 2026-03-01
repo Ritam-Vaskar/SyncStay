@@ -302,7 +302,7 @@ export const DashboardPage = () => {
             <Link
               key={booking._id}
               to={`/guest/bookings/${booking._id}`}
-              className="flex items-center justify-between p-4 rounded-lg hover:bg-gray-50 transition-colors border"
+              className="flex items-center justify-between p-4 rounded-lg hover:bg-gray-50 transition-colors border border-gray-200"
             >
               <div>
                 <p className="font-semibold">{booking.roomDetails?.hotelName}</p>

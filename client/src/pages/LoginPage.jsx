@@ -23,7 +23,7 @@ export const LoginPage = () => {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-primary-50 to-primary-100 px-4">
+    <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 relative">
       <div className="w-full max-w-md">
         <div className="card">
           <div className="mb-8 text-center">
@@ -88,13 +88,12 @@ export const LoginPage = () => {
           </div>
 
           {/* Demo Credentials */}
-          <div className="mt-8 border-t pt-6">
+          <div className="mt-8 border-t border-gray-200 pt-6">
             <p className="text-xs text-gray-500 mb-2 font-semibold">Demo Credentials:</p>
             <div className="space-y-1 text-xs text-gray-600">
+              <p>Planner: Planner2@example.com / 123456</p>
+              <p>Guest: ritamvaskar0@gmail.com / 123456</p>
               <p>Admin: admin@example.com / password123</p>
-              <p>Planner: planner@example.com / password123</p>
-              <p>Hotel: hotel1@example.com / password123</p>
-              <p>Guest: guest1@example.com / password123</p>
             </div>
           </div>
         </div>

@@ -23,8 +23,8 @@ export const COLLECTIONS = {
   PLANNERS: 'planners_vectors',
 };
 
-// Vector dimension for text-embedding-3-small
-export const VECTOR_SIZE = 1536;
+// Vector dimension for text-embedding-3-large
+export const VECTOR_SIZE = 3072;
 
 /**
  * Initialize all Qdrant collections

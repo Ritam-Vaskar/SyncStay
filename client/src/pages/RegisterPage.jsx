@@ -23,7 +23,7 @@ export const RegisterPage = () => {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-primary-50 to-primary-100 px-4 py-12">
+    <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 relative">
       <div className="w-full max-w-md">
         <div className="card">
           <div className="mb-8 text-center">

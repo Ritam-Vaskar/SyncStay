@@ -1,6 +1,6 @@
 import Event from '../models/Event.js';
 import User from '../models/User.js';
-import { retrieveVector, searchVectors, COLLECTIONS, uuidToObjectId } from '../config/qdrant.js';
+import { retrieveVector, searchVectors, COLLECTIONS, uuidToObjectId, VECTOR_SIZE } from '../config/qdrant.js';
 import { combineVectors } from '../services/embeddingService.js';
 import { enrichHotelsWithTBO } from '../services/tboHotelEnrichmentService.js';
 import { scoreFacilitiesWithGemini, buildFallbackScores } from '../services/geminiRecommendationService.js';
@@ -19,7 +19,11 @@ export const getUserRecommendations = async (req, res) => {
 
     let recommendations;
 
-    if (!userVectorData || !userVectorData.vector) {
+    // Guard: treat stale vectors (wrong dims) the same as missing
+    const userVector = userVectorData?.vector;
+    const validVector = userVector && userVector.length === VECTOR_SIZE ? userVector : null;
+
+    if (!validVector) {
       // Cold start: return trending/popular events
       recommendations = await getTrendingEvents(parseInt(limit));
       
@@ -34,7 +38,7 @@ export const getUserRecommendations = async (req, res) => {
     // Search similar events using user vector (no payload filter - filter in app instead)
     const vectorResults = await searchVectors(
       COLLECTIONS.EVENTS,
-      userVectorData.vector,
+      validVector,
       50 // Get more for filtering
     );
 

@@ -110,6 +110,7 @@ export const MicrositeInventoryManagement = () => {
   const [isLoadingRecommendations, setIsLoadingRecommendations] = useState(false);
   const [populatedHotels, setPopulatedHotels] = useState([]);
   const [expandedGroupRecs, setExpandedGroupRecs] = useState({});
+  const [isPersonalizedRecsCollapsed, setIsPersonalizedRecsCollapsed] = useState(true);
   // Hotel assignment state
   const [groupAssignments, setGroupAssignments] = useState({}); // { [groupId]: { hotelId, hotelName, fullHotel } }
   const [nearbyHotels, setNearbyHotels] = useState({});         // { [groupId]: [{ ...hotel, distanceKm }] }
@@ -1299,7 +1300,20 @@ export const MicrositeInventoryManagement = () => {
                 {/* Individual Recommendations */}
                 {Object.keys(recommendations.individualRecommendations || {}).length > 0 && (
                   <div className="card">
-                    <h3 className="text-xl font-bold text-gray-900 mb-4">Personalized Recommendations</h3>
+                    <div 
+                      className="flex items-center justify-between cursor-pointer mb-4"
+                      onClick={() => setIsPersonalizedRecsCollapsed(!isPersonalizedRecsCollapsed)}
+                    >
+                      <h3 className="text-xl font-bold text-gray-900">Personalized Recommendations</h3>
+                      <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+                        {isPersonalizedRecsCollapsed ? (
+                          <ChevronDown className="h-5 w-5 text-gray-600" />
+                        ) : (
+                          <ChevronUp className="h-5 w-5 text-gray-600" />
+                        )}
+                      </button>
+                    </div>
+                    {!isPersonalizedRecsCollapsed && (
                     <div className="space-y-4">
                       {Object.entries(recommendations.individualRecommendations).map(
                         ([guestEmail, personalRec]) => (
@@ -1399,6 +1413,7 @@ export const MicrositeInventoryManagement = () => {
                         )
                       )}
                     </div>
+                    )}
                   </div>
                 )}
               </div>

@@ -8,6 +8,42 @@
   body {
     @apply bg-gray-50 text-gray-900 antialiased;
   }
+  .dark body {
+    @apply bg-gray-950 text-gray-100;
+  }
+  .dark .card {
+    @apply bg-gray-900 border-gray-800 text-gray-100;
+  }
+  .dark .input {
+    @apply bg-gray-800 border-gray-700 text-gray-100 placeholder-gray-500;
+  }
+  .dark .btn-secondary {
+    @apply bg-gray-700 text-gray-100 hover:bg-gray-600;
+  }
+  .dark .btn-outline {
+    @apply border-primary-400 text-primary-400 hover:bg-primary-950;
+  }
+  .dark .badge-success {
+    @apply bg-green-900 text-green-300;
+  }
+  .dark .badge-warning {
+    @apply bg-yellow-900 text-yellow-300;
+  }
+  .dark .badge-error {
+    @apply bg-red-900 text-red-300;
+  }
+  .dark .badge-info {
+    @apply bg-blue-900 text-blue-300;
+  }
+  .dark .skeleton {
+    @apply bg-gray-700;
+  }
+  /* Smooth transitions globally */
+  *, *::before, *::after {
+    transition-property: background-color, border-color, color;
+    transition-duration: 200ms;
+    transition-timing-function: ease;
+  }
 }
 
 @layer components {
@@ -59,6 +95,176 @@
 /* Loading skeleton */
 .skeleton {
   @apply animate-pulse bg-gray-200 rounded;
+}
+
+/* ═══════════════════════════════════════════════
+   DARK MODE — Global page & dashboard overrides
+   Applied when html.dark is present (class strategy)
+   ═══════════════════════════════════════════════ */
+/* Page-level backgrounds that aren't cards */
+.dark .bg-white:not(.microsite-page *) {
+  background-color: rgb(17 24 39); /* gray-900 */
+}
+.dark .bg-gray-50:not(.microsite-page *) {
+  background-color: rgb(31 41 55); /* gray-800 */
+}
+.dark .bg-gray-100:not(.microsite-page *):not([class*="text-"]):not([class*="icon"]) {
+  background-color: rgb(55 65 81); /* gray-700 */
+}
+/* Border overrides */
+.dark .border-gray-200:not(.microsite-page *),
+.dark .border-gray-100:not(.microsite-page *) {
+  border-color: rgb(55 65 81); /* gray-700 */
+}
+.dark .border-blue-200:not(.microsite-page *) { border-color: rgba(29, 78, 216, 0.3); }
+.dark .border-red-200:not(.microsite-page *)  { border-color: rgba(127, 29, 29, 0.35); }
+.dark .border-green-200:not(.microsite-page *){ border-color: rgba(22, 101, 52, 0.3); }
+.dark .border-yellow-200:not(.microsite-page *),.dark .border-amber-200:not(.microsite-page *) { border-color: rgba(161, 98, 7, 0.3); }
+.dark .border-orange-200:not(.microsite-page *){ border-color: rgba(154, 52, 18, 0.3); }
+/* Text overrides inside dashboard area */
+.dark .space-y-6 .text-gray-900,
+.dark .space-y-4 .text-gray-900,
+.dark .grid .text-gray-900,
+.dark .card .text-gray-900 {
+  color: rgb(255 255 255);
+}
+.dark .space-y-6 .text-gray-700,
+.dark .space-y-4 .text-gray-700,
+.dark .grid .text-gray-700,
+.dark .card .text-gray-700 {
+  color: rgb(209 213 219); /* gray-300 */
+}
+.dark .space-y-6 .text-gray-600,
+.dark .space-y-4 .text-gray-600,
+.dark .grid .text-gray-600,
+.dark .card .text-gray-600 {
+  color: rgb(156 163 175); /* gray-400 */
+}
+.dark .space-y-6 .text-gray-500,
+.dark .space-y-4 .text-gray-500,
+.dark .grid .text-gray-500,
+.dark .card .text-gray-500 {
+  color: rgb(107 114 128); /* gray-500 */
+}
+/* Text inside converted bg-white containers (modals, panels not in space-y-6) */
+.dark .bg-white .text-gray-900:not(.microsite-page *) { color: rgb(255 255 255); }
+.dark .bg-white .text-gray-700:not(.microsite-page *) { color: rgb(209 213 219); }
+.dark .bg-white .text-gray-600:not(.microsite-page *) { color: rgb(156 163 175); }
+.dark .bg-white .text-gray-500:not(.microsite-page *) { color: rgb(107 114 128); }
+.dark .bg-white .text-gray-400:not(.microsite-page *) { color: rgb(75 85 99); }
+/* Hover states */
+.dark .hover\:bg-gray-50:hover:not(.microsite-page *) {
+  background-color: rgb(31 41 55) !important; /* gray-800 */
+}
+.dark .hover\:bg-gray-100:hover:not(.microsite-page *) {
+  background-color: rgb(55 65 81) !important; /* gray-700 */
+}
+.dark .hover\:bg-gray-200:hover:not(.microsite-page *) {
+  background-color: rgb(75 85 99) !important; /* gray-600 */
+}
+/* Select dropdown dark mode */
+.dark select.input {
+  background-color: rgb(31 41 55);
+  color: rgb(243 244 246);
+}
+/* Table-like rows */
+.dark .divide-gray-200 {
+  border-color: rgb(55 65 81);
+}
+/* bg-gray-200 dividers */
+.dark .bg-gray-200:not(.microsite-page *) {
+  background-color: rgb(55 65 81); /* gray-700 */
+}
+/* Colored light backgrounds → dark tints (icon circles, info boxes) */
+.dark .bg-primary-50:not(.microsite-page *),
+.dark .bg-primary-100:not(.microsite-page *) {
+  background-color: rgba(79, 70, 229, 0.15);
+}
+.dark .bg-blue-50:not(.microsite-page *),
+.dark .bg-blue-100:not(.microsite-page *) {
+  background-color: rgba(29, 78, 216, 0.15);
+}
+.dark .bg-green-50:not(.microsite-page *),
+.dark .bg-green-100:not(.microsite-page *) {
+  background-color: rgba(22, 101, 52, 0.18);
+}
+.dark .bg-yellow-50:not(.microsite-page *),
+.dark .bg-yellow-100:not(.microsite-page *),
+.dark .bg-amber-50:not(.microsite-page *),
+.dark .bg-amber-100:not(.microsite-page *) {
+  background-color: rgba(161, 98, 7, 0.18);
+}
+.dark .bg-red-50:not(.microsite-page *),
+.dark .bg-red-100:not(.microsite-page *) {
+  background-color: rgba(127, 29, 29, 0.2);
+}
+.dark .bg-orange-50:not(.microsite-page *),
+.dark .bg-orange-100:not(.microsite-page *) {
+  background-color: rgba(154, 52, 18, 0.18);
+}
+.dark .bg-purple-50:not(.microsite-page *),
+.dark .bg-purple-100:not(.microsite-page *),
+.dark .bg-indigo-50:not(.microsite-page *),
+.dark .bg-indigo-100:not(.microsite-page *) {
+  background-color: rgba(88, 28, 135, 0.18);
+}
+.dark .bg-teal-50:not(.microsite-page *),
+.dark .bg-teal-100:not(.microsite-page *),
+.dark .bg-emerald-50:not(.microsite-page *),
+.dark .bg-emerald-100:not(.microsite-page *),
+.dark .bg-cyan-50:not(.microsite-page *),
+.dark .bg-cyan-100:not(.microsite-page *) {
+  background-color: rgba(6, 95, 70, 0.18);
+}
+/* Colors for text ON the same element as colored bg (status chips/badges) */
+.dark .bg-green-100.text-green-800,
+.dark .bg-green-100.text-green-700 { color: rgb(134 239 172) !important; } /* green-300 */
+.dark .bg-blue-100.text-blue-800,
+.dark .bg-blue-100.text-blue-700 { color: rgb(147 197 253) !important; } /* blue-300 */
+.dark .bg-yellow-100.text-yellow-800,
+.dark .bg-yellow-100.text-yellow-700 { color: rgb(253 224 71) !important; } /* yellow-300 */
+.dark .bg-red-100.text-red-800,
+.dark .bg-red-100.text-red-700 { color: rgb(252 165 165) !important; } /* red-300 */
+.dark .bg-orange-100.text-orange-800,
+.dark .bg-orange-100.text-orange-700 { color: rgb(253 186 116) !important; } /* orange-300 */
+.dark .bg-purple-100.text-purple-800,
+.dark .bg-purple-100.text-purple-700 { color: rgb(216 180 254) !important; } /* purple-300 */
+.dark .bg-gray-100.text-gray-800,
+.dark .bg-gray-100.text-gray-700 { color: rgb(209 213 219) !important; } /* gray-300 */
+.dark .bg-primary-100.text-primary-800,
+.dark .bg-primary-100.text-primary-700 { color: rgb(165 180 252) !important; } /* indigo-300 */
+/* Colors for text INSIDE these colored boxes */
+.dark .bg-blue-100 .text-blue-600,
+.dark .bg-blue-50 .text-blue-600 { color: rgb(147 197 253); }
+.dark .bg-green-100 .text-green-600,
+.dark .bg-green-50 .text-green-600 { color: rgb(134 239 172); }
+.dark .bg-yellow-100 .text-yellow-600,
+.dark .bg-yellow-50 .text-yellow-600 { color: rgb(253 224 71); }
+.dark .bg-purple-100 .text-purple-600,
+.dark .bg-purple-50 .text-purple-600 { color: rgb(216 180 254); }
+.dark .bg-orange-100 .text-orange-600,
+.dark .bg-orange-50 .text-orange-600 { color: rgb(253 186 116); }
+/* Colored hover states → neutral dark */
+.dark .hover\:bg-blue-50:hover:not(.microsite-page *),
+.dark .hover\:bg-primary-50:hover:not(.microsite-page *) {
+  background-color: rgb(31 41 55) !important; /* gray-800 */
+}
+/* Text in colored light boxes */
+.dark .bg-red-50 .text-red-700,
+.dark .bg-red-50 .text-red-800 { color: rgb(252 165 165); } /* red-300 */
+.dark .bg-blue-50 .text-blue-700,
+.dark .bg-blue-50 .text-blue-800,
+.dark .bg-blue-50 .text-blue-900 { color: rgb(147 197 253); } /* blue-300 */
+.dark .bg-green-50 .text-green-700,
+.dark .bg-green-50 .text-green-800 { color: rgb(134 239 172); } /* green-300 */
+.dark .bg-yellow-50 .text-yellow-700,
+.dark .bg-yellow-50 .text-yellow-800 { color: rgb(253 224 71); } /* yellow-300 */
+.dark .bg-orange-50 .text-orange-700,
+.dark .bg-orange-50 .text-orange-800 { color: rgb(253 186 116); } /* orange-300 */
+/* Focus ring visible in dark */
+.dark .input:focus {
+  border-color: rgb(99 102 241);
+  box-shadow: 0 0 0 3px rgba(99 102 241 / 0.2);
 }
 
 /* Smooth transitions */

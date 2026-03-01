@@ -170,7 +170,7 @@ const ChatBot = () => {
               onKeyDown={handleKeyDown}
               placeholder="Ask about events…"
               disabled={loading}
-              className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 disabled:opacity-50"
+              className="flex-1 rounded-lg border border-gray-300 bg-white text-gray-900 placeholder-gray-400 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 disabled:opacity-50"
             />
             <button
               onClick={sendMessage}

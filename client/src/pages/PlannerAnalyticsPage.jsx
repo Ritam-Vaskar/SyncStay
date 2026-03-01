@@ -17,6 +17,7 @@ import {
   Activity
 } from 'lucide-react';
 import { bookingService, eventService, inventoryService } from '@/services/apiServices';
+import { useThemeStore } from '@/store/themeStore';
 import {
   BarChart,
   Bar,
@@ -37,6 +38,12 @@ import {
 
 export const PlannerAnalyticsPage = () => {
   const [timeRange, setTimeRange] = useState('30'); // 7, 30, 90 days
+  const { isDark } = useThemeStore();
+  const chartGridColor = isDark ? '#374151' : '#e5e7eb';
+  const chartTickColor = isDark ? '#9ca3af' : '#6b7280';
+  const chartTooltipStyle = isDark
+    ? { backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px', color: '#f3f4f6' }
+    : { backgroundColor: 'white', border: '1px solid #e5e7eb', borderRadius: '8px' };
 
   const { data: bookingsData } = useQuery({
     queryKey: ['planner-bookings'],
@@ -280,16 +287,16 @@ export const PlannerAnalyticsPage = () => {
                 <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
               </linearGradient>
             </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+            <CartesianGrid strokeDasharray="3 3" stroke={chartGridColor} />
             <XAxis 
               dataKey="date" 
-              tick={{ fontSize: 11 }} 
+              tick={{ fontSize: 11, fill: chartTickColor }} 
               angle={-45} 
               textAnchor="end" 
               height={60}
             />
             <YAxis 
-              tick={{ fontSize: 11 }} 
+              tick={{ fontSize: 11, fill: chartTickColor }} 
               tickFormatter={(value) => `₹${value.toLocaleString('en-IN', { notation: 'compact' })}`}
             />
             <Tooltip 
@@ -297,7 +304,7 @@ export const PlannerAnalyticsPage = () => {
                 if (name === 'Revenue (₹)') return [`₹${value.toLocaleString('en-IN')}`, 'Revenue'];
                 return [value, 'Bookings'];
               }}
-              contentStyle={{ backgroundColor: 'white', border: '1px solid #e5e7eb', borderRadius: '8px' }}
+              contentStyle={chartTooltipStyle}
             />
             <Legend wrapperStyle={{ paddingTop: '10px' }} />
             <Area 
@@ -370,14 +377,14 @@ export const PlannerAnalyticsPage = () => {
             <ResponsiveContainer width="100%" height={350}>
               <BarChart data={topEventsChartData} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis type="number" tick={{ fontSize: 12 }} />
-                <YAxis dataKey="name" type="category" width={120} tick={{ fontSize: 11 }} />
+                <XAxis type="number" tick={{ fontSize: 12, fill: chartTickColor }} />
+                <YAxis dataKey="name" type="category" width={120} tick={{ fontSize: 11, fill: chartTickColor }} />
                 <Tooltip 
                   formatter={(value, name) => {
                     if (name === 'Revenue (₹)') return [`₹${value.toLocaleString('en-IN')}`, 'Revenue'];
                     return [value, 'Bookings'];
                   }}
-                  contentStyle={{ backgroundColor: 'white', border: '1px solid #e5e7eb', borderRadius: '8px' }}
+                  contentStyle={chartTooltipStyle}
                 />
                 <Legend wrapperStyle={{ paddingTop: '10px' }} />
                 <Bar dataKey="revenue" fill="#10b981" name="Revenue (₹)" radius={[0, 8, 8, 0]} barSize={20} />

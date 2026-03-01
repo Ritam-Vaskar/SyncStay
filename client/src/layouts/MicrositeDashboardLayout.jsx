@@ -13,7 +13,7 @@ import {
   X,
   Home,
   FileText,
-  Plane
+  Plane,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -121,15 +121,15 @@ export const MicrositeDashboardLayout = ({ children, event }) => {
               <div className="space-y-3 px-4 py-2">
                 <div>
                   <p className="text-xs text-gray-600">Event Type</p>
-                  <p className="text-sm font-semibold capitalize">{event?.type}</p>
+                  <p className="text-sm font-semibold text-gray-900 capitalize">{event?.type}</p>
                 </div>
                 <div>
                   <p className="text-xs text-gray-600">Location</p>
-                  <p className="text-sm font-semibold">{event?.location?.city}</p>
+                  <p className="text-sm font-semibold text-gray-900">{event?.location?.city}</p>
                 </div>
                 <div>
                   <p className="text-xs text-gray-600">Your Role</p>
-                  <p className="text-sm font-semibold capitalize">{user?.role}</p>
+                  <p className="text-sm font-semibold text-gray-900 capitalize">{user?.role}</p>
                 </div>
               </div>
             </div>
@@ -138,6 +138,9 @@ export const MicrositeDashboardLayout = ({ children, event }) => {
           {/* User profile */}
           <div className="p-4 border-t border-gray-200">
             <div className="flex items-center gap-3 mb-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary-600 text-white font-semibold text-sm">
+                {user?.name?.charAt(0).toUpperCase()}
+              </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-gray-900 truncate">{user?.name}</p>
                 <p className="text-xs text-gray-600 truncate">{user?.email}</p>
@@ -145,7 +148,7 @@ export const MicrositeDashboardLayout = ({ children, event }) => {
             </div>
             <button
               onClick={handleLogout}
-              className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+              className="flex items-center gap-2 w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors"
             >
               <LogOut className="h-4 w-4" />
               Logout
@@ -177,19 +180,21 @@ export const MicrositeDashboardLayout = ({ children, event }) => {
                 </div>
               </div>
               
-              <Link
-                to="/"
-                className="text-sm text-gray-600 hover:text-primary-600 flex items-center gap-2"
-              >
-                <Home className="h-4 w-4" />
-                Main Site
-              </Link>
+              <div className="flex items-center gap-3">
+                <Link
+                  to="/"
+                  className="text-sm text-gray-600 hover:text-primary-600 flex items-center gap-2"
+                >
+                  <Home className="h-4 w-4" />
+                  Main Site
+                </Link>
+              </div>
             </div>
           </div>
         </header>
 
         {/* Page content */}
-        <main className="p-4 sm:p-6 lg:p-8">
+        <main className="p-4 sm:p-6 lg:p-8 bg-gray-50 min-h-screen">
           {children}
         </main>
       </div>
