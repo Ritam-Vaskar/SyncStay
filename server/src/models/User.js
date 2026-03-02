@@ -39,6 +39,10 @@ const userSchema = new mongoose.Schema(
       city: String,
       country: String,
       address: String,
+      coordinates: {
+        latitude: { type: Number, default: null },
+        longitude: { type: Number, default: null },
+      },
     },
     totalRooms: {
       type: Number,
