@@ -1,10 +1,6 @@
 import Event from '../models/Event.js';
 import User from '../models/User.js';
 import { retrieveVector, searchVectors, COLLECTIONS, uuidToObjectId, VECTOR_SIZE } from '../config/qdrant.js';
-import { combineVectors } from '../services/embeddingService.js';
-import { enrichHotelsWithTBO } from '../services/tboHotelEnrichmentService.js';
-import { scoreFacilitiesWithGemini, buildFallbackScores } from '../services/geminiRecommendationService.js';
-import { scoreHotelsForPlanner } from '../services/hybridScoringService.js';
 
 /**
  * Get personalized event recommendations for a user
@@ -110,106 +106,149 @@ export const getUserRecommendations = async (req, res) => {
 
 /**
  * Get hotel recommendations for an event (planner perspective)
+ * ──────────────────────────────────────────────────────────────
+ * ALL recommendation logic now lives in the Python ML server.
+ * This function:
+ *   1. Fetches event + all active hotels from MongoDB
+ *   2. Resolves coordinates (location.coordinates or tboData)
+ *   3. POSTs to ML server /hotel/recommend
+ *   4. Maps the response back to the shape expected by the frontend
  */
+
+const ML_SERVER_URL = process.env.ML_SERVER_URL || 'http://localhost:8020';
+
 /**
  * Core logic for getting hotel recommendations (can be reused)
  * @param {String} eventId - The event ID
- * @param {String} plannerId - The planner ID
+ * @param {String} plannerId - The planner ID (unused – kept for API compat)
  * @param {Number} limit - Number of recommendations
  * @returns {Array} - Scored hotel recommendations
  */
 export const getHotelRecommendationsLogic = async (eventId, plannerId, limit = 10) => {
-  const event = await Event.findById(eventId);
+  const event = await Event.findById(eventId).populate('selectedHotels.hotel', 'name location tboData');
   if (!event) throw new Error('Event not found');
 
-  // ── Step 1: Build Qdrant search vector ──────────────────────────────────
-  const [eventVectorData, plannerVectorData] = await Promise.all([
-    retrieveVector(COLLECTIONS.EVENTS, eventId),
-    retrieveVector(COLLECTIONS.PLANNERS, plannerId.toString()),
-  ]);
+  // Fetch all active hotels
+  const hotels = await User.find({ role: 'hotel', isActive: true }).lean();
+  if (hotels.length === 0) return [];
 
-  let searchVector = null;
-  if (eventVectorData?.vector) {
-    searchVector = plannerVectorData?.vector
-      ? combineVectors(eventVectorData.vector, plannerVectorData.vector, 0.7, 0.3)
-      : eventVectorData.vector;
-    console.log('[Reco] Using ' + (plannerVectorData?.vector ? 'combined event+planner' : 'event-only') + ' vector');
-  } else {
-    console.warn('⚠️  [Reco] No event vector — falling back to rule-based');
-    const { generateHotelRecommendations } = await import('../services/hotelRecommendationService.js');
-    const ruleBasedRecs = await generateHotelRecommendations(eventId);
-    const hotelIds = ruleBasedRecs.map(r => r.hotel);
-    const hotels = await User.find({ _id: { $in: hotelIds } }).lean();
-    return ruleBasedRecs
-      .map(rec => ({ hotel: hotels.find(h => h._id.toString() === rec.hotel.toString()), score: rec.score, breakdown: { total: rec.score }, reasons: rec.reasons || [] }))
-      .filter(r => r.hotel).slice(0, limit);
-  }
-
-  // ── Step 2: Vector search – pull candidates from BOTH collections ───────────
-  // Note: no Qdrant payload filter (payload indexes not provisioned on cloud).
-  // Country filtering happens in the MongoDB query below.
-
-  // Search hotel profiles AND activity history in parallel
-  const [profileResults, activityResults] = await Promise.all([
-    searchVectors(COLLECTIONS.HOTELS, searchVector, 50),
-    searchVectors(COLLECTIONS.HOTEL_ACTIVITY, eventVectorData.vector, 50).catch(() => []),
-  ]);
-
-  console.log(`🔍 [Reco] Profile: ${profileResults.length}  ActivityHistory: ${activityResults.length}`);
-
-  // Merge both result sets (de-duplicate, keep best score from each)
-  const candidateMap = {};
-  for (const r of profileResults) {
-    const id = uuidToObjectId(r.id);
-    if (!candidateMap[id] || r.score > (candidateMap[id].profileScore || 0)) {
-      candidateMap[id] = { ...(candidateMap[id] || {}), id, profileScore: r.score };
-    }
-  }
-  for (const r of activityResults) {
-    const id = uuidToObjectId(r.id);
-    if (!candidateMap[id]) candidateMap[id] = { id };
-    if (r.score > (candidateMap[id].activityScore || 0)) {
-      candidateMap[id].activityScore = r.score;
+  // ── Detect if a hotel is already selected ──────────────────────────
+  // If planner already picked a hotel, we skip ML and sort remaining
+  // by distance from the selected one (guests should stay nearby).
+  let selectedHotelPayload = null;
+  if (event.selectedHotels && event.selectedHotels.length > 0) {
+    const sel = event.selectedHotels[0].hotel; // first selected hotel
+    if (sel) {
+      const selLat = sel.location?.coordinates?.latitude ?? sel.tboData?.latitude ?? null;
+      const selLng = sel.location?.coordinates?.longitude ?? sel.tboData?.longitude ?? null;
+      selectedHotelPayload = {
+        id: sel._id.toString(),
+        name: sel.name || 'Selected Hotel',
+        latitude: selLat,
+        longitude: selLng,
+        city: sel.location?.city || '',
+        country: sel.location?.country || '',
+      };
+      console.log(`🏨 [Reco] Hotel already selected: "${selectedHotelPayload.name}" — using distance mode (no ML)`);
     }
   }
 
-  const candidateIds = Object.keys(candidateMap);
-  const eventCountry = event.location?.country;
-  const countryQuery = eventCountry ? { 'location.country': { $regex: new RegExp(eventCountry, 'i') } } : {};
-  const hotels = await User.find({ _id: { $in: candidateIds }, role: 'hotel', isActive: true, ...countryQuery }).lean();
-  console.log(`🏨 [Reco] ${hotels.length} hotels fetched from DB`);
+  // Resolve event coordinates
+  const eventLat = event.location?.coordinates?.latitude ?? null;
+  const eventLng = event.location?.coordinates?.longitude ?? null;
 
-  // ── Step 3: TBO enrichment ────────────────────────────────────────────────
-  const enrichedHotels = await enrichHotelsWithTBO(hotels);
+  // Build hotel payload — resolve coordinates from location.coordinates or tboData
+  const hotelPayload = hotels.map((h) => {
+    const lat = h.location?.coordinates?.latitude ?? h.tboData?.latitude ?? null;
+    const lng = h.location?.coordinates?.longitude ?? h.tboData?.longitude ?? null;
 
-  // ── Step 4: Gemini facility scoring ─────────────────────────────────────────
-  let geminiScores;
-  try {
-    geminiScores = await scoreFacilitiesWithGemini(enrichedHotels, event, []);
-  } catch {
-    geminiScores = buildFallbackScores(enrichedHotels, event, []);
+    return {
+      id: h._id.toString(),
+      name: h.name || h.organization || 'Hotel',
+      latitude: lat,
+      longitude: lng,
+      city: h.location?.city || '',
+      country: h.location?.country || '',
+      totalRooms: h.totalRooms || 0,
+      specialization: h.specialization || [],
+      priceRange: h.priceRange || {},
+      averageRating: h.averageRating || 0,
+      eventsHostedCount: h.eventsHostedCount || 0,
+    };
+  });
+
+  // Build event payload
+  const eventPayload = {
+    id: event._id.toString(),
+    name: event.name || '',
+    type: event.type || '',
+    description: event.description || '',
+    latitude: eventLat,
+    longitude: eventLng,
+    city: event.location?.city || '',
+    country: event.location?.country || '',
+  };
+
+  console.log(`🤖 [Reco] Calling ML server for event "${event.name}" with ${hotelPayload.length} hotels`);
+  console.log(`🤖 [Reco] Event payload:`, JSON.stringify(eventPayload));
+  console.log(`🤖 [Reco] Sample hotel (first):`, JSON.stringify(hotelPayload[0]));
+
+  // Call ML server
+  const mlBody = {
+    event: eventPayload,
+    hotels: hotelPayload,
+    radius_km: 5.0,
+    limit,
+  };
+  // If a hotel is already selected, send it so ML server skips Qdrant
+  if (selectedHotelPayload) {
+    mlBody.selected_hotel = selectedHotelPayload;
   }
 
-  // Inject pre-computed activity similarity into candidateMap for hybridScoringService
-  // (scoreHotelsForPlanner will re-fetch from Qdrant but we already have the scores —
-  //  override the Qdrant retrieve call by patching the hotel objects)
-  for (const hotel of enrichedHotels) {
-    const id = hotel._id.toString();
-    hotel._precomputedActivityScore = candidateMap[id]?.activityScore != null
-      ? candidateMap[id].activityScore * 100
-      : null;
+  const response = await fetch(`${ML_SERVER_URL}/hotel/recommend`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(mlBody),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error('❌ ML server error:', errorText);
+    throw new Error(`ML server returned ${response.status}: ${errorText}`);
   }
 
-  // ── Step 5: Hybrid blend + sort ───────────────────────────────────────────────
-  const scored = await scoreHotelsForPlanner(
-    enrichedHotels,
-    event,
-    geminiScores,
-    eventVectorData.vector,
-  );
+  const mlResult = await response.json();
+  console.log(`✅ [Reco] ML server returned ${mlResult.recommendations?.length || 0} recommendations (${mlResult.hotels_within_radius} within radius, total_candidates: ${mlResult.total_candidates})`);
+  if (mlResult.recommendations?.length === 0) {
+    console.log('⚠️  [Reco] No recommendations — full ML response:', JSON.stringify(mlResult));
+  }
 
-  console.log(`✅ [Reco] Returning top ${Math.min(limit, scored.length)} recommendations`);
-  return scored.slice(0, limit);
+  // Map ML response to the shape expected by frontend/event controller
+  const hotelMap = {};
+  for (const h of hotels) {
+    hotelMap[h._id.toString()] = h;
+  }
+
+  const scored = (mlResult.recommendations || []).map((rec) => {
+    const hotel = hotelMap[rec.hotel_id];
+    const similarityPct = Math.round((rec.similarity_score || 0) * 100);
+
+    return {
+      hotel: hotel || { _id: rec.hotel_id, name: rec.hotel_name },
+      score: similarityPct,
+      rank: rec.rank,
+      isBestMatch: rec.is_best_match,
+      isDistanceMode: !!selectedHotelPayload, // true when Mode B (no ML)
+      breakdown: {
+        similarity: similarityPct,
+        distanceFromEvent: rec.distance_from_event_km,
+        distanceFromBest: rec.distance_from_best_km,
+      },
+      reasons: rec.reasons || [],
+    };
+  });
+
+  return scored;
 };
 
 export const getHotelRecommendationsForEvent = async (req, res) => {
@@ -251,97 +290,6 @@ async function getTrendingEvents(limit = 10) {
       trending: true,
     },
   }));
-}
-
-/**
- * Calculate capacity bonus (0-100)
- * Critical constraint: Can the hotel physically accommodate guests?
- */
-function calculateCapacityBonus(hotel, event) {
-  if (!hotel.totalRooms || !event.expectedGuests) return 50; // Neutral if unknown
-
-  const roomsNeeded = Math.ceil(event.expectedGuests / 2); // Assume 2 guests per room
-
-  if (hotel.totalRooms >= roomsNeeded) {
-    return 100; // Perfect capacity
-  }
-
-  if (hotel.totalRooms >= roomsNeeded * 0.7) {
-    return 70; // Can accommodate most guests
-  }
-
-  return 30; // Insufficient capacity
-}
-
-/**
- * Calculate city match bonus (0-100)
- * Small bonus for exact city match (AI already handles location semantically)
- */
-function calculateCityBonus(hotel, event) {
-  if (!hotel.location?.city || !event.location?.city) return 50;
-
-  // Case-insensitive comparison
-  const hotelCity = hotel.location.city.toLowerCase().trim();
-  const eventCity = event.location.city.toLowerCase().trim();
-
-  if (hotelCity === eventCity) {
-    return 100; // Exact city match
-  }
-
-  // Check if cities contain each other (e.g., "New Delhi" contains "Delhi")
-  if (hotelCity.includes(eventCity) || eventCity.includes(hotelCity)) {
-    return 80; // Close match
-  }
-
-  return 50; // Different city (country filter already applied)
-}
-
-/**
- * Generate AI-driven recommendation reasons
- */
-function generateAIReasons(hotel, event, aiScore, capacityBonus, cityBonus) {
-  const reasons = [];
-
-  // Primary reason: AI match quality
-  if (aiScore >= 80) {
-    reasons.push('🎯 Excellent AI match for your event requirements');
-  } else if (aiScore >= 60) {
-    reasons.push('✅ Good AI match for your event type and needs');
-  } else if (aiScore >= 40) {
-    reasons.push('👌 Suitable match based on event criteria');
-  }
-
-  // Location  
-  if (cityBonus === 100) {
-    reasons.push(`📍 Located in ${event.location?.city}`);
-  } else if (cityBonus >= 80) {
-    reasons.push(`📍 Near ${event.location?.city}`);
-  } else {
-    reasons.push(`🌍 Available in ${hotel.location?.country || 'your country'}`);
-  }
-
-  // Capacity
-  if (capacityBonus === 100 && event.expectedGuests) {
-    reasons.push(`👥 Can accommodate all ${event.expectedGuests} guests`);
-  } else if (capacityBonus >= 70 && event.expectedGuests) {
-    reasons.push(`👥 Can accommodate most of your ${event.expectedGuests} guests`);
-  }
-
-  // Hotel quality indicators
-  if (hotel.averageRating >= 4) {
-    reasons.push(`⭐ Highly rated (${hotel.averageRating}/5)`);
-  }
-
-  if (hotel.eventsHostedCount > 10) {
-    reasons.push(`🏆 Experienced (hosted ${hotel.eventsHostedCount}+ events)`);
-  }
-
-  // Event type specialization (from AI + metadata)
-  if (hotel.specialization?.includes(event.type)) {
-    reasons.push(`🎪 Specializes in ${event.type} events`);
-  }
-
-  return reasons;
 }
 
 export default {

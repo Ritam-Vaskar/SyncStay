@@ -75,8 +75,8 @@ export const MicrositeHotelsManagement = () => {
     onSuccess: (data) => {
       console.log('✅ Hotel selection successful:', data);
       toast.success('Hotel selected successfully!');
-      queryClient.invalidateQueries(['microsite-hotels']);
-      queryClient.invalidateQueries(['microsite-event']);
+      queryClient.invalidateQueries({ queryKey: ['microsite-hotels'] });
+      queryClient.invalidateQueries({ queryKey: ['microsite-event'] });
     },
     onError: (error) => {
       console.error('❌ Hotel selection failed:', error);
@@ -90,8 +90,8 @@ export const MicrositeHotelsManagement = () => {
     mutationFn: (proposalId) => hotelProposalService.selectProposal(proposalId),
     onSuccess: () => {
       toast.success('Proposal selected successfully!');
-      queryClient.invalidateQueries(['microsite-hotels']);
-      queryClient.invalidateQueries(['microsite-event']);
+      queryClient.invalidateQueries({ queryKey: ['microsite-hotels'] });
+      queryClient.invalidateQueries({ queryKey: ['microsite-event'] });
     },
     onError: (error) => {
       toast.error(error.response?.data?.message || 'Failed to select proposal');
@@ -178,9 +178,15 @@ export const MicrositeHotelsManagement = () => {
         {activeTab === 'recommended' && (
           <div className="space-y-6">
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <h3 className="font-semibold text-blue-900 mb-2">🎯 AI-Matched Hotels</h3>
+              <h3 className="font-semibold text-blue-900 mb-2">
+                {recommendations.length > 0 && recommendations[0].isDistanceMode 
+                  ? '📍 Hotels Near Your Selected Hotel' 
+                  : '🎯 AI-Matched Hotels'}
+              </h3>
               <p className="text-sm text-blue-800">
-                These hotels are recommended based on your event location, budget, type, and capacity requirements.
+                {recommendations.length > 0 && recommendations[0].isDistanceMode
+                  ? 'You\'ve already selected a hotel. These are the nearest hotels to keep your guests close together.'
+                  : 'Hotels within 5 km of your event, ranked by event similarity and proximity. The #1 pick is the best match based on past event history.'}
               </p>
             </div>
 
@@ -192,9 +198,9 @@ export const MicrositeHotelsManagement = () => {
               </div>
             ) : (
               <div className="grid md:grid-cols-2 gap-6">
-                {recommendations.map((rec) => (
+                {recommendations.map((rec, idx) => (
                   <RecommendedHotelCard
-                    key={rec._id}
+                    key={rec.hotel?._id || rec.hotel_id || idx}
                     recommendation={rec}
                     onSelect={handleSelectRecommended}
                     isSelecting={selectHotelMutation.isPending}
@@ -449,43 +455,77 @@ export const MicrositeHotelsManagement = () => {
 const RecommendedHotelCard = ({ recommendation, onSelect, isSelecting }) => {
   const hotel = recommendation.hotel;
   const isSelected = recommendation.isSelectedByPlanner;
-  const matchScore = Math.round(recommendation.score || 0);
+  const rank = recommendation.rank || 0;
+  const isBestMatch = recommendation.isBestMatch || false;
+  const isDistanceMode = recommendation.isDistanceMode || false;
+  const similarityPct = Math.round(recommendation.score || 0);
+  const distFromEvent = recommendation.breakdown?.distanceFromEvent ?? '-';
+  const distFromBest = recommendation.breakdown?.distanceFromBest ?? '-';
 
   const getMatchQuality = (score) => {
-    if (score >= 80) return { label: 'Excellent Match', badge: 'bg-green-50 text-green-700 border-green-200' };
-    if (score >= 60) return { label: 'Good Match', badge: 'bg-blue-50 text-blue-700 border-blue-200' };
-    return { label: 'Fair Match', badge: 'bg-orange-50 text-orange-700 border-orange-200' };
+    if (isDistanceMode) {
+      // In distance mode, quality is based on proximity to selected hotel
+      const d = recommendation.breakdown?.distanceFromBest;
+      if (d !== undefined && d <= 1) return { label: 'Very Close', badge: 'bg-green-50 text-green-700 border-green-200' };
+      if (d !== undefined && d <= 3) return { label: 'Nearby', badge: 'bg-blue-50 text-blue-700 border-blue-200' };
+      if (d !== undefined && d <= 5) return { label: 'Moderate', badge: 'bg-orange-50 text-orange-700 border-orange-200' };
+      return { label: 'In Radius', badge: 'bg-gray-50 text-gray-700 border-gray-200' };
+    }
+    if (score >= 70) return { label: 'Excellent Match', badge: 'bg-green-50 text-green-700 border-green-200' };
+    if (score >= 40) return { label: 'Good Match', badge: 'bg-blue-50 text-blue-700 border-blue-200' };
+    if (score > 0) return { label: 'Fair Match', badge: 'bg-orange-50 text-orange-700 border-orange-200' };
+    return { label: 'Nearby', badge: 'bg-gray-50 text-gray-700 border-gray-200' };
   };
 
-  const matchQuality = getMatchQuality(matchScore);
+  const matchQuality = getMatchQuality(similarityPct);
 
   return (
     <div className={`bg-white rounded-xl transition-all duration-300 hover:shadow-lg ${
       isSelected 
         ? 'ring-2 ring-green-400 shadow-md shadow-green-50' 
-        : 'shadow-md border border-gray-200 hover:border-blue-300'
+        : isBestMatch
+          ? 'ring-2 ring-yellow-400 shadow-md shadow-yellow-50'
+          : 'shadow-md border border-gray-200 hover:border-blue-300'
     }`}>
       {/* Card Header */}
       <div className="p-4 border-b border-gray-100">
         <div className="flex items-start justify-between gap-3 mb-2">
-          <h3 className="text-lg font-bold text-gray-900 flex-1">
-            {hotel?.name || hotel?.organization || 'Hotel'}
-          </h3>
+          <div className="flex items-center gap-2 flex-1">
+            {/* Rank Badge */}
+            <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${
+              rank === 1
+                ? 'bg-yellow-100 text-yellow-800 border-2 border-yellow-400'
+                : 'bg-gray-100 text-gray-600 border border-gray-300'
+            }`}>
+              #{rank}
+            </div>
+            <h3 className="text-lg font-bold text-gray-900">
+              {hotel?.name || hotel?.organization || 'Hotel'}
+            </h3>
+          </div>
           
           {/* Match Score Badge */}
           <div className={`px-3 py-1 rounded-full border ${matchQuality.badge} flex items-center gap-1.5 whitespace-nowrap`}>
             <Sparkles className="h-3.5 w-3.5" />
-            <span className="font-bold text-xs">{matchScore}%</span>
+            <span className="font-bold text-xs">{matchQuality.label}</span>
           </div>
         </div>
 
-        {/* Selected Badge */}
-        {isSelected && (
-          <div className="inline-flex items-center gap-1.5 bg-green-50 text-green-700 px-2.5 py-1 rounded-full border border-green-200">
-            <CheckCircle className="h-3.5 w-3.5" />
-            <span className="text-xs font-semibold">SELECTED</span>
-          </div>
-        )}
+        {/* Best Match / Selected Badges */}
+        <div className="flex items-center gap-2">
+          {isBestMatch && !isDistanceMode && (
+            <div className="inline-flex items-center gap-1.5 bg-yellow-50 text-yellow-700 px-2.5 py-1 rounded-full border border-yellow-300">
+              <Star className="h-3.5 w-3.5 fill-yellow-500" />
+              <span className="text-xs font-semibold">BEST SIMILARITY MATCH</span>
+            </div>
+          )}
+          {isSelected && (
+            <div className="inline-flex items-center gap-1.5 bg-green-50 text-green-700 px-2.5 py-1 rounded-full border border-green-200">
+              <CheckCircle className="h-3.5 w-3.5" />
+              <span className="text-xs font-semibold">SELECTED</span>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Card Content */}
@@ -497,11 +537,11 @@ const RecommendedHotelCard = ({ recommendation, onSelect, isSelecting }) => {
               <MapPin className="h-3.5 w-3.5 text-blue-600" />
             </div>
             <span className="text-xs font-medium">
-              {hotel.location?.city ? `${hotel.location.city}, ${hotel.location.country || ''}` : 'Location not specified'}
+              {hotel?.location?.city ? `${hotel.location.city}, ${hotel.location.country || ''}` : 'Location not specified'}
             </span>
           </div>
           
-          {hotel.totalRooms && (
+          {hotel?.totalRooms > 0 && (
             <div className="flex items-center gap-2 text-gray-700">
               <div className="flex-shrink-0 w-7 h-7 rounded-lg bg-purple-50 flex items-center justify-center">
                 <Building className="h-3.5 w-3.5 text-purple-600" />
@@ -510,7 +550,7 @@ const RecommendedHotelCard = ({ recommendation, onSelect, isSelecting }) => {
             </div>
           )}
           
-          {hotel.priceRange && (hotel.priceRange.min || hotel.priceRange.max) && (
+          {hotel?.priceRange && (hotel.priceRange.min || hotel.priceRange.max) && (
             <div className="flex items-center gap-2 text-gray-700">
               <div className="flex-shrink-0 w-7 h-7 rounded-lg bg-green-50 flex items-center justify-center">
                 <IndianRupee className="h-3.5 w-3.5 text-green-600" />
@@ -520,6 +560,67 @@ const RecommendedHotelCard = ({ recommendation, onSelect, isSelecting }) => {
               </span>
             </div>
           )}
+        </div>
+
+        {/* Distance & Similarity Metrics */}
+        <div className="mb-3 bg-indigo-50 rounded-lg p-3 border border-indigo-100">
+          <p className="text-xs font-bold text-indigo-900 mb-2 flex items-center gap-1.5">
+            <TrendingUp className="h-3.5 w-3.5" />
+            {isDistanceMode ? 'Proximity Metrics:' : 'Recommendation Metrics:'}
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            {isDistanceMode ? (
+              <>
+                {/* Distance from selected hotel */}
+                <div>
+                  <span className="text-xs font-semibold text-indigo-700 block mb-1">From Selected Hotel</span>
+                  <span className="text-sm font-bold text-indigo-900">
+                    {distFromBest !== '-' ? `${distFromBest} km` : 'N/A'}
+                  </span>
+                </div>
+
+                {/* Distance from event */}
+                <div>
+                  <span className="text-xs font-semibold text-indigo-700 block mb-1">From Event Venue</span>
+                  <span className="text-sm font-bold text-indigo-900">
+                    {distFromEvent !== '-' ? `${distFromEvent} km` : 'N/A'}
+                  </span>
+                </div>
+              </>
+            ) : (
+              <>
+                {/* Similarity Score */}
+                <div>
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-xs font-semibold text-indigo-700">Event Similarity</span>
+                    <span className="text-xs font-bold text-indigo-900">{similarityPct}%</span>
+                  </div>
+                  <div className="h-1.5 bg-indigo-100 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-gradient-to-r from-indigo-400 to-purple-500 rounded-full transition-all duration-500"
+                      style={{ width: `${Math.min(similarityPct, 100)}%` }}
+                    ></div>
+                  </div>
+                </div>
+
+                {/* Distance from event */}
+                <div>
+                  <span className="text-xs font-semibold text-indigo-700 block mb-1">Distance from Event</span>
+                  <span className="text-sm font-bold text-indigo-900">
+                    {distFromEvent !== '-' ? `${distFromEvent} km` : 'N/A'}
+                  </span>
+                </div>
+
+                {/* Distance from best hotel (for non-best hotels) */}
+                {!isBestMatch && distFromBest !== '-' && (
+                  <div className="col-span-2">
+                    <span className="text-xs font-semibold text-indigo-700 block mb-1">Distance from Best Match</span>
+                    <span className="text-sm font-bold text-indigo-900">{distFromBest} km</span>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
         </div>
 
         {/* Why Recommended Section */}
@@ -540,76 +641,8 @@ const RecommendedHotelCard = ({ recommendation, onSelect, isSelecting }) => {
           </div>
         )}
 
-        {/* AI Match Breakdown with Progress Bars */}
-        {recommendation.breakdown && (
-          <div className="mb-3 bg-purple-50 rounded-lg p-3 border border-purple-100">
-            <p className="text-xs font-bold text-purple-900 mb-2 flex items-center gap-1.5">
-              <Sparkles className="h-3.5 w-3.5" />
-              AI Match Breakdown:
-            </p>
-            <div className="space-y-2">
-              {recommendation.breakdown.vector !== undefined && (
-                <div>
-                  <div className="flex justify-between items-center mb-1">
-                    <span className="text-xs font-semibold text-purple-700">AI Similarity</span>
-                    <span className="text-xs font-bold text-purple-900">{Math.round(recommendation.breakdown.vector)}%</span>
-                  </div>
-                  <div className="h-1.5 bg-purple-100 rounded-full overflow-hidden">
-                    <div 
-                      className="h-full bg-gradient-to-r from-purple-400 to-pink-400 rounded-full transition-all duration-500"
-                      style={{ width: `${Math.round(recommendation.breakdown.vector)}%` }}
-                    ></div>
-                  </div>
-                </div>
-              )}
-              {recommendation.breakdown.location !== undefined && (
-                <div>
-                  <div className="flex justify-between items-center mb-1">
-                    <span className="text-xs font-semibold text-purple-700">Location Match</span>
-                    <span className="text-xs font-bold text-purple-900">{Math.round(recommendation.breakdown.location)}%</span>
-                  </div>
-                  <div className="h-1.5 bg-blue-100 rounded-full overflow-hidden">
-                    <div 
-                      className="h-full bg-gradient-to-r from-blue-400 to-cyan-400 rounded-full transition-all duration-500"
-                      style={{ width: `${Math.round(recommendation.breakdown.location)}%` }}
-                    ></div>
-                  </div>
-                </div>
-              )}
-              {recommendation.breakdown.budget !== undefined && (
-                <div>
-                  <div className="flex justify-between items-center mb-1">
-                    <span className="text-xs font-semibold text-purple-700">Budget Match</span>
-                    <span className="text-xs font-bold text-purple-900">{Math.round(recommendation.breakdown.budget)}%</span>
-                  </div>
-                  <div className="h-1.5 bg-green-100 rounded-full overflow-hidden">
-                    <div 
-                      className="h-full bg-gradient-to-r from-green-400 to-emerald-400 rounded-full transition-all duration-500"
-                      style={{ width: `${Math.round(recommendation.breakdown.budget)}%` }}
-                    ></div>
-                  </div>
-                </div>
-              )}
-              {recommendation.breakdown.capacity !== undefined && (
-                <div>
-                  <div className="flex justify-between items-center mb-1">
-                    <span className="text-xs font-semibold text-purple-700">Capacity Match</span>
-                    <span className="text-xs font-bold text-purple-900">{Math.round(recommendation.breakdown.capacity)}%</span>
-                  </div>
-                  <div className="h-1.5 bg-orange-100 rounded-full overflow-hidden">
-                    <div 
-                      className="h-full bg-gradient-to-r from-orange-400 to-amber-400 rounded-full transition-all duration-500"
-                      style={{ width: `${Math.round(recommendation.breakdown.capacity)}%` }}
-                    ></div>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
         {/* Specialization Tags */}
-        {hotel.specialization && hotel.specialization.length > 0 && (
+        {hotel?.specialization && hotel.specialization.length > 0 && (
           <div className="flex flex-wrap gap-1.5 mb-3">
             {hotel.specialization.map((spec, i) => (
               <span key={i} className="text-xs font-medium bg-purple-50 text-purple-700 px-2 py-1 rounded-full border border-purple-200">
@@ -621,7 +654,7 @@ const RecommendedHotelCard = ({ recommendation, onSelect, isSelecting }) => {
 
         {/* Action Button */}
         <button
-          onClick={() => onSelect(hotel._id)}
+          onClick={() => onSelect(hotel?._id)}
           disabled={isSelected || isSelecting}
           className={`w-full py-2.5 px-4 rounded-lg font-semibold text-sm transition-all duration-300 flex items-center justify-center gap-2 ${
             isSelected

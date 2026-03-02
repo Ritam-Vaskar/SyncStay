@@ -7,6 +7,7 @@ import uvicorn
 from event.embedding import router as embedding_router
 from event.event_fetch import router as event_fetch_router
 from agent.routes import router as agent_router
+from hotel.recommendation import router as hotel_recommendation_router
 
 load_dotenv()
 
@@ -37,6 +38,7 @@ async def health_check():
 app.include_router(embedding_router, prefix="/event")
 app.include_router(event_fetch_router, prefix="/event")
 app.include_router(agent_router, prefix="/agent")
+app.include_router(hotel_recommendation_router, prefix="/hotel")
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8020)
