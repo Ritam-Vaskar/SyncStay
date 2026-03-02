@@ -75,8 +75,8 @@ export const MicrositeHotelsManagement = () => {
     onSuccess: (data) => {
       console.log('✅ Hotel selection successful:', data);
       toast.success('Hotel selected successfully!');
-      queryClient.invalidateQueries(['microsite-hotels']);
-      queryClient.invalidateQueries(['microsite-event']);
+      queryClient.invalidateQueries({ queryKey: ['microsite-hotels'] });
+      queryClient.invalidateQueries({ queryKey: ['microsite-event'] });
     },
     onError: (error) => {
       console.error('❌ Hotel selection failed:', error);
@@ -90,8 +90,8 @@ export const MicrositeHotelsManagement = () => {
     mutationFn: (proposalId) => hotelProposalService.selectProposal(proposalId),
     onSuccess: () => {
       toast.success('Proposal selected successfully!');
-      queryClient.invalidateQueries(['microsite-hotels']);
-      queryClient.invalidateQueries(['microsite-event']);
+      queryClient.invalidateQueries({ queryKey: ['microsite-hotels'] });
+      queryClient.invalidateQueries({ queryKey: ['microsite-event'] });
     },
     onError: (error) => {
       toast.error(error.response?.data?.message || 'Failed to select proposal');
