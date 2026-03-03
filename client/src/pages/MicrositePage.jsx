@@ -283,38 +283,42 @@ export const MicrositePage = () => {
 
         <div className="ms-hero-inner ms-container">
           {/* Auth Header Bar */}
-          <div className="flex justify-end">
+          <div className="flex justify-end mb-4">
             {isAuthenticated ? (
-              <div className="flex items-center gap-3">
-                <div className="ms-auth-bar px-4 py-2 rounded-lg flex items-center gap-3">
-                  <div className="text-right">
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <div className="ms-auth-bar px-3 sm:px-4 py-2 rounded-lg flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3 w-full sm:w-auto">
+                  <div className="text-left sm:text-right w-full sm:w-auto">
                     <p className="text-sm font-semibold text-gray-900">{user?.name}</p>
                     <p className="text-xs text-gray-600 capitalize">{user?.role}</p>
                   </div>
-                  <Link
-                    to={`/microsite/${slug}/dashboard`}
-                    className="btn btn-sm bg-primary-600 text-white hover:bg-primary-700 flex items-center gap-2"
-                  >
-                    <LayoutDashboard className="h-4 w-4" />
-                    Event Dashboard
-                  </Link>
-                  <button
-                    onClick={handleLogout}
-                    className="btn btn-sm bg-white text-gray-700 hover:bg-gray-100 flex items-center gap-2"
-                  >
-                    <LogOut className="h-4 w-4" />
-                    Logout
-                  </button>
+                  <div className="flex gap-2 w-full sm:w-auto">
+                    <Link
+                      to={`/microsite/${slug}/dashboard`}
+                      className="btn btn-sm bg-primary-600 text-white hover:bg-primary-700 flex items-center justify-center gap-1 sm:gap-2 flex-1 sm:flex-initial text-xs sm:text-sm"
+                    >
+                      <LayoutDashboard className="h-4 w-4" />
+                      <span className="hidden sm:inline">Event Dashboard</span>
+                      <span className="sm:hidden">Dashboard</span>
+                    </Link>
+                    <button
+                      onClick={handleLogout}
+                      className="btn btn-sm bg-white text-gray-700 hover:bg-gray-100 flex items-center justify-center gap-1 sm:gap-2 flex-1 sm:flex-initial text-xs sm:text-sm"
+                    >
+                      <LogOut className="h-4 w-4" />
+                      <span className="hidden sm:inline">Logout</span>
+                      <span className="sm:hidden">Out</span>
+                    </button>
+                  </div>
                 </div>
               </div>
             ) : (
-              <div className="flex gap-2">
+              <div className="flex gap-2 w-full sm:w-auto">
                 <button
                   onClick={() => {
                     setAuthMode('login');
                     setShowAuthModal(true);
                   }}
-                  className="btn btn-sm bg-white text-gray-700 hover:bg-gray-100 flex items-center gap-2 shadow-lg"
+                  className="btn btn-sm bg-white text-gray-700 hover:bg-gray-100 flex items-center justify-center gap-2 shadow-lg flex-1 sm:flex-initial"
                 >
                   <LogIn className="h-4 w-4" />
                   Login
@@ -324,7 +328,7 @@ export const MicrositePage = () => {
                     setAuthMode('register');
                     setShowAuthModal(true);
                   }}
-                  className="btn btn-sm bg-primary-600 text-white hover:bg-primary-700 flex items-center gap-2 shadow-lg"
+                  className="btn btn-sm bg-primary-600 text-white hover:bg-primary-700 flex items-center justify-center gap-2 shadow-lg flex-1 sm:flex-initial"
                 >
                   <UserPlus className="h-4 w-4" />
                   Register
@@ -333,39 +337,40 @@ export const MicrositePage = () => {
             )}
           </div>
 
-          <div className="ms-reveal">
+          <div className="ms-reveal px-2 sm:px-0">
             {theme.logo && (
-              <img src={theme.logo} alt="Logo" className="h-14 mb-5 drop-shadow" />
+              <img src={theme.logo} alt="Logo" className="h-10 sm:h-14 mb-4 sm:mb-5 drop-shadow" />
             )}
             <div className="flex flex-wrap gap-2 mb-4">
-              <span className="ms-pill">
-                <Calendar className="h-4 w-4" />
-                {formatDate(event.startDate)} to {formatDate(event.endDate)}
+              <span className="ms-pill text-xs sm:text-sm bg-white/90 text-gray-800 font-semibold backdrop-blur-sm">
+                <Calendar className="h-3 w-3 sm:h-4 sm:w-4" />
+                <span className="hidden sm:inline">{formatDate(event.startDate)} to {formatDate(event.endDate)}</span>
+                <span className="sm:hidden">{new Date(event.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - {new Date(event.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
               </span>
-              <span className="ms-pill">
-                <MapPin className="h-4 w-4" />
+              <span className="ms-pill text-xs sm:text-sm bg-white/90 text-gray-800 font-semibold backdrop-blur-sm">
+                <MapPin className="h-3 w-3 sm:h-4 sm:w-4" />
                 {event.location?.city || event.location?.venue || 'Location TBD'}
               </span>
-              <span className="ms-pill">
-                <Users className="h-4 w-4" />
+              <span className="ms-pill text-xs sm:text-sm bg-white/90 text-gray-800 font-semibold backdrop-blur-sm">
+                <Users className="h-3 w-3 sm:h-4 sm:w-4" />
                 {event.expectedGuests} guests
               </span>
             </div>
-            <h1 className="ms-hero-title text-white mb-3">{event.name}</h1>
-            <p className="ms-hero-subtitle max-w-2xl">{event.description}</p>
-            <div className="ms-hero-meta">
-              <span className="ms-pill">Event type: {event.type}</span>
-              <span className="ms-pill">Booking deadline: {formatDate(event.bookingDeadline)}</span>
+            <h1 className="ms-hero-title text-white mb-3 text-2xl sm:text-3xl md:text-4xl font-bold drop-shadow-lg">{event.name}</h1>
+            <p className="ms-hero-subtitle max-w-2xl text-sm sm:text-base text-white/95 leading-relaxed drop-shadow-md">{event.description}</p>
+            <div className="ms-hero-meta flex-col sm:flex-row gap-2">
+              <span className="ms-pill text-xs sm:text-sm bg-white/20 backdrop-blur-sm text-white font-semibold">Event type: {event.type}</span>
+              <span className="ms-pill text-xs sm:text-sm bg-white/20 backdrop-blur-sm text-white font-semibold">Booking deadline: {formatDate(event.bookingDeadline)}</span>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="ms-container py-12">
+      <div className="ms-container py-6 sm:py-8 md:py-12 px-4 sm:px-6 lg:px-8">
         {/* Private Event Notice - Show for private events */}
         {event.isPrivate && (
-          <div className="card ms-alert mb-8 bg-purple-50 border-2 border-purple-200">
-            <div className="flex items-start gap-4">
+          <div className="card ms-alert mb-6 sm:mb-8 bg-purple-50 border-2 border-purple-200">
+            <div className="flex flex-col sm:flex-row items-start gap-3 sm:gap-4">
               <div className="flex-shrink-0">
                 <div className="bg-purple-100 p-3 rounded-lg">
                   <Lock className="h-6 w-6 text-purple-600" />
@@ -387,8 +392,8 @@ export const MicrositePage = () => {
         )}
 
         {/* Event Details */}
-        <div className="grid md:grid-cols-3 gap-6 mb-12">
-          <div className="card flex items-start gap-4 ms-reveal">
+        <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6 mb-8 sm:mb-12">
+          <div className="card flex items-start gap-3 sm:gap-4 ms-reveal">
             <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary-100">
               <Calendar className="h-6 w-6 text-primary-600" />
             </div>
@@ -398,7 +403,7 @@ export const MicrositePage = () => {
             </div>
           </div>
 
-          <div className="card flex items-start gap-4 ms-reveal ms-reveal--delay">
+          <div className="card flex items-start gap-3 sm:gap-4 ms-reveal ms-reveal--delay">
             <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary-100">
               <MapPin className="h-6 w-6 text-primary-600" />
             </div>
@@ -409,7 +414,7 @@ export const MicrositePage = () => {
             </div>
           </div>
 
-          <div className="card flex items-start gap-4 ms-reveal ms-reveal--delay">
+          <div className="card flex items-start gap-3 sm:gap-4 ms-reveal ms-reveal--delay">
             <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary-100">
               <Users className="h-6 w-6 text-primary-600" />
             </div>
@@ -421,7 +426,7 @@ export const MicrositePage = () => {
         </div>
 
         {/* Important Dates */}
-        <div className="card ms-alert mb-12 bg-amber-50 border-amber-200">
+        <div className="card ms-alert mb-8 sm:mb-12 bg-amber-50 border-amber-200">
           <div className="flex items-center gap-3">
             <Calendar className="h-6 w-6 text-amber-600" />
             <div>
@@ -445,16 +450,16 @@ export const MicrositePage = () => {
             const hasDeparture = departure?.flightDetails?.airline;
 
             return (
-              <div className="rounded-2xl bg-gradient-to-br from-emerald-700 via-green-700 to-teal-800 text-white shadow-2xl p-8 ms-reveal border-2 border-emerald-500">
-                <div className="mb-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-3">
-                      <div className="bg-white p-3 rounded-xl shadow-lg">
-                        <CheckCircle className="h-8 w-8 text-green-600" />
+              <div className="rounded-2xl bg-gradient-to-br from-emerald-700 via-green-700 to-teal-800 text-white shadow-2xl p-4 sm:p-6 md:p-8 ms-reveal border-2 border-emerald-500">
+                <div className="mb-4 sm:mb-6">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0 mb-4">
+                    <div className="flex items-center gap-2 sm:gap-3">
+                      <div className="bg-white p-2 sm:p-3 rounded-xl shadow-lg">
+                        <CheckCircle className="h-6 w-6 sm:h-8 sm:w-8 text-green-600" />
                       </div>
                       <div>
-                        <h3 className="text-3xl font-bold text-white drop-shadow-lg">Your Flight Booking</h3>
-                        <p className="text-white text-base font-bold mt-1">Booking ID: <span className="font-mono bg-emerald-900/50 px-3 py-1 rounded-md">{latestBooking.bookingId}</span></p>
+                        <h3 className="text-xl sm:text-2xl md:text-3xl font-bold text-white drop-shadow-lg">Your Flight Booking</h3>
+                        <p className="text-white text-xs sm:text-sm md:text-base font-bold mt-1">Booking ID: <span className="font-mono bg-emerald-900/50 px-2 sm:px-3 py-1 rounded-md text-xs sm:text-sm">{latestBooking.bookingId}</span></p>
                       </div>
                     </div>
                     <span className={`px-4 py-2 rounded-full text-sm font-bold shadow-md ${
@@ -471,9 +476,9 @@ export const MicrositePage = () => {
                 </div>
 
                 {/* Flight Details */}
-                <div className="space-y-4">
+                <div className="space-y-3 sm:space-y-4">
                   {hasArrival && (
-                    <div className="bg-white rounded-xl p-6 shadow-xl border-2 border-gray-200">
+                    <div className="bg-white rounded-xl p-4 sm:p-6 shadow-xl border-2 border-gray-200">
                       <div className="flex items-center gap-2 mb-4 pb-3 border-b-2 border-gray-200">
                         <div className="bg-blue-600 p-2 rounded-lg">
                           <Plane className="h-5 w-5 text-white" />
@@ -488,45 +493,46 @@ export const MicrositePage = () => {
                           </span>
                         )}
                       </div>
-                      <div className="mb-4">
-                        <p className="font-bold text-2xl text-gray-900">{arrival.flightDetails.airline}</p>
-                        <p className="text-base text-gray-700 font-semibold">
+                      <div className="mb-3 sm:mb-4">
+                        <p className="font-bold text-lg sm:text-xl md:text-2xl text-gray-900">{arrival.flightDetails.airline}</p>
+                        <p className="text-sm sm:text-base text-gray-700 font-semibold">
                           {arrival.flightDetails.airlineCode} {arrival.flightDetails.flightNumber}
                         </p>
                       </div>
                       <div className="flex items-center justify-between">
                         <div className="flex-1">
-                          <p className="text-xs font-bold text-gray-600 uppercase mb-2">From</p>
-                          <p className="font-bold text-xl text-gray-900">{arrival.flightDetails.origin}</p>
-                          <p className="text-lg font-bold text-blue-600 mt-1">{formatTime(arrival.flightDetails.departureTime)}</p>
-                          <p className="text-sm text-gray-600 font-medium">{formatDate(arrival.flightDetails.departureTime)}</p>
+                          <p className="text-xs font-bold text-gray-600 uppercase mb-1 sm:mb-2">From</p>
+                          <p className="font-bold text-base sm:text-lg md:text-xl text-gray-900">{arrival.flightDetails.origin}</p>
+                          <p className="text-sm sm:text-base md:text-lg font-bold text-blue-600 mt-1">{formatTime(arrival.flightDetails.departureTime)}</p>
+                          <p className="text-xs sm:text-sm text-gray-600 font-medium hidden sm:block">{formatDate(arrival.flightDetails.departureTime)}</p>
                         </div>
-                        <div className="flex flex-col items-center px-4">
-                          <ArrowRight className="h-7 w-7 text-gray-500 mb-2" />
-                          <div className="flex items-center gap-1 text-sm text-gray-700 bg-gray-200 px-3 py-1.5 rounded-full font-semibold">
-                            <Clock className="h-4 w-4" />
-                            <span>{formatDuration(arrival.flightDetails.duration)}</span>
+                        <div className="flex flex-col items-center px-2 sm:px-4">
+                          <ArrowRight className="h-5 w-5 sm:h-6 sm:w-6 md:h-7 md:w-7 text-gray-500 mb-1 sm:mb-2" />
+                          <div className="flex items-center gap-1 text-xs sm:text-sm text-gray-700 bg-gray-200 px-2 sm:px-3 py-1 sm:py-1.5 rounded-full font-semibold">
+                            <Clock className="h-3 w-3 sm:h-4 sm:w-4" />
+                            <span className="hidden sm:inline">{formatDuration(arrival.flightDetails.duration)}</span>
+                            <span className="sm:hidden">{Math.floor(arrival.flightDetails.duration / 60)}h</span>
                           </div>
                         </div>
                         <div className="flex-1 text-right">
-                          <p className="text-xs font-bold text-gray-600 uppercase mb-2">To</p>
-                          <p className="font-bold text-xl text-gray-900">{arrival.flightDetails.destination}</p>
-                          <p className="text-lg font-bold text-green-600 mt-1">{formatTime(arrival.flightDetails.arrivalTime)}</p>
-                          <p className="text-sm text-gray-600 font-medium">{formatDate(arrival.flightDetails.arrivalTime)}</p>
+                          <p className="text-xs font-bold text-gray-600 uppercase mb-1 sm:mb-2">To</p>
+                          <p className="font-bold text-base sm:text-lg md:text-xl text-gray-900">{arrival.flightDetails.destination}</p>
+                          <p className="text-sm sm:text-base md:text-lg font-bold text-green-600 mt-1">{formatTime(arrival.flightDetails.arrivalTime)}</p>
+                          <p className="text-xs sm:text-sm text-gray-600 font-medium hidden sm:block">{formatDate(arrival.flightDetails.arrivalTime)}</p>
                         </div>
                       </div>
                     </div>
                   )}
 
                   {hasDeparture && (
-                    <div className="bg-white rounded-xl p-6 shadow-xl border-2 border-gray-200">
-                      <div className="flex items-center gap-2 mb-4 pb-3 border-b-2 border-gray-200">
+                    <div className="bg-white rounded-xl p-4 sm:p-6 shadow-xl border-2 border-gray-200">
+                      <div className="flex items-center gap-2 mb-3 sm:mb-4 pb-2 sm:pb-3 border-b-2 border-gray-200">
                         <div className="bg-orange-600 p-2 rounded-lg">
                           <Plane className="h-5 w-5 text-white rotate-180" />
                         </div>
                         <div className="flex-1">
-                          <p className="font-bold text-xl text-gray-900">Departure Flight</p>
-                          <p className="text-sm text-gray-600 font-medium">Return Journey</p>
+                          <p className="font-bold text-base sm:text-lg md:text-xl text-gray-900">Departure Flight</p>
+                          <p className="text-xs sm:text-sm text-gray-600 font-medium">Return Journey</p>
                         </div>
                         {departure.flightDetails.stops === 0 && (
                           <span className="px-4 py-1.5 bg-green-600 text-white text-sm font-bold rounded-full shadow-md">
@@ -534,55 +540,56 @@ export const MicrositePage = () => {
                           </span>
                         )}
                       </div>
-                      <div className="mb-4">
-                        <p className="font-bold text-2xl text-gray-900">{departure.flightDetails.airline}</p>
-                        <p className="text-base text-gray-700 font-semibold">
+                      <div className="mb-3 sm:mb-4">
+                        <p className="font-bold text-lg sm:text-xl md:text-2xl text-gray-900">{departure.flightDetails.airline}</p>
+                        <p className="text-sm sm:text-base text-gray-700 font-semibold">
                           {departure.flightDetails.airlineCode} {departure.flightDetails.flightNumber}
                         </p>
                       </div>
                       <div className="flex items-center justify-between">
                         <div className="flex-1">
-                          <p className="text-xs font-bold text-gray-600 uppercase mb-2">From</p>
-                          <p className="font-bold text-xl text-gray-900">{departure.flightDetails.origin}</p>
-                          <p className="text-lg font-bold text-orange-600 mt-1">{formatTime(departure.flightDetails.departureTime)}</p>
-                          <p className="text-sm text-gray-600 font-medium">{formatDate(departure.flightDetails.departureTime)}</p>
+                          <p className="text-xs font-bold text-gray-600 uppercase mb-1 sm:mb-2">From</p>
+                          <p className="font-bold text-base sm:text-lg md:text-xl text-gray-900">{departure.flightDetails.origin}</p>
+                          <p className="text-sm sm:text-base md:text-lg font-bold text-orange-600 mt-1">{formatTime(departure.flightDetails.departureTime)}</p>
+                          <p className="text-xs sm:text-sm text-gray-600 font-medium hidden sm:block">{formatDate(departure.flightDetails.departureTime)}</p>
                         </div>
-                        <div className="flex flex-col items-center px-4">
-                          <ArrowRight className="h-7 w-7 text-gray-500 mb-2" />
-                          <div className="flex items-center gap-1 text-sm text-gray-700 bg-gray-200 px-3 py-1.5 rounded-full font-semibold">
-                            <Clock className="h-4 w-4" />
-                            <span>{formatDuration(departure.flightDetails.duration)}</span>
+                        <div className="flex flex-col items-center px-2 sm:px-4">
+                          <ArrowRight className="h-5 w-5 sm:h-6 sm:w-6 md:h-7 md:w-7 text-gray-500 mb-1 sm:mb-2" />
+                          <div className="flex items-center gap-1 text-xs sm:text-sm text-gray-700 bg-gray-200 px-2 sm:px-3 py-1 sm:py-1.5 rounded-full font-semibold">
+                            <Clock className="h-3 w-3 sm:h-4 sm:w-4" />
+                            <span className="hidden sm:inline">{formatDuration(departure.flightDetails.duration)}</span>
+                            <span className="sm:hidden">{Math.floor(departure.flightDetails.duration / 60)}h</span>
                           </div>
                         </div>
                         <div className="flex-1 text-right">
-                          <p className="text-xs font-bold text-gray-600 uppercase mb-2">To</p>
-                          <p className="font-bold text-xl text-gray-900">{departure.flightDetails.destination}</p>
-                          <p className="text-lg font-bold text-green-600 mt-1">{formatTime(departure.flightDetails.arrivalTime)}</p>
-                          <p className="text-sm text-gray-600 font-medium">{formatDate(departure.flightDetails.arrivalTime)}</p>
+                          <p className="text-xs font-bold text-gray-600 uppercase mb-1 sm:mb-2">To</p>
+                          <p className="font-bold text-base sm:text-lg md:text-xl text-gray-900">{departure.flightDetails.destination}</p>
+                          <p className="text-sm sm:text-base md:text-lg font-bold text-green-600 mt-1">{formatTime(departure.flightDetails.arrivalTime)}</p>
+                          <p className="text-xs sm:text-sm text-gray-600 font-medium hidden sm:block">{formatDate(departure.flightDetails.arrivalTime)}</p>
                         </div>
                       </div>
                     </div>
                   )}
 
                   {/* Booking Summary */}
-                  <div className="bg-white rounded-xl p-6 shadow-xl border-2 border-gray-200">
-                    <div className="grid grid-cols-2 gap-6">
-                      <div className="flex items-center gap-4">
-                        <div className="bg-purple-600 p-3 rounded-xl">
-                          <Users className="h-6 w-6 text-white" />
+                  <div className="bg-white rounded-xl p-4 sm:p-6 shadow-xl border-2 border-gray-200">
+                    <div className="grid grid-cols-2 gap-3 sm:gap-6">
+                      <div className="flex items-center gap-2 sm:gap-4">
+                        <div className="bg-purple-600 p-2 sm:p-3 rounded-xl">
+                          <Users className="h-4 w-4 sm:h-6 sm:w-6 text-white" />
                         </div>
                         <div>
-                          <p className="text-sm text-gray-600 font-bold uppercase">Passengers</p>
-                          <p className="text-3xl font-bold text-gray-900">{latestBooking.passengers?.length || 0}</p>
+                          <p className="text-xs sm:text-sm text-gray-600 font-bold uppercase">Passengers</p>
+                          <p className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900">{latestBooking.passengers?.length || 0}</p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-4">
-                        <div className="bg-green-600 p-3 rounded-xl">
-                          <CreditCard className="h-6 w-6 text-white" />
+                      <div className="flex items-center gap-2 sm:gap-4">
+                        <div className="bg-green-600 p-2 sm:p-3 rounded-xl">
+                          <CreditCard className="h-4 w-4 sm:h-6 sm:w-6 text-white" />
                         </div>
                         <div>
-                          <p className="text-sm text-gray-600 font-bold uppercase">Total Amount</p>
-                          <p className="text-3xl font-bold text-green-600">{formatCurrency(latestBooking.pricing?.totalAmount || 0)}</p>
+                          <p className="text-xs sm:text-sm text-gray-600 font-bold uppercase">Total Amount</p>
+                          <p className="text-xl sm:text-2xl md:text-3xl font-bold text-green-600">{formatCurrency(latestBooking.pricing?.totalAmount || 0)}</p>
                         </div>
                       </div>
                     </div>
@@ -603,10 +610,11 @@ export const MicrositePage = () => {
                   {/* View Details Link */}
                   <Link
                     to={`/microsite/${slug}/book-flights`}
-                    className="w-full flex items-center justify-center gap-3 px-8 py-5 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-xl hover:from-green-700 hover:to-emerald-700 hover:shadow-2xl font-bold text-xl shadow-xl transition-all transform hover:scale-[1.02]"
+                    className="w-full flex items-center justify-center gap-2 sm:gap-3 px-4 sm:px-6 md:px-8 py-3 sm:py-4 md:py-5 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-xl hover:from-green-700 hover:to-emerald-700 hover:shadow-2xl font-bold text-sm sm:text-base md:text-xl shadow-xl transition-all transform hover:scale-[1.02]"
                   >
-                    View Complete Flight Details
-                    <ChevronRight className="h-7 w-7" />
+                    <span className="hidden sm:inline">View Complete Flight Details</span>
+                    <span className="sm:hidden">View Flight Details</span>
+                    <ChevronRight className="h-5 w-5 sm:h-6 sm:w-6 md:h-7 md:w-7" />
                   </Link>
                 </div>
               </div>
@@ -614,63 +622,64 @@ export const MicrositePage = () => {
           } else {
             // Show booking CTA
             return (
-              <div className="card bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-700 text-white shadow-2xl ms-reveal border-2 border-blue-400/30 relative overflow-hidden">
+              <div className="card bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-700 text-white shadow-2xl ms-reveal border-2 border-blue-400/30 relative overflow-hidden p-4 sm:p-6">
                 {/* Decorative elements */}
-                <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -mr-32 -mt-32"></div>
-                <div className="absolute bottom-0 left-0 w-48 h-48 bg-white/5 rounded-full -ml-24 -mb-24"></div>
+                <div className="absolute top-0 right-0 w-32 h-32 sm:w-64 sm:h-64 bg-white/5 rounded-full -mr-16 sm:-mr-32 -mt-16 sm:-mt-32"></div>
+                <div className="absolute bottom-0 left-0 w-24 h-24 sm:w-48 sm:h-48 bg-white/5 rounded-full -ml-12 sm:-ml-24 -mb-12 sm:-mb-24"></div>
                 
                 <div className="relative z-10">
-                  <div className="flex items-start gap-4 mb-6">
-                    <div className="bg-white p-4 rounded-2xl shadow-xl">
-                      <Plane className="h-10 w-10 text-blue-600" />
+                  <div className="flex flex-col sm:flex-row items-start gap-3 sm:gap-4 mb-4 sm:mb-6">
+                    <div className="bg-white p-3 sm:p-4 rounded-2xl shadow-xl">
+                      <Plane className="h-8 w-8 sm:h-10 sm:w-10 text-blue-600" />
                     </div>
                     <div className="flex-1">
-                      <h3 className="text-3xl font-bold mb-2 drop-shadow-sm">Flights Available for You!</h3>
-                      <p className="text-white text-lg font-semibold">We've configured flight options for your location group</p>
+                      <h3 className="text-xl sm:text-2xl md:text-3xl font-bold mb-2 drop-shadow-sm">Flights Available for You!</h3>
+                      <p className="text-white text-sm sm:text-base md:text-lg font-semibold">We've configured flight options for your location group</p>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                    <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20">
-                      <div className="flex items-center gap-2 mb-3">
-                        <MapPin className="h-5 w-5 text-white" />
-                        <p className="text-sm font-bold text-white uppercase tracking-wide">Your Location</p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 mb-4 sm:mb-6">
+                    <div className="bg-white/10 backdrop-blur-sm rounded-xl p-3 sm:p-4 border border-white/20">
+                      <div className="flex items-center gap-2 mb-2 sm:mb-3">
+                        <MapPin className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
+                        <p className="text-xs sm:text-sm font-bold text-white uppercase tracking-wide">Your Location</p>
                       </div>
-                      <p className="text-2xl font-bold mb-1">{flightData.locationGroup}</p>
-                      <p className="text-base text-white font-semibold">Airport: {flightData.origin}</p>
+                      <p className="text-lg sm:text-xl md:text-2xl font-bold mb-1">{flightData.locationGroup}</p>
+                      <p className="text-sm sm:text-base text-white font-semibold">Airport: {flightData.origin}</p>
                     </div>
-                    <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20">
-                      <div className="flex items-center gap-2 mb-3">
-                        <MapPin className="h-5 w-5 text-white" />
-                        <p className="text-sm font-bold text-white uppercase tracking-wide">Event Location</p>
+                    <div className="bg-white/10 backdrop-blur-sm rounded-xl p-3 sm:p-4 border border-white/20">
+                      <div className="flex items-center gap-2 mb-2 sm:mb-3">
+                        <MapPin className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
+                        <p className="text-xs sm:text-sm font-bold text-white uppercase tracking-wide">Event Location</p>
                       </div>
-                      <p className="text-2xl font-bold mb-1">{event.location?.city}</p>
-                      <p className="text-base text-white font-semibold">Airport: {flightData.destination}</p>
+                      <p className="text-lg sm:text-xl md:text-2xl font-bold mb-1">{event.location?.city}</p>
+                      <p className="text-sm sm:text-base text-white font-semibold">Airport: {flightData.destination}</p>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4 mb-6">
-                    <div className="bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl p-5 shadow-lg">
-                      <Plane className="h-6 w-6 mb-2 text-white/80" />
-                      <p className="text-sm font-medium text-white/90 mb-1">Arrival Options</p>
-                      <p className="text-4xl font-bold">{flightData.arrivalFlights?.length || 0}</p>
+                  <div className="grid grid-cols-2 gap-3 sm:gap-4 mb-4 sm:mb-6">
+                    <div className="bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl p-3 sm:p-4 md:p-5 shadow-lg">
+                      <Plane className="h-5 w-5 sm:h-6 sm:w-6 mb-2 text-white/80" />
+                      <p className="text-xs sm:text-sm font-medium text-white/90 mb-1">Arrival Options</p>
+                      <p className="text-2xl sm:text-3xl md:text-4xl font-bold">{flightData.arrivalFlights?.length || 0}</p>
                       <p className="text-xs text-white/80 mt-1">flights available</p>
                     </div>
-                    <div className="bg-gradient-to-br from-orange-500 to-red-600 rounded-xl p-5 shadow-lg">
-                      <Plane className="h-6 w-6 mb-2 text-white/80 rotate-180" />
-                      <p className="text-sm font-medium text-white/90 mb-1">Departure Options</p>
-                      <p className="text-4xl font-bold">{flightData.departureFlights?.length || 0}</p>
+                    <div className="bg-gradient-to-br from-orange-500 to-red-600 rounded-xl p-3 sm:p-4 md:p-5 shadow-lg">
+                      <Plane className="h-5 w-5 sm:h-6 sm:w-6 mb-2 text-white/80 rotate-180" />
+                      <p className="text-xs sm:text-sm font-medium text-white/90 mb-1">Departure Options</p>
+                      <p className="text-2xl sm:text-3xl md:text-4xl font-bold">{flightData.departureFlights?.length || 0}</p>
                       <p className="text-xs text-white/80 mt-1">flights available</p>
                     </div>
                   </div>
 
                   <Link
                     to={`/microsite/${slug}/book-flights`}
-                    className="w-full flex items-center justify-center gap-3 px-8 py-5 bg-white text-blue-600 rounded-xl hover:bg-blue-50 hover:shadow-2xl font-bold text-xl shadow-xl transition-all transform hover:scale-[1.02] border-2 border-white"
+                    className="w-full flex items-center justify-center gap-2 sm:gap-3 px-4 sm:px-6 md:px-8 py-3 sm:py-4 md:py-5 bg-white text-blue-600 rounded-xl hover:bg-blue-50 hover:shadow-2xl font-bold text-sm sm:text-base md:text-xl shadow-xl transition-all transform hover:scale-[1.02] border-2 border-white"
                   >
-                    <Plane className="h-6 w-6" />
-                    Book Your Flights Now
-                    <ChevronRight className="h-6 w-6" />
+                    <Plane className="h-5 w-5 sm:h-6 sm:w-6" />
+                    <span className="hidden sm:inline">Book Your Flights Now</span>
+                    <span className="sm:hidden">Book Flights</span>
+                    <ChevronRight className="h-5 w-5 sm:h-6 sm:w-6" />
                   </Link>
                 </div>
               </div>
@@ -765,8 +774,8 @@ export const MicrositePage = () => {
 
                     {/* Room Types */}
                     <div>
-                      <h4 className="font-semibold text-gray-900 mb-4">Available Room Types</h4>
-                      <div className="grid md:grid-cols-3 gap-4">
+                      <h4 className="font-semibold text-gray-900 mb-3 sm:mb-4 text-base sm:text-lg">Available Room Types</h4>
+                      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                         {['singleRoom', 'doubleRoom', 'suite'].map((roomType) => {
                           const room = proposal.pricing[roomType];
                           if (!room || !room.availableRooms || room.availableRooms === 0) return null;
@@ -872,8 +881,8 @@ export const MicrositePage = () => {
         </div>
 
         {/* Organized By */}
-        <div className="card mt-12 bg-gray-100">
-          <div className="flex items-center justify-between">
+        <div className="card mt-8 sm:mt-12 bg-gray-100">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
               <p className="text-sm text-gray-600">Organized by</p>
               <p className="text-lg font-semibold">{event.planner?.name}</p>
@@ -1090,19 +1099,19 @@ const BookingModal = ({ inventory, event, user, onClose, onSuccess }) => {
   const totalPrice = inventory.pricePerNight * formData.numberOfRooms * nights;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="p-6">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-bold">Complete Your Booking</h2>
-            <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
+      <div className="bg-white rounded-xl max-w-2xl w-full max-h-[95vh] sm:max-h-[90vh] overflow-y-auto">
+        <div className="p-4 sm:p-6">
+          <div className="flex items-center justify-between mb-4 sm:mb-6 gap-2">
+            <h2 className="text-lg sm:text-xl md:text-2xl font-bold">Complete Your Booking</h2>
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-600 flex-shrink-0">
               <X className="h-6 w-6" />
             </button>
           </div>
 
-          <div className="card bg-blue-50 mb-6">
-            <h3 className="font-semibold mb-2">{inventory.hotelName}</h3>
-            <p className="text-sm text-gray-600">{inventory.roomType}</p>
+          <div className="card bg-blue-50 mb-4 sm:mb-6">
+            <h3 className="font-semibold mb-2 text-base sm:text-lg">{inventory.hotelName}</h3>
+            <p className="text-xs sm:text-sm text-gray-600">{inventory.roomType}</p>
             {event.isPrivate ? (
               <div className="mt-2 inline-flex items-center gap-2 px-3 py-1 bg-blue-100 rounded-lg">
                 <CheckCircle className="h-4 w-4 text-blue-600" />
@@ -1306,14 +1315,14 @@ const AuthModal = ({ mode, onClose, onSuccess, onSwitchMode }) => {
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
-        <div className="p-6">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-bold">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
+      <div className="bg-white rounded-xl max-w-md w-full max-h-[95vh] sm:max-h-[90vh] overflow-y-auto">
+        <div className="p-4 sm:p-6">
+          <div className="flex items-center justify-between mb-4 sm:mb-6 gap-2">
+            <h2 className="text-lg sm:text-xl md:text-2xl font-bold">
               {mode === 'login' ? 'Login to Book' : 'Create Account'}
             </h2>
-            <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-600 flex-shrink-0">
               <X className="h-6 w-6" />
             </button>
           </div>
