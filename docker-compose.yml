@@ -21,8 +21,8 @@ services:
       context: ./client
       dockerfile: Dockerfile
       args:
-        - VITE_API_URL=http://31.97.236.171:5001/api
-        - VITE_SOCKET_URL=http://31.97.236.171:5001
+        - VITE_API_URL=https://ssapi.fedkiit.com/api
+        - VITE_SOCKET_URL=https://ssapi.fedkiit.com
         - VITE_RAZORPAY_KEY_ID=rzp_test_SHTHhd0ibiOnrO
     container_name: syncstay-frontend
     restart: unless-stopped
