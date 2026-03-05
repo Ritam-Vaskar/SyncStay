@@ -124,6 +124,13 @@ const userSchema = new mongoose.Schema(
       default: 0,
     },
     images: [String],
+    // Telegram integration
+    telegramId: {
+      type: String,
+      default: null,
+      index: true,
+      sparse: true,
+    },
   },
   {
     timestamps: true,
