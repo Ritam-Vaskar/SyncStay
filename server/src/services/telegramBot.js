@@ -6,10 +6,17 @@ let bot = null;
 
 /**
  * Initialize the Telegram bot instance.
- * - Development (no SERVER_URL): uses polling mode
- * - Production (SERVER_URL set):  uses webhook mode
+ * - Production: webhook mode (bot just listens, webhook must be set manually via curl)
+ * - Development: only starts if TELEGRAM_BOT_POLLING=true is set in .env
+ *
+ * To register the webhook for production, run:
+ *   curl -F "url=https://ssapi.fedkiit.com/api/telegram/webhook" \
+ *        https://api.telegram.org/bot<TOKEN>/setWebhook
+ *
+ * To remove the webhook:
+ *   curl https://api.telegram.org/bot<TOKEN>/deleteWebhook
  */
-export const initTelegramBot = async () => {
+export const initTelegramBot = () => {
   const token = config.telegramBotToken;
 
   if (!token) {
@@ -17,23 +24,22 @@ export const initTelegramBot = async () => {
     return null;
   }
 
-  const useWebhook = config.env === 'production' && config.serverUrl;
+  const isProduction = config.env === 'production';
+  const enablePolling = process.env.TELEGRAM_BOT_POLLING === 'true';
 
-  if (useWebhook) {
-    // Webhook mode — Telegram pushes updates to our /api/telegram/webhook
-    bot = new TelegramBot(token, { webHook: false });  // we handle the express route ourselves
-
-    const webhookUrl = `${config.serverUrl}/api/telegram/webhook`;
-    try {
-      await bot.setWebHook(webhookUrl);
-      console.log(`🤖 Telegram bot initialized (webhook → ${webhookUrl})`);
-    } catch (err) {
-      console.error('❌ Failed to set Telegram webhook:', err.message);
-    }
-  } else {
-    // Polling mode — bot pulls updates (ideal for local dev)
+  if (isProduction) {
+    // Webhook mode — no polling, no auto setWebhook
+    // Telegram pushes updates to POST /api/telegram/webhook
+    // You must manually register the webhook once via curl (see above)
+    bot = new TelegramBot(token, { webHook: false });
+    console.log('🤖 Telegram bot initialized (webhook mode — waiting for updates)');
+  } else if (enablePolling) {
+    // Local dev — opt-in polling mode (only when explicitly enabled)
     bot = new TelegramBot(token, { polling: true });
-    console.log('🤖 Telegram bot initialized (polling mode)');
+    console.log('🤖 Telegram bot initialized (polling mode — local dev)');
+  } else {
+    console.log('ℹ️  Telegram bot skipped in dev (set TELEGRAM_BOT_POLLING=true to enable locally)');
+    return null;
   }
 
   // ── /start ─────────────────────────────────────────────────────────
