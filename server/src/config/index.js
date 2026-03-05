@@ -28,4 +28,6 @@ export default {
     keySecret: process.env.RAZORPAY_KEY_SECRET,
   },
   mlServerUrl: process.env.ML_SERVER_URL || 'http://localhost:8020',
+  telegramBotToken: process.env.TELEGRAM_BOT_TOKEN || '',
+  serverUrl: process.env.SERVER_URL || '',  // e.g. https://your-domain.com
 };

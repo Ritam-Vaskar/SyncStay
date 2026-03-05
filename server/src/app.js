@@ -26,13 +26,18 @@ import activityRoutes from './routes/activityRoutes.js';
 import recommendationRoutes from './routes/recommendationRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 import flightRoutes from './routes/flightRoutes.js';
+import telegramRoutes from './routes/telegramRoutes.js';
+import { initTelegramBot } from './services/telegramBot.js';
 
 // Initialize Express app
 const app = express();
 const server = createServer(app);
 
-// Connect to Database & seed admin
-connectDB().then(() => seedAdmin());
+// Connect to Database & seed admin, then start Telegram bot
+connectDB().then(async () => {
+  await seedAdmin();
+  initTelegramBot();
+});
 
 // Initialize Socket.io
 const io = initSocket(server);
@@ -118,6 +123,7 @@ app.use('/api/activity', activityRoutes);
 app.use('/api/recommendations', recommendationRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/flights', flightRoutes);
+app.use('/api/telegram', telegramRoutes);
 
 // Root Route
 app.get('/', (req, res) => {
